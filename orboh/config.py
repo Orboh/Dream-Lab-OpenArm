@@ -45,8 +45,25 @@ class DiscoveryConfig(BaseModel):
     motion_amplitude: float = 0.6
 
 
+class PerceptionConfig(BaseModel):
+    """Classical block finder on the depth camera (orboh/perception/block_finder.py)."""
+
+    roi: list[int] = Field(default_factory=lambda: [0, 290, 640, 480])  # x0, y0, x1, y1 in colour pixels: the carpet only
+    min_height_mm: float = 15  # above the fitted table plane
+    max_height_mm: float = 130
+    plane_tol_mm: float = 6  # RANSAC inlier distance
+    min_pixels: int = 250
+    footprint_range_mm: list[float] = Field(default_factory=lambda: [25, 130])  # sane object sizes; outside = rejected
+    height_range_mm: list[float] = Field(default_factory=lambda: [20, 110])
+    match_tol_mm: float = 14
+    # Known pieces (Kitakyushu wood-L1 scene): footprint sides (mm, sorted) and height; lying variants listed separately.
+    pieces: dict[str, list[float]] = Field(default_factory=lambda: {
+        "cube": [47, 47, 47], "cylinder_standing": [46, 46, 98], "cylinder_lying": [46, 98, 46]})
+
+
 class CamerasConfig(BaseModel):
     expected_roles: list[str] = Field(default_factory=lambda: ["center", "right_wrist"])
+    depth_roles: list[str] = Field(default_factory=list)  # roles that also stream depth (needed by `pick`)
     width: int = 640
     height: int = 480
     fps: int = 30
@@ -104,6 +121,8 @@ class RecordingConfig(BaseModel):
 class SimConfig(BaseModel):
     engine: Literal["mujoco"] = "mujoco"
     scene: str = "pedestal/move_puck_scene.xml"
+    torso_tolerance_m: float = 0.0  # arm-vs-torso overlap allowed (model is stricter than reality); 0 = strict
+    table_drop_m: float = 0.0  # lower the twin's table by this much (twin vs real table height; see work/07)
 
 
 class SafetyConfig(BaseModel):
@@ -120,6 +139,7 @@ class SafetyConfig(BaseModel):
     allow_finger_env_contact: bool = True
     require_sim_pass: bool = True
     require_manual_approval: bool = True
+    conform_plan: bool = True  # slew-limit + clip every plan to the limits before the checks (a leader demo is jerky)
 
 
 class WebConfig(BaseModel):
@@ -133,6 +153,7 @@ class Config(BaseModel):
     cameras: CamerasConfig = Field(default_factory=CamerasConfig)
     dreamlab: DreamLabConfig = Field(default_factory=DreamLabConfig)
     policy: PolicyConfig = Field(default_factory=PolicyConfig)
+    perception: PerceptionConfig = Field(default_factory=PerceptionConfig)
     demos: DemosConfig = Field(default_factory=DemosConfig)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     sim: SimConfig = Field(default_factory=SimConfig)

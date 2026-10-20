@@ -37,19 +37,25 @@
 | `watchdog_s` | 0.25 | one control iteration must finish within this |
 | `allow_finger_env_contact` | true | gripper touching the table is a warning, not a failure |
 | `require_sim_pass` / `require_manual_approval` | true / true | execution gates (keep on) |
+| `sim.table_drop_m` | 0.075 | lowers the twin's table by this many metres = how much higher the real arms stand than the twin assumes (estimated from a real demo; see [07](07-simulation.md)) |
+| `sim.torso_tolerance_m` | 0.02 | arm-vs-torso overlap allowed in the check (twin's torso mesh is stricter than reality); table etc. stay strict |
+| `conform_plan` | true | slew-limit + clip every plan to the limits before the checks; logs the max deviation (`plan.meta.conformed_max_deviation_rad`) |
 
 ## VERIFY checklist
 
 Each line marked `VERIFY` in the YAML is an assumption, not yet confirmed on hardware:
 
-- [ ] `robot.lerobot.robot_type`: the name registered in the Orboh fork
-- [ ] `robot.lerobot.robot_kwargs`: CAN ports and other config fields
-- [ ] `robot.lerobot.joint_key` / `gripper_key`: observation/action key names
-- [ ] `robot.lerobot.joint_units`: radians or degrees
-- [ ] `robot.lerobot.gripper_closed` / `gripper_open`: raw values at the extremes
+- [x] `robot.lerobot.robot_type`: `bi_openarm_follower` (confirmed in the fork, 2026-10-20)
+- [x] `robot.lerobot.robot_kwargs`: not used by the bridge; CAN ports are `scripts/start_bridge.sh` args (`can_fol_l`, `can_fol_r`)
+- [x] `robot.lerobot.joint_key` / `gripper_key`: `left_joint_1.pos` / `left_gripper.pos` (read from the fork)
+- [x] `robot.lerobot.joint_units`: degrees
+- [x] `robot.lerobot.gripper_closed` / `gripper_open`: `0` / `-65`: direction confirmed from 8 real demos (open = negative, holds the wood at about -32 deg), see [18](18-grasp-planner.md)
 - [ ] `joint_signs` / `joint_offsets`: real vs MuJoCo joint direction and zero (see [07](07-simulation.md#sim-to-real-alignment))
 - [ ] `dreamlab.plan_endpoint` / `health_endpoint`
 - [ ] `recording.command`: path to `collect_bimanual.sh`
+
+New sections: `robot.bridge` (`endpoint`, `timeout_ms`) and `policy` ([14](14-policy.md)); `cameras.pinned_serials`
+now holds the Kitakyushu serials.
 
 Tick each item here and remove its `VERIFY` tag in the YAML once confirmed.
 

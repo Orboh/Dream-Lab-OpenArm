@@ -30,9 +30,17 @@ Everything uses canonical units. `make_robot(cfg)` in `orboh/robot/__init__.py` 
 | Backend | File | Behavior |
 |---|---|---|
 | `sim` | `sim_robot.py` | MuJoCo twin ([07](07-simulation.md)); each `send_joints` advances physics by one control period |
-| `lerobot` | `lerobot_robot.py` | Orboh LeRobot fork, Damiao motors over SocketCAN |
+| `bridge` | `zmq_robot.py` | real arms in a separate process (`scripts/robot_bridge.py`) over ZMQ; **recommended** ([15](15-real-robot.md)) |
+| `lerobot` | `lerobot_robot.py` | Orboh LeRobot fork in-process; needs `lerobot` importable in this venv |
 
-### LeRobot backend
+### Bridge backend
+- `ZmqRobot` (REQ socket, `robot.bridge.endpoint`, `timeout_ms`) sends `ping` / `read` / `send` JSON requests;
+  `JointMapping` converts the fork's degrees to canonical units. A missed reply closes the socket; `connect()` reopens.
+- Why it exists and how to run it: [15](15-real-robot.md).
+
+### LeRobot backend (in-process)
+- The fork's robot takes nested `left_arm_config` / `right_arm_config`; `robot_kwargs` as written for it
+  (`left_arm_port`) does not apply, which is one reason the bridge is preferred.
 - Builds the fork's robot through `RobotConfig.get_choice_class(robot_type)(**robot_kwargs, cameras={})`,
   then calls `make_robot_from_config`.
 - **Cameras are deliberately not given to the robot.** `orboh.cameras` owns the RealSense devices

@@ -37,10 +37,11 @@ In `config/pipeline.yaml`, `robot.backend: sim` uses a MuJoCo twin of the bimanu
 ```bash
 bash scripts/setup_env.sh --robot  # + pyrealsense2 and the Orboh LeRobot fork (~/projects/lerobot)
 # edit .env:  DREAMLAB_API_KEY, DREAMLAB_BASE_URL, ORBOH_WEB_TOKEN
-# edit config/pipeline.yaml: robot.backend: lerobot, then check every line marked VERIFY
-orboh preflight
-orboh discover-cameras --wiggle
-orboh serve                        # reachable from your PC at http://<robot-box>:8000
+# real arms run in a separate process (LeRobot venv): see work/15-real-robot.md for the full new-setup guide
+bash scripts/start_bridge.sh fake  # terminal 1 (use `real` only with CAN up and the e-stop in reach)
+orboh --backend bridge preflight
+orboh --backend bridge run-policy --policy-backend dream --dry-run --prompt "Pick up the wood and place it in the box"
+orboh --backend bridge serve       # reachable from your PC at http://<robot-box>:8000
 ```
 
 ## Console steps
@@ -67,8 +68,8 @@ Arm joints are in radians (MuJoCo OpenArm convention); grippers run from 0 (clos
 
 - **DreamLab API.** Fill in `HttpDreamLabClient._build_payload` / `_parse_response` in
   `orboh/dreamlab/client.py` and the endpoints in config. Nothing else needs to change.
-- **LeRobot fork.** Verify `robot_type`, `robot_kwargs`, key names, units and gripper range
-  (`orboh/robot/lerobot_robot.py`).
+- **Real arms.** Keys, units and `robot_type` are confirmed (work/15-real-robot.md); still verify the gripper open
+  direction and `joint_signs` / `joint_offsets` on hardware.
 - **Sim ↔ real.** The default scene is the stock pedestal + table. Model your real workcell
   (table height and position, fixtures) in an MJCF and point `sim.scene` at it; collision
   checks are only as good as that model. Check that joint signs and the gripper open

@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass
 import numpy as np
 from PIL import Image
 
+from orboh.perception.types import RGBD
+
 
 @dataclass
 class CameraDevice:
@@ -61,14 +63,35 @@ def list_realsense() -> list[CameraDevice]:
 
 
 class RealSenseSource(CameraSource):
-    def __init__(self, device: CameraDevice, width: int, height: int, fps: int):
+    def __init__(self, device: CameraDevice, width: int, height: int, fps: int, depth: bool = False):
         rs = _rs()
         self.device = device
         self._pipe = rs.pipeline()
         cfg = rs.config()
         cfg.enable_device(device.serial)
         cfg.enable_stream(rs.stream.color, width, height, rs.format.rgb8, fps)
-        self._pipe.start(cfg)
+        if depth:
+            cfg.enable_stream(rs.stream.depth, width, height, rs.format.z16, fps)
+        profile = self._pipe.start(cfg)
+        self._align = rs.align(rs.stream.color) if depth else None
+        self._depth_scale = profile.get_device().first_depth_sensor().get_depth_scale() if depth else 0.0
+
+    @property
+    def has_depth(self) -> bool:
+        return self._align is not None
+
+    def read_rgbd(self) -> RGBD | None:
+        """Colour + depth in metres aligned to colour, with the colour intrinsics; None without a depth stream."""
+        if not self.has_depth:
+            return None
+        frames = self._align.process(self._pipe.wait_for_frames(1000))
+        color, depth = frames.get_color_frame(), frames.get_depth_frame()
+        if not color or not depth:
+            return None
+        i = color.profile.as_video_stream_profile().intrinsics
+        return RGBD(np.asanyarray(color.get_data()).copy(),
+                    (np.asanyarray(depth.get_data()) * self._depth_scale).astype(np.float32),
+                    i.fx, i.fy, i.ppx, i.ppy)
 
     def read(self) -> np.ndarray | None:
         frames = self._pipe.poll_for_frames()
@@ -131,6 +154,12 @@ class CameraManager:
             s.close()
         self.sources = {}
         self._jpeg = {}
+
+    def snapshot_rgbd(self, role: str) -> RGBD | None:
+        """A fresh RGB-D frame from a depth-enabled role (None if the role has no depth stream)."""
+        with self._lock:
+            src = self.sources.get(role)
+            return src.read_rgbd() if isinstance(src, RealSenseSource) else None
 
     def snapshot(self, role: str, max_age_s: float = 0.05) -> bytes | None:
         with self._lock:

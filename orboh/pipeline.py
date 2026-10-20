@@ -33,6 +33,7 @@ from orboh.dreamlab.client import DreamLabClient, PlanRequest, make_dreamlab
 from orboh.dreamlab.policy import PolicyError, make_policy
 from orboh.execution.executor import Executor, build_execution_trajectory
 from orboh.execution.policy_runner import PolicyResult, PolicyRunner
+from orboh.execution.slew import slew_limit
 from orboh.robot import make_robot
 from orboh.robot.mapping import JointMapping
 from orboh.safety import CheckResult, SafetyReport, check_trajectory, fingerprint
@@ -54,7 +55,7 @@ class Pipeline:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.robot = make_robot(cfg)
-        self.check_sim = MujocoSim(cfg.sim.scene)  # separate twin used only for checks
+        self.check_sim = MujocoSim(cfg.sim.scene, cfg.sim.table_drop_m, cfg.sim.torso_tolerance_m)  # separate twin used only for checks
         self.lo, self.hi = self.check_sim.limits()
         self.mapping = JointMapping(cfg.robot.lerobot)
         self.cameras = CameraManager()
@@ -184,11 +185,11 @@ class Pipeline:
     def _devices(self) -> list:
         return SIM_DEVICES if self.cfg.robot.backend == "sim" else list_realsense()
 
-    def _make_source(self, device) -> CameraSource:
+    def _make_source(self, device, role: str = "") -> CameraSource:
         if self.cfg.robot.backend == "sim":
             return SimCameraSource(self.robot.sim, device)
         c = self.cfg.cameras
-        return RealSenseSource(device, c.width, c.height, c.fps)
+        return RealSenseSource(device, c.width, c.height, c.fps, depth=role in c.depth_roles)
 
     def _open_cameras(self, assignments: dict[str, str]) -> None:
         by_serial = {d.serial: d for d in self._devices()}
@@ -196,7 +197,7 @@ class Pipeline:
         for role, serial in assignments.items():
             if serial not in by_serial:
                 raise RuntimeError(f"camera {serial} for role {role} not connected")
-            sources[role] = self._make_source(by_serial[serial])
+            sources[role] = self._make_source(by_serial[serial], role)
         self.cameras.open(sources)
 
     def discover_cameras(self, wiggle: bool) -> None:
@@ -307,6 +308,7 @@ class Pipeline:
         self.log(f"calling DreamLab ({self.dreamlab.name}) with demo {episode}, {len(images)} image(s)")
         t0 = time.time()
         self.plan = self.dreamlab.plan(req)
+        self._conform_plan()
         tr = self.plan.trajectory
         self.run_dir = self.cfg.path(self.cfg.runs_dir) / time.strftime(f"%Y%m%d-%H%M%S_ep{episode}")
         self.run_dir.mkdir(parents=True, exist_ok=True)
@@ -315,6 +317,24 @@ class Pipeline:
              "trajectory": tr.to_dict()}))
         self._set_step("plan", "ok", f"{self.plan.source}: {len(tr)} steps, {tr.duration:.1f}s "
                                      f"(took {time.time() - t0:.1f}s)")
+
+    def _conform_plan(self) -> None:
+        """Make the plan respect velocity / acceleration / joint limits, and log how far that moved it.
+
+        A leader demo replayed verbatim is jerky and can touch a limit by a few mrad; the checks would reject
+        it. The result is still a plan: it goes through every check and the approval gate like any other.
+        """
+        if not self.cfg.safety.conform_plan:
+            return
+        tr = self.plan.trajectory
+        q, _ = slew_limit(tr.positions[0], np.zeros(len(tr.positions[0])), tr.positions, tr.hz, self.cfg.safety,
+                          self.lo, self.hi)
+        arm = list(ARM_IDX)
+        dev = float(np.abs(q[:, arm] - tr.positions[:, arm]).max())
+        self.plan.meta["conformed_max_deviation_rad"] = round(dev, 4)
+        self.plan.trajectory = Trajectory(q, tr.hz)
+        self.log(f"plan conformed to limits: max arm-joint deviation from the source {dev:.3f} rad",
+                 "warn" if dev > 0.3 else "info")
 
     # ---------------------------------------------------------------- check
     def check(self, speed_scale: float = 1.0) -> None:

@@ -6,7 +6,7 @@ def make_robot(cfg: Config) -> Robot:
     if cfg.robot.backend == "sim":
         from orboh.robot.sim_robot import SimRobot
 
-        return SimRobot(cfg.sim.scene, cfg.robot.control_hz)
+        return SimRobot(cfg.sim.scene, cfg.robot.control_hz, cfg.sim.table_drop_m, cfg.sim.torso_tolerance_m)
     if cfg.robot.backend == "bridge":
         from orboh.robot.zmq_robot import ZmqRobot
 

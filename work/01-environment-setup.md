@@ -35,8 +35,12 @@ LEROBOT_DIR=~/projects/lerobot bash scripts/setup_env.sh --robot
   `-DBUILD_PYTHON_BINDINGS=ON` and make it importable inside `.venv`.
 - **The Orboh LeRobot fork** (branch `feat/bi-openarm-soft-move-to`), installed as editable from `$LEROBOT_DIR`.
 
-SocketCAN must be up before starting, e.g. `sudo ip link set can0 up type can bitrate 1000000`.
-That command is the team's existing procedure; check the bitrate (and CAN-FD) against their scripts.
+Two interpreters are involved on the robot box: Orboh's `.venv` (Python 3.12, also holds the Dream client
+via `requirements-dream.txt`, which needs 3.11–3.13) and the LeRobot fork's own venv (3.13) that runs the
+robot bridge ([15](15-real-robot.md)). Python 3.10 cannot run the Dream client.
+
+SocketCAN must be up before starting: `sudo bash ~/projects/openarm-orboh/scripts/canup.sh` creates the fixed
+names `can_fol_l`, `can_fol_r` (followers) and `can_lead_l`, `can_lead_r` (leaders).
 
 ## `.env` variables
 
@@ -56,6 +60,10 @@ The loader (`orboh/config.py:load_config`) reads `.env` from the project root. V
 - **`requirements.txt`** pins *every* library (direct and transitive) to the exact version tested.
   `setup_env.sh` installs from it, so every machine gets an identical `.venv`.
 - **`requirements-robot.txt`** holds robot-box-only extras.
+- **`requirements-dream.txt`** holds the Dream client (`bash scripts/setup_env.sh --dream`, heavy: jax, av, boto3).
+
+`pyzmq` (robot bridge client) is in `pyproject.toml` and `requirements.txt`.
+To run pytest on a box with ROS 2 sourced, use `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q` (ROS's pytest plugins break import).
 
 Manual install, without the script:
 ```bash

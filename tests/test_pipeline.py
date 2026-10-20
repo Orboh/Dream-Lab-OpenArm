@@ -218,3 +218,28 @@ def test_web_full_flow_and_gates(client):
     client.post("/api/estop", headers=h)
     s = _wait_idle(client, h)
     assert s["estopped"] and s["execution"] and not s["execution"]["completed"]
+
+
+def test_plan_conform_removes_jerk_and_limit_overshoot(tmp_path):
+    """A jerky leader demo that nudges a limit is smoothed and clipped before the checks."""
+    from orboh.pipeline import Pipeline
+    from orboh.types import Plan
+
+    cfg = load_config()
+    cfg.robot.backend, cfg.dreamlab.backend, cfg.runs_dir = "sim", "mock", str(tmp_path)
+    p = Pipeline(cfg)
+    q = np.tile(p.check_sim.home(), (90, 1))
+    q[40:, 6] += 0.9  # a 0.9 rad step on left_joint7 in one frame: far above the acceleration cap
+    q[:, 1] = p.hi[1]  # left_joint2 sitting exactly on its limit, inside the margin
+    p.plan = Plan(Trajectory(q, 30), source="test", meta={})
+    p._conform_plan()
+    out = p.plan.trajectory.positions
+    assert np.abs(np.diff(out[:, 6], 2)).max() * 30**2 <= cfg.safety.max_joint_accel_rad_s2
+    assert out[:, 1].max() <= p.hi[1] - cfg.safety.joint_limit_margin_rad + 1e-9
+    assert p.plan.meta["conformed_max_deviation_rad"] > 0
+
+
+def test_table_drop_lowers_table_and_puck():
+    flat, dropped = MujocoSim("pedestal/move_puck_scene.xml"), MujocoSim("pedestal/move_puck_scene.xml", 0.02)
+    for body in ("table", "puck"):
+        assert flat.model.body(body).pos[2] - dropped.model.body(body).pos[2] == pytest.approx(0.02)

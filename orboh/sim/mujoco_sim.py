@@ -27,9 +27,12 @@ def resolve_scene(scene: str) -> str:
 
 
 class MujocoSim:
-    def __init__(self, scene: str):
+    def __init__(self, scene: str, table_drop_m: float = 0.0, torso_tolerance_m: float = 0.0):
         self.scene = resolve_scene(scene)
         self.model = mujoco.MjModel.from_xml_path(self.scene)
+        if table_drop_m:
+            for body in ("table", "puck"):  # the puck rests on the table
+                self.model.body(body).pos[2] -= table_drop_m
         self.data = mujoco.MjData(self.model)
         self.lock = threading.RLock()
         self._renderer: mujoco.Renderer | None = None
@@ -53,6 +56,10 @@ class MujocoSim:
                 # Closed = the bound nearest zero; open = the far bound. VERIFY on hardware.
                 self._grip_lo[i], self._grip_hi[i] = (lo, hi) if abs(lo) < abs(hi) else (hi, lo)
         self._robot_bodies = self._classify_bodies()
+        self._torso_tol = torso_tolerance_m
+        self._torso_pairs: list[tuple[int, int]] = []
+        if torso_tolerance_m > 0:
+            self._tolerate_torso()
         self.reset()
 
     # ------------------------------------------------------------------ state
@@ -110,6 +117,33 @@ class MujocoSim:
             for c in d.contact[: d.ncon]:
                 b1, b2 = int(m.geom_bodyid[c.geom1]), int(m.geom_bodyid[c.geom2])
                 out.append((self._contact_kind(b1, b2), m.body(b1).name, m.body(b2).name))
+            out += self._torso_overlaps()
+        return out
+
+    def _tolerate_torso(self) -> None:
+        """Let the arms overlap the torso mesh by up to `torso_tolerance_m` and no further.
+
+        The twin's simplified torso collision mesh is a centimetre or two stricter than the real robot, and its
+        contact force would also stop the sim arm following a demo the real arm performed. So the torso geom is
+        taken out of MuJoCo's contact pass and replaced by an explicit penetration test in `contacts()`.
+        The arm's own mount (base link, link1) is not tested: it sits against the torso by construction.
+        """
+        m = self.model
+        torso = [g for g in range(m.ngeom) if (m.geom(g).name or "").startswith("openarm_body_link0_collision")]
+        mount = {b for b in self._robot_bodies if m.body(b).name.endswith(("_base_link", "_link1"))}
+        arm = [g for g in range(m.ngeom) if int(m.geom_bodyid[g]) in self._robot_bodies
+               and int(m.geom_bodyid[g]) not in mount and m.geom_contype[g]]
+        self._torso_pairs = [(t, a) for t in torso for a in arm]
+        for t in torso:
+            m.geom_contype[t] = m.geom_conaffinity[t] = 0
+
+    def _torso_overlaps(self) -> list[tuple[str, str, str]]:
+        m, d = self.model, self.data
+        fromto = np.zeros(6)
+        out = []
+        for t, a in self._torso_pairs:
+            if mujoco.mj_geomDistance(m, d, t, a, 0.0, fromto) < -self._torso_tol:
+                out.append(("env", m.body(m.geom_bodyid[t]).name, m.body(m.geom_bodyid[a]).name))
         return out
 
     def _classify_bodies(self) -> dict[int, tuple[str, bool]]:

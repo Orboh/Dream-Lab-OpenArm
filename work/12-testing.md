@@ -2,7 +2,7 @@
 
 # 12 · Testing
 
-**Run:** `MUJOCO_GL=egl pytest -q` (about 11 s; no hardware needed) · **Code:** `tests/test_pipeline.py`
+**Run:** `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 MUJOCO_GL=egl pytest -q` (about 11 s; no hardware needed) · **Code:** `tests/test_pipeline.py`
 
 ## What the suite proves
 
@@ -14,6 +14,9 @@
 | Execution | `test_executor_completes_and_tracks`, `test_executor_estop_halts_immediately`, `test_supervisor_clamps_step_size` | the executor reaches its target, E-STOP sends nothing more, an unchecked 1 rad jump is capped |
 | Cameras | `test_roles_from_wiggle_scores`, `test_ambiguous_wiggle_needs_confirmation`, `test_model_heuristic_and_pinned`, `test_missing_camera_reported`, `test_cameras_yaml_round_trip`, `test_changed_fraction` | role logic, including confidence rules and file round-trip |
 | Dataset | `test_sample_dataset_round_trip` | the LeRobot v3.0 writer and reader agree, and units survive |
+| Policy | `test_chunk_to_canonical_*`, `test_slew_limit_*`, `test_runner_*` (`tests/test_policy.py`) | chunk layout and shape checks; slew limits respect velocity, acceleration, joint limits and brake without overshoot; the runner completes, never moves in dry-run, stops on E-STOP, halts on repeated unsafe, non-finite or silent chunks ([14](14-policy.md)) |
+| Plan conform | `test_plan_conform_removes_jerk_and_limit_overshoot` | a jerky demo on a limit is smoothed and clipped before the checks |
+| Robot bridge | `test_roundtrip_converts_units`, `test_unreachable_bridge_raises` (`tests/test_zmq_robot.py`) | `ZmqRobot` ↔ `robot_bridge.py --fake` round trip converts degrees ↔ canonical; a dead bridge raises instead of hanging |
 | Web | `test_web_requires_token`, `test_web_full_flow_and_gates` | auth; the gates refuse an unchecked run (412) and an unapproved run (412); E-STOP aborts a live run |
 
 ## Manual browser check

@@ -19,13 +19,14 @@ robot:
     joint_signs: {}
     joint_offsets: {}
     gripper_closed: 0.0                    # degrees; fork limits are (-65, 0)
-    gripper_open: -65.0                    # VERIFY on the real gripper before trusting the open direction
+    gripper_open: -65.0                    # open direction confirmed from 8 real demos (open = negative); see work/18
   bridge:
     endpoint: tcp://127.0.0.1:5560         # scripts/robot_bridge.py --endpoint
     timeout_ms: 2000
 
 cameras:
   expected_roles: [center, right_wrist, left_wrist]
+  depth_roles: [center]                    # these roles also stream depth (D435i); the D405 wrists stay colour-only
   width: 640
   height: 480
   fps: 30
@@ -60,6 +61,15 @@ policy:
   camera_map: {overhead: center, wrist_l: left_wrist, wrist_r: right_wrist}
   sim_cameras: {overhead: tablecam, wrist_l: camera_wrist_left, wrist_r: camera_wrist_right}
 
+# Block finder on the chest D435i depth (work/16-perception.md). Pixel ROI = the carpet below the box.
+perception:
+  roi: [0, 290, 640, 480]                  # x0, y0, x1, y1 (colour pixels); re-check if the camera is moved
+  min_height_mm: 15                        # an object must stand this far above the fitted table plane
+  max_height_mm: 130
+  plane_tol_mm: 6
+  min_pixels: 250
+  match_tol_mm: 14                         # tolerance when naming a piece (cube / cylinder) from its size
+
 demos:
   dataset_root: data/demos                 # LeRobot Dataset v3.0 directory
 
@@ -71,6 +81,13 @@ sim:
   engine: mujoco
   # Path to an MJCF file, or a path inside the openarm-mujoco package.
   scene: pedestal/move_puck_scene.xml
+  # Lower the twin's table (and puck) by this many metres, i.e. how much higher the real arms stand above the table
+  # than the twin assumes. 0.075 is ESTIMATED from the Kitakyushu wood-L1 demo (2026-10-20): at 0.02 the left
+  # fingers sank 53 mm into the table, so ~0.073 puts them on it. VERIFY by measuring plate thickness + plate-tip -> arm base.
+  table_drop_m: 0.075
+  # Arm-vs-torso overlap allowed, metres. The twin's torso mesh is ~1-2 cm stricter than the real robot (a real demo
+  # overlaps it by up to 15 mm). Only the arm links vs the torso; table and everything else stay strict. 0 = strict.
+  torso_tolerance_m: 0.02
 
 safety:
   joint_limit_margin_rad: 0.05

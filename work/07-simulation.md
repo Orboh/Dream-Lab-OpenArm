@@ -53,5 +53,25 @@ The collision check is only as good as the model of your workcell:
    - Fix any mismatch with `joint_signs` / `joint_offsets` ([03](03-robot-layer.md)).
 3. **Hardware version:** confirm the model version (v2 package vs your arms' version).
 
+## Findings from a real leader demo (2026-10-20)
+
+Replaying a freshly recorded Kitakyushu wood-L1 demo (`demos.dataset_root` = the LeRobot dataset) through
+`orboh --backend bridge check` with the fake bridge started at the real start pose (`scripts/start_bridge.sh fake`):
+- Static checks pass once the plan is conformed ([02](02-configuration.md), `safety.conform_plan`; raw replay failed on
+  `left_joint2` at the limit margin and on jerk of 27–50 rad/s² in older demos).
+- The MuJoCo rollout still fails: the twin's collision meshes are stricter than the real arms. The same joint
+  values put `body_link0` against left `link4`/`link5` by 3–15 mm and `table_top` against the left `ee_base_link`
+  by up to 19 mm. The real arms did this motion without a collision, so a 1–2 cm model error (simplified
+  `body_link0_symp` mesh, and the real table height relative to the arm base, which is not recorded) is the likely cause.
+- **Table height (the main error):** with `table_drop_m: 0.02` the left fingers still sank 53 mm into the twin's table
+  and the jammed wrist stalled the whole rollout. A drop of ~0.073 m puts them on the table, so **the real arms stand
+  about 7.3 cm higher above the table than the twin assumes** (the team's "arm had to be raised"). Set 0.075.
+- **Torso:** left `link4`/`link5` still overlap `body_link0` by up to 15.5 mm (checked kinematically over the whole
+  demo). With `torso_tolerance_m: 0` the check fails on it; with 0.02 (arm links vs torso only, implemented as a
+  separate penetration test because the torso geom is removed from MuJoCo's contact pass) the whole check passes:
+  no collisions, tracking error 0.218 rad (limit 0.25). The renders showed the idle arm folded tight against the torso.
+- Do **not** loosen the check to pass: measure the base plate thickness / plate-tip → arm-base offset, correct the twin's
+  table height, then re-run. Start the check from the real pose, never from the sim home pose (that adds an invented approach).
+
 ## Related
 - [08 Safety](08-safety.md) · [04 Cameras](04-cameras.md) (sim camera sources) · [03 Robot layer](03-robot-layer.md)

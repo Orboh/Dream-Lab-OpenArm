@@ -7,12 +7,13 @@
 | Item | Needed from | Unblocks |
 |---|---|---|
 | DreamLab API docs (inputs, outputs, endpoints, auth, sync vs job) | user | `HttpDreamLabClient` ([06](06-dreamlab.md)) |
-| Orboh LeRobot fork access or details (robot type, keys, units, gripper) | team | `lerobot` backend, [VERIFY list](02-configuration.md#verify-checklist) |
+| Gripper open direction and `joint_signs` / `joint_offsets` on the real arms | team | trusting real-arm runs ([15](15-real-robot.md)) |
 | Path and arguments of `collect_bimanual.sh` | team | recording from the console ([05](05-demos-recording.md)) |
-| Real workcell dimensions and camera poses | user | trustworthy collision checks ([07](07-simulation.md#sim-to-real-alignment)) |
-| RealSense models and serials | user | pinned camera roles ([04](04-cameras.md)) |
+| Real workcell dimensions (base plate thickness, plate tip → arm base offset) and a twin scene with the box + carpet | user | trustworthy collision checks ([07](07-simulation.md#sim-to-real-alignment)) |
 
 ## Next steps
+0. **Real-arm Dream run:** fake-bridge dry-run done (chunks 1–3 pass, later ones hit the table in the twin). Next: build the
+   twin scene with the real table/box, dry-run on the real arms' joint state, then a short `--approve` run ([15](15-real-robot.md)).
 1. Wire the real DreamLab API; test offline with `orboh check` on recorded demos.
 2. Bring up on the robot box (see [12 → first bring-up](12-testing.md#on-the-robot-first-bring-up)).
 3. Build a workcell MJCF scene that matches reality.
@@ -34,6 +35,8 @@
 | 2026-10-20 | Wiggle test uses the right gripper, not an arm joint | 0.55 vs 0.03 separation in sim (an elbow move gave ~0.01 each); no arm motion needed |
 | 2026-10-20 | Mock DreamLab = replay the demo | the full flow is testable before the API is wired |
 | 2026-10-20 | Web console in vanilla JS with no build step | easy to maintain on the robot box |
+| 2026-10-20 | Robot bridge process (ZMQ) instead of one interpreter | `dreamlabs` needs Python ≥3.11 (forced 3.10 install fails on scipy); the LeRobot venv is separate; option chosen by the user |
+| 2026-10-20 | Always dry-run from the real start pose | the fork's default pose failed every chunk in the twin; the real pose set passes |
 | 2026-10-20 | Docs live in `work/`; `instruction.md` ≤ 175 lines | user request: well maintained and structured |
 
 ## Related

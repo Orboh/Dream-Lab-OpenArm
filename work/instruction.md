@@ -30,6 +30,8 @@ Everything is driven from a **web console**.
 | 11 | [Web console](11-web-console.md) | REST / WebSocket API, UI, auth token |
 | 12 | [Testing](12-testing.md) | test suite, what each test proves, how to add tests |
 | 13 | [Roadmap & open items](13-roadmap.md) | what's blocked, next steps, decisions log |
+| 14 | [Dream-1 policy](14-policy.md) | closed-loop policy client, `run-policy`, reading a dry-run |
+| 15 | [Real robot via the bridge](15-real-robot.md) | **new-setup guide**: CAN, cameras, bridge, dry-run, real run, troubleshooting |
 
 ---
 
@@ -126,9 +128,12 @@ Orboh/
 | `orboh discover-cameras [--wiggle]` | assign camera roles, write `config/cameras.yaml` |
 | `orboh sample-demos` | write synthetic demos to `data/demos` |
 | `orboh check --episode N --speed 0.5` | plan + sim safety check, **no robot motion** |
-| `MUJOCO_GL=egl pytest -q` | run the test suite |
+| `orboh run-policy --dry-run [--policy-backend dream]` | Dream-1 closed loop, sim-checked, **no motion** ([14](14-policy.md)) |
+| `bash scripts/start_bridge.sh fake\|real` | robot bridge for the real arms ([15](15-real-robot.md)) |
+| `.venv/bin/python scripts/camera_probe_web.py` | live cameras + "Ask Dream" page (read-only) |
+| `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 pytest -q` | run the test suite |
 
-All commands accept `--backend sim|lerobot` and `--config path`.
+All commands accept `--backend sim|lerobot|bridge` and `--config path`.
 
 ---
 
@@ -164,7 +169,7 @@ Details and rationale: [08 Safety](08-safety.md).
 ## 9. Current status (2026-10-20)
 
 - ✅ Full flow works in sim: preflight → cameras → demo → plan → sim check → execute → E-STOP.
-- ✅ 19 tests pass.
-- ⏳ **Blocked on:** DreamLab API docs, the Orboh LeRobot fork details, and a model of the real workcell.
+- ✅ 35 tests pass. Real cameras + real Dream-1 + fake bridge: dry-run chunks 1–3 pass the safety check ([14](14-policy.md)).
+- ⏳ **Next:** twin scene matching the real table/box, dry-run on the real arms, then a short approved run ([15](15-real-robot.md)).
 
 See [13 Roadmap](13-roadmap.md).

@@ -11,8 +11,8 @@ class SimRobot(Robot):
 
     name = "sim"
 
-    def __init__(self, scene: str, control_hz: float):
-        self.sim = MujocoSim(scene)
+    def __init__(self, scene: str, control_hz: float, table_drop_m: float = 0.0, torso_tolerance_m: float = 0.0):
+        self.sim = MujocoSim(scene, table_drop_m, torso_tolerance_m)
         self.period = 1.0 / control_hz
         self._connected = False
 

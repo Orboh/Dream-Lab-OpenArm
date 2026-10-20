@@ -6,6 +6,9 @@ Shows the three live cameras (serials from cameras.pinned_serials in config/pipe
 button that sends the current overhead frame (optionally the wrist frames) to Dream-1 with a zero joint state and
 plots the returned joint targets. Dream is a policy, not a detector: it has no "found the block" output, so
 check that the plot changes when you move the object. Stop other programs that hold the cameras first.
+
+The overhead D435i also streams depth: our own block finder (orboh/perception) draws the object's box, height, size and
+camera-frame xyz on that view, and /detect returns the same as JSON. Dream always receives the clean, undrawn frame.
 """
 import asyncio, os, threading, time
 from pathlib import Path
@@ -18,6 +21,8 @@ from PIL import Image
 from orboh.cameras.sources import list_realsense, RealSenseSource, to_jpeg
 from orboh.config import load_config
 from orboh.dreamlab.policy import DreamPolicyClient, PolicyError
+from orboh.perception.block_finder import BlockFinder
+from PIL import ImageDraw
 
 cfg = load_config(None)
 # Dream slot -> serial, through policy.camera_map and the pinned role serials
@@ -25,17 +30,47 @@ ROLES = {slot: cfg.cameras.pinned_serials[role] for slot, role in cfg.policy.cam
          if role and cfg.cameras.pinned_serials.get(role)}
 if not ROLES:
     raise SystemExit("set cameras.pinned_serials in config/pipeline.yaml (run `orboh discover-cameras` to find them)")
-latest: dict[str, bytes] = {}
+latest: dict[str, bytes] = {}  # what the page shows (overhead has the detection drawn on it)
+clean: dict[str, bytes] = {}  # untouched frames: this is what Dream gets
 lock = threading.Lock()
+
+finder = BlockFinder(cfg.perception)
+last_det: dict = {"detections": []}
+
+
+def annotate(rgbd, dets):
+    im = Image.fromarray(rgbd.color)
+    dr = ImageDraw.Draw(im)
+    x0, y0, x1, y1 = cfg.perception.roi
+    dr.rectangle([x0, y0, x1 - 1, y1 - 1], outline=(0, 120, 255))
+    for d in dets:
+        ys, xs = np.nonzero(d.mask)
+        dr.rectangle([xs.min(), ys.min(), xs.max(), ys.max()], outline=(255, 0, 0), width=3)
+        x, y, z = d.cam_xyz
+        dr.text((xs.min(), max(0, ys.min() - 26)), f"{d.height_mm:.0f}mm {d.size_mm[0]:.0f}x{d.size_mm[1]:.0f} {','.join(d.matches) or '?'}", fill=(255, 255, 0))
+        dr.text((xs.min(), max(0, ys.min() - 13)), f"cam xyz {x:.3f} {y:.3f} {z:.3f} m", fill=(255, 255, 0))
+    return np.asarray(im)
+
 
 def pump(slot, serial):
     dev = next(d for d in list_realsense() if d.serial == serial)
-    src = RealSenseSource(dev, 640, 480, 30)
+    depth = slot == "overhead"  # the D435i also streams depth for the block finder
+    src = RealSenseSource(dev, 640, 480, 30, depth=depth)
     while True:
-        img = src.read()
+        if depth:
+            rgbd = src.read_rgbd()
+            if rgbd is None:
+                continue
+            dets = finder.find(rgbd)
+            last_det["detections"] = [d.to_dict() for d in dets]
+            img = annotate(rgbd, dets)
+        else:
+            img = src.read()
         if img is not None:
             j = to_jpeg(img, 80)
-            with lock: latest[slot] = j
+            with lock:
+                latest[slot] = j
+                clean[slot] = to_jpeg(rgbd.color, 80) if depth else j
 
 for slot, ser in ROLES.items():
     threading.Thread(target=pump, args=(slot, ser), daemon=True).start()
@@ -55,6 +90,10 @@ def index(): return HTMLResponse(PAGE)
 @app.get("/info")
 def info(): return {"roles": ROLES}
 
+@app.get("/detect")
+def detect(): return last_det
+
+
 @app.get("/snap/{slot}.jpg")
 def snap(slot: str):
     with lock: j = latest.get(slot)
@@ -71,7 +110,7 @@ async def stream(slot: str):
 
 @app.post("/ask")
 def ask(prompt: str = "Pick up the wood and place it in the box", wrists: bool = False):
-    with lock: snaps = dict(latest)
+    with lock: snaps = dict(clean)
     sent = {"overhead": snaps.get("overhead")}
     if wrists: sent.update(wrist_l=snaps.get("wrist_l"), wrist_r=snaps.get("wrist_r"))
     with open("/tmp/last_sent.jpg", "wb") as f: f.write(sent["overhead"])
@@ -106,6 +145,7 @@ button{padding:7px 14px;cursor:pointer}pre{background:#1b1b1b;padding:8px;border
 <div class=c><input id=p type=text value="Pick up the wood and place it in the box">
 <label><input type=checkbox id=w> include wrist cams </label>
 <button onclick=ask()>Ask Dream</button> <span id=s></span></div><br>
+<pre id=det></pre><script>setInterval(async()=>{try{const r=await (await fetch('/detect')).json();det.textContent=r.detections.length?'block finder: '+JSON.stringify(r.detections[0]):'block finder: nothing found on the carpet'}catch(e){}},700)</script>
 <div class=row><div class=c><b>Frame sent</b><img id=sent></div>
 <div class=c><b>Predicted joint targets (rad) over the 2.4 s chunk</b><br><canvas id=cv width=640 height=300></canvas>
 <div id=leg></div></div></div><pre id=o></pre>
