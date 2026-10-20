@@ -84,8 +84,9 @@ function send(ev) {
   }
   if (["sim", "simulate", "simulation"].includes(w)) { if (!pending) return say("Tell me a task first."); return run(pending, false, false, true); }
   if (["stop", "halt", "estop", "e-stop"].includes(w)) return stop();
+  if (["reset", "reset arms", "reset the arm", "start pose", "home"].includes(w)) return call("/api/reset", {}).then(() => say("Resetting: both arms go slowly back to the start pose and the grippers close. Keep clear of them.", "bot", "warn")).catch(e => say(`Can't reset: ${e.message}`, "bot", "bad"));
   if (["release", "resume", "unlock", "release estop"].includes(w)) return call("/api/estop/reset", {}).then(() => say("E-STOP released. The arms are free to follow the next approved run.", "bot", "ok")).catch(e => say(`Could not release: ${e.message}`, "bot", "bad"));
-  if (w === "help") return say("Type a task and I dry-run it with Dream-1 (nothing moves). If the check passes, type  go  to run it on the robot, or  sim  to watch it in the simulation. Type  retry  after a failure to ask Dream-1 again, and  stop  anytime (then  release  to continue).");
+  if (w === "help") return say("Type a task and I dry-run it with Dream-1 (nothing moves). If the check passes, type  go  to run it on the robot, or  sim  to watch it in the simulation. Type  retry  after a failure to ask Dream-1 again, and  stop  anytime (then  release  to continue). Type  reset  to send both arms back to the start pose.");
   if (["retry", "again", "try again"].includes(w)) { if (!lastPrompt) return say("Nothing to retry yet. Tell me a task first."); return ask(lastPrompt); }
   ask(t);
 }

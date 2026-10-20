@@ -11,7 +11,7 @@ import numpy as np
 
 from orboh.config import SafetyConfig
 from orboh.robot.base import Robot
-from orboh.types import ARM_IDX, JOINT_NAMES, Trajectory, min_jerk
+from orboh.types import ARM_IDX, GRIPPER_IDX, JOINT_NAMES, Trajectory, min_jerk
 
 
 def build_execution_trajectory(current_q: np.ndarray, plan: Trajectory, cfg: SafetyConfig,
@@ -25,7 +25,8 @@ def build_execution_trajectory(current_q: np.ndarray, plan: Trajectory, cfg: Saf
     start = body.positions[0]
     dist = float(np.max(np.abs(start - current_q)[list(ARM_IDX)]))
     # min-jerk peaks at 1.875x average speed; size the move so the peak stays at approach_speed.
-    duration = max(0.5, 1.875 * dist / cfg.approach_speed_rad_s)
+    grip = float(np.max(np.abs(start - current_q)[list(GRIPPER_IDX)]))  # a gripper-only move still needs time (limit: max_gripper_velocity)
+    duration = max(0.5, 1.875 * dist / cfg.approach_speed_rad_s, 1.875 * grip / (0.8 * cfg.max_gripper_velocity))
     n = int(round(duration * body.hz)) + 1
     approach = min_jerk(np.asarray(current_q, dtype=float), start, n)
     full = np.vstack([approach[:-1], body.positions])

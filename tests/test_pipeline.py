@@ -351,3 +351,37 @@ def test_reset_script_and_depth_fallback_exist():
 
     assert (Path(__file__).resolve().parent.parent / "scripts" / "reset_realsense.py").exists()
     assert "depth_failed" in open(src.__file__).read()
+
+
+def test_reset_returns_the_arms_to_the_configured_start_pose(tmp_path):
+    """'reset' reads left.yaml / right.yaml (degrees) and moves both arms there through the safety-checked move."""
+    import yaml
+    from orboh.pipeline import GateError, Pipeline
+
+    pose = {"joint_1": 4.0, "joint_2": 0.0, "joint_3": 0.0, "joint_4": 90.0, "joint_5": 0.0, "joint_6": 0.0, "joint_7": 0.0, "gripper": 0.0}
+    (tmp_path / "left.yaml").write_text(yaml.safe_dump(pose))
+    (tmp_path / "right.yaml").write_text(yaml.safe_dump({**pose, "joint_1": -4.0}))
+    cfg = load_config()
+    cfg.robot.backend, cfg.dreamlab.backend, cfg.runs_dir = "sim", "mock", str(tmp_path / "runs")
+    cfg.robot.start_pose_dir = str(tmp_path)
+    p = Pipeline(cfg)
+    p.start()
+    p.reset_to_start_pose()
+    q = p.robot.read_joints()
+    assert np.degrees(q[0]) == pytest.approx(4.0, abs=2.0) and np.degrees(q[8]) == pytest.approx(-4.0, abs=2.0)
+    assert q[7] < 0.1 and q[15] < 0.1  # grippers closed
+    cfg.robot.start_pose_dir = ""
+    with pytest.raises(GateError):
+        p.reset_to_start_pose()
+    p.shutdown()
+
+
+def test_gripper_only_move_is_slow_enough_for_the_gripper_speed_limit():
+    """Regression 2026-10-20: 'reset' closing the grippers was refused (peak 3.02/s > 3.0) because the move duration ignored the gripper."""
+    cfg = SafetyConfig()
+    q0 = np.zeros(NUM_JOINTS)
+    q0[[7, 15]] = [0.81, 0.55]  # both grippers wide open
+    target = np.zeros(NUM_JOINTS)  # arms where they are, grippers closed
+    traj, _ = build_execution_trajectory(q0, Trajectory(np.vstack([target, target]), 30), cfg)
+    peak = np.abs(np.diff(traj.positions[:, [7, 15]], axis=0)).max() * 30
+    assert peak <= cfg.max_gripper_velocity, peak

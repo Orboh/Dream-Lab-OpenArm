@@ -243,6 +243,10 @@ def create_app(pipeline: Pipeline) -> FastAPI:
         except GateError as e:
             raise HTTPException(409, str(e))
 
+    @app.post("/api/reset", dependencies=auth)
+    def reset():
+        return task("reset arms", pipeline.reset_to_start_pose)
+
     @app.post("/api/home", dependencies=auth)
     def home():
         return task("go home", pipeline.go_home)

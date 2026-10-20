@@ -8,6 +8,8 @@ robot:
   # lerobot -> in-process LeRobot fork; only works if this venv can import lerobot + openarm_can
   backend: sim
   control_hz: 30
+  # Pose the arms return to on "reset" (left.yaml / right.yaml in degrees). Kitakyushu wood-L1 set from the team's repo.
+  start_pose_dir: ~/projects/openarm-orboh/config/pose_sets/kitakyushu-wood-l1-v1
   lerobot:
     robot_type: bi_openarm_follower        # name registered in the fork (checked 2026-10-20)
     robot_kwargs: {}                       # only for backend: lerobot; the fork wants left_arm_config/right_arm_config

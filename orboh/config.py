@@ -34,6 +34,9 @@ class RobotBridgeConfig(BaseModel):
 
 
 class RobotConfig(BaseModel):
+    # Directory with left.yaml / right.yaml (degrees: joint_1..7 + gripper): the pose "reset" returns the arms to. These are the files the
+    # follower aligns to on connect (openarm-orboh config/pose_sets/<set>). Empty = no reset.
+    start_pose_dir: str = ""
     backend: Literal["sim", "lerobot", "bridge"] = "sim"
     control_hz: float = 30
     lerobot: LeRobotConfig = Field(default_factory=LeRobotConfig)

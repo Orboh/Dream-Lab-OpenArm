@@ -12,6 +12,7 @@ E-STOP is always accepted, even while another task runs.
 from __future__ import annotations
 
 import json
+import yaml
 import shlex
 import subprocess
 import threading
@@ -43,7 +44,7 @@ from orboh.perception.block_finder import BlockFinder
 from orboh.perception.calibration import attach_base_positions, load_extrinsics
 from orboh.perception.types import Detection
 from orboh.sim.mujoco_sim import MujocoSim
-from orboh.types import ARM_IDX, JOINT_NAMES, Plan, Trajectory, joint_index
+from orboh.types import ARM_IDX, GRIPPER_IDX, JOINT_NAMES, Plan, Trajectory, joint_index
 
 STEPS = ("preflight", "cameras", "demo", "plan", "check", "execute")
 
@@ -568,6 +569,31 @@ class Pipeline:
         result = self._executor().run(traj, self.stop_event)
         if not result.completed:
             raise GateError(f"move aborted: {result.reason}")
+
+    def reset_to_start_pose(self) -> None:
+        """Return both arms (and close the grippers) to the start pose, slowly, through the usual safety-checked move."""
+        d = self.cfg.path(self.cfg.robot.start_pose_dir) if self.cfg.robot.start_pose_dir else None
+        if d is None or not (d / "left.yaml").exists() or not (d / "right.yaml").exists():
+            raise GateError("no start pose configured: set robot.start_pose_dir (left.yaml / right.yaml, degrees)")
+        values = {}
+        for side in ("left", "right"):
+            pose = yaml.safe_load((d / f"{side}.yaml").read_text())
+            for i in range(1, 8):
+                values[self.cfg.robot.lerobot.joint_key.format(side=side, index=i)] = float(pose[f"joint_{i}"])
+            values[self.cfg.robot.lerobot.gripper_key.format(side=side)] = float(pose.get("gripper", 0.0))
+        target = self.mapping.to_canonical(values)
+        before = self.robot.read_joints()
+        self.log(f"reset: moving the arms to the start pose from {d.name}; the biggest joint move is "
+                 f"{np.degrees(np.abs(target - before)[list(ARM_IDX)].max()):.0f} deg")
+        grip = list(GRIPPER_IDX)
+        if np.abs(target[grip] - before[grip]).max() > 0.05:  # grippers first, on their own: open fingers near the table / body made the joint move fail the check
+            stage = before.copy()
+            stage[grip] = target[grip]
+            self.log("reset 1/2: closing the grippers")
+            self._safe_move_to(stage)
+        self.log("reset 2/2: arms to the start pose")
+        self._safe_move_to(target)
+        self.log("arms at the start pose (grippers closed)")
 
     def go_home(self) -> None:
         self._safe_move_to(self.check_sim.home())
