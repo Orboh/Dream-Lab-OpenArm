@@ -68,10 +68,33 @@ def cmd_check(args):
     sys.exit(0 if p.report.passed else 1)
 
 
+def cmd_run_policy(args):
+    """Run the Dream-1 policy. Moves the robot unless --dry-run; real hardware also needs --approve."""
+    cfg = load_config(args.config)
+    if args.backend:
+        cfg.robot.backend = args.backend
+    if args.policy_backend:
+        cfg.policy.backend = args.policy_backend
+    from orboh.pipeline import GateError, Pipeline
+
+    p = Pipeline(cfg)
+    p.subscribe(lambda e: e["type"] == "log" and e["level"] != "debug" and print(f"[{e['level']}] {e['msg']}"))
+    p.start()
+    try:
+        res = p.run_policy(args.prompt, args.seconds, approved=args.approve, dry_run=args.dry_run)
+    except GateError as e:
+        print(f"refused: {e}", file=sys.stderr)
+        p.shutdown()
+        sys.exit(2)
+    print(json.dumps({k: v for k, v in res.__dict__.items() if k not in ("events", "timings")}, indent=2))
+    p.shutdown()
+    sys.exit(0 if res.completed else 1)
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="orboh", description="OpenArm + DreamLab one-shot manipulation pipeline")
     ap.add_argument("--config", help="path to pipeline.yaml")
-    ap.add_argument("--backend", choices=["sim", "lerobot"], help="override robot.backend")
+    ap.add_argument("--backend", choices=["sim", "lerobot", "bridge"], help="override robot.backend")
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("serve", help="start the web control panel")
     s.add_argument("--host")
@@ -87,6 +110,13 @@ def main(argv=None):
     s.add_argument("--task", default="")
     s.add_argument("--speed", type=float, default=0.5)
     s.set_defaults(fn=cmd_check)
+    s = sub.add_parser("run-policy", help="drive the arms with the Dream-1 policy (closed loop)")
+    s.add_argument("--prompt", default="", help="task text, e.g. 'pick up the red cup'")
+    s.add_argument("--seconds", type=float, help="run length (default policy.max_duration_s)")
+    s.add_argument("--dry-run", action="store_true", help="query + safety-check chunks, never move the robot")
+    s.add_argument("--approve", action="store_true", help="operator approval to move the arms")
+    s.add_argument("--policy-backend", choices=["mock", "dream"], help="override policy.backend")
+    s.set_defaults(fn=cmd_run_policy)
     args = ap.parse_args(argv)
     args.fn(args)
 

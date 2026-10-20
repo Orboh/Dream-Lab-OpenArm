@@ -24,13 +24,15 @@ from typing import Callable
 import numpy as np
 
 from orboh.cameras.discovery import DiscoveryResult, assign_roles, changed_fraction, load_cameras_yaml, save_cameras_yaml
-from orboh.cameras.sources import (SIM_DEVICES, CameraManager, CameraSource, RealSenseSource, SimCameraSource,
-                                   list_realsense, to_jpeg)
+from orboh.cameras.sources import (SIM_DEVICES, CameraDevice, CameraManager, CameraSource, RealSenseSource,
+                                   SimCameraSource, list_realsense, to_jpeg)
 from orboh.config import Config
 from orboh.demos.dataset import LeRobotDemoDataset
 from orboh.demos.sample import write_sample_dataset
 from orboh.dreamlab.client import DreamLabClient, PlanRequest, make_dreamlab
+from orboh.dreamlab.policy import PolicyError, make_policy
 from orboh.execution.executor import Executor, build_execution_trajectory
+from orboh.execution.policy_runner import PolicyResult, PolicyRunner
 from orboh.robot import make_robot
 from orboh.robot.mapping import JointMapping
 from orboh.safety import CheckResult, SafetyReport, check_trajectory, fingerprint
@@ -128,10 +130,11 @@ class Pipeline:
         self.robot.connect()
         self.log(f"robot backend '{self.robot.name}' connected")
         saved = load_cameras_yaml(self.cfg.path(self.cfg.cameras.output))
-        if saved:
+        pinned = {r: s for r, s in self.cfg.cameras.pinned_serials.items() if s}
+        if saved or pinned:
             try:
-                self._open_cameras(saved)
-                self._set_step("cameras", "ok", f"loaded {self.cfg.cameras.output}")
+                self._open_cameras(saved or pinned)
+                self._set_step("cameras", "ok", f"loaded {self.cfg.cameras.output}" if saved else "pinned serials")
             except Exception as e:
                 self.log(f"could not open saved cameras: {e}", "warn")
 
@@ -162,6 +165,12 @@ class Pipeline:
             res.append(CheckResult("dreamlab_api", ok, f"{self.dreamlab.name}: {msg}"))
         else:
             res.append(CheckResult("dreamlab_api", False, self.dreamlab_error))
+        if self.cfg.policy.backend == "dream":
+            try:
+                ok, msg = make_policy(self.cfg.policy, self.cfg.dreamlab.api_key).health()
+            except PolicyError as e:
+                ok, msg = False, str(e)
+            res.append(CheckResult("policy_api", ok, msg))
         res.append(CheckResult("sim_model", True, Path(self.check_sim.scene).name))
         eps = self.list_demos()
         res.append(CheckResult("demo_dataset", bool(eps), f"{len(eps)} episodes in {self.cfg.demos.dataset_root}",
@@ -362,6 +371,59 @@ class Pipeline:
             self.progress = {"done": done, "total": total}
             self._emit("progress", **self.progress)
         return Executor(self.robot, self.cfg.safety, self.lo, self.hi, progress)
+
+    # --------------------------------------------------------------- policy
+    def _policy_snapshots(self) -> Callable[[], dict[str, bytes | None]]:
+        """A function returning one JPEG per Dream camera slot (None when the slot has no camera)."""
+        pc = self.cfg.policy
+        if self.cfg.robot.backend == "sim":
+            srcs = {slot: SimCameraSource(self.robot.sim, CameraDevice(f"sim-{cam}", f"MuJoCo {cam}"),
+                                          pc.image_width, pc.image_height)
+                    for slot, cam in pc.sim_cameras.items()}
+            return lambda: {slot: to_jpeg(src.read(), pc.jpeg_quality) for slot, src in srcs.items()}
+        missing = [slot for slot, role in pc.camera_map.items() if not role or role not in self.cameras.sources]
+        if missing:
+            self.log(f"no camera for Dream slot(s) {missing}: the model gets a black frame there", "warn")
+        return lambda: {slot: self.cameras.snapshot(role, max_age_s=0.05) if role else None
+                        for slot, role in pc.camera_map.items()}
+
+    def run_policy(self, prompt: str = "", seconds: float | None = None, approved: bool = False,
+                   dry_run: bool = False) -> PolicyResult:
+        """Drive the arms with the Dream-1 policy; each chunk is slew-limited and sim-checked before it moves anything.
+
+        dry_run: query the policy and check its chunks against the current pose, but send nothing to the robot.
+        """
+        if not dry_run and self.cfg.safety.require_manual_approval and not approved:
+            raise GateError("running the policy needs explicit operator approval")
+        pc = self.cfg.policy
+        try:
+            client = make_policy(pc, self.cfg.dreamlab.api_key)
+        except PolicyError as e:
+            raise GateError(str(e)) from e
+        prompt = prompt or pc.prompt
+        self.stop_event.clear()
+        self.run_dir = self.cfg.path(self.cfg.runs_dir) / time.strftime("%Y%m%d-%H%M%S_policy")
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        self._set_step("execute", "running", f"policy '{prompt}' ({client.name}{', dry-run' if dry_run else ''})")
+        self.log(f"policy {client.name} / {pc.checkpoint}: '{prompt}' for {seconds or pc.max_duration_s:g}s"
+                 + (" (dry-run: robot will not move)" if dry_run else ""))
+
+        def progress(done, total):
+            self.progress = {"done": done, "total": total}
+            self._emit("progress", **self.progress)
+
+        runner = PolicyRunner(self.robot, client, self._policy_snapshots(), pc, self.cfg.safety, self.lo, self.hi,
+                              self.check_sim, execute=not dry_run, log=self.log, on_progress=progress)
+        try:
+            result = runner.run(prompt, seconds, self.stop_event)
+        except PolicyError as e:
+            result = PolicyResult(False, str(e), dry_run=dry_run)
+        self.execution = result.__dict__
+        (self.run_dir / "policy_run.json").write_text(json.dumps(
+            {"prompt": prompt, "checkpoint": pc.checkpoint, "backend": client.name, **result.__dict__}, indent=2))
+        self.log(("✔ " if result.completed else "✖ ") + result.reason, "info" if result.completed else "error")
+        self._set_step("execute", "ok" if result.completed else "fail", result.reason)
+        return result
 
     def _safe_move_to(self, q_target: np.ndarray) -> None:
         """Small utility moves (home, wiggle) still go through static + sim checks."""

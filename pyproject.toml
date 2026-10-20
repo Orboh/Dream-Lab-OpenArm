@@ -19,6 +19,7 @@ dependencies = [
   "pillow",
   "mujoco>=3.2",
   "openarm-mujoco>=2.3",
+  "pyzmq",
 ]
 
 [project.optional-dependencies]

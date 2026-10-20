@@ -9,14 +9,15 @@ from orboh.sim.mujoco_sim import MujocoSim
 from orboh.types import Trajectory
 
 
-def check_trajectory(traj: Trajectory, sim: MujocoSim, cfg: SafetyConfig, start_q: np.ndarray) -> SafetyReport:
+def check_trajectory(traj: Trajectory, sim: MujocoSim, cfg: SafetyConfig, start_q: np.ndarray,
+                     preview_frames: int = 6) -> SafetyReport:
     """Static checks first; only a statically sane trajectory is worth simulating."""
     lo, hi = sim.limits()
     checks = static_checks(traj, lo, hi, cfg)
     sim_summary: dict = {}
     artifacts: dict = {}
     if all(c.passed for c in checks):
-        sim_checks, sim_summary = simulate(traj, sim, cfg)
+        sim_checks, sim_summary = simulate(traj, sim, cfg, preview_frames)
         checks += sim_checks
         artifacts = {k: sim_summary.pop(k) for k in ("measured", "frames")}
     else:

@@ -4,31 +4,34 @@
 
 robot:
   # sim     -> MuJoCo-backed fake robot (develop the whole pipeline on a laptop)
-  # lerobot -> real bimanual OpenArm through the Orboh LeRobot fork (SocketCAN)
+  # bridge  -> real arms through scripts/robot_bridge.py, a separate process in the LeRobot venv (recommended)
+  # lerobot -> in-process LeRobot fork; only works if this venv can import lerobot + openarm_can
   backend: sim
   control_hz: 30
   lerobot:
-    robot_type: bi_openarm_follower        # VERIFY: name registered in the fork
-    robot_kwargs:                          # VERIFY: passed to the fork's robot config
-      left_arm_port: can0
-      right_arm_port: can1
-    # Observation / action keys. {side} = left|right, {index} = 1..7
-    joint_key: "{side}_joint_{index}.pos"  # VERIFY
-    gripper_key: "{side}_gripper.pos"      # VERIFY
-    joint_units: radians                   # VERIFY: radians | degrees
+    robot_type: bi_openarm_follower        # name registered in the fork (checked 2026-10-20)
+    robot_kwargs: {}                       # only for backend: lerobot; the fork wants left_arm_config/right_arm_config
+    # Observation / action keys of the fork, e.g. left_joint_1.pos, right_gripper.pos. {side} = left|right
+    joint_key: "{side}_joint_{index}.pos"
+    gripper_key: "{side}_gripper.pos"
+    joint_units: degrees                   # the fork speaks degrees
     # canonical_rad = sign * robot_value + offset   (per joint, defaults 1 / 0)
     joint_signs: {}
     joint_offsets: {}
-    gripper_closed: 0.0                    # VERIFY: robot units when fully closed
-    gripper_open: 1.0                      # VERIFY: robot units when fully open
+    gripper_closed: 0.0                    # degrees; fork limits are (-65, 0)
+    gripper_open: -65.0                    # VERIFY on the real gripper before trusting the open direction
+  bridge:
+    endpoint: tcp://127.0.0.1:5560         # scripts/robot_bridge.py --endpoint
+    timeout_ms: 2000
 
 cameras:
-  expected_roles: [center, right_wrist]
+  expected_roles: [center, right_wrist, left_wrist]
   width: 640
   height: 480
   fps: 30
   # Pin serial numbers once known; discovery is then skipped.
-  pinned_serials: {}                       # e.g. {center: "123456789", right_wrist: "987654321"}
+  # Serials from the Kitakyushu setup (openarm-orboh bimanual-collect.takeei_wood_l1.env, matches lsusb 2026-10-20).
+  pinned_serials: {center: "344422070898", right_wrist: "352122273417", left_wrist: "409122272149"}
   discovery:
     # auto: pinned -> model heuristic (D405 = wrist) -> wiggle-test (if allowed)
     # Opening/closing the right gripper fills much of the wrist view but is tiny in
@@ -43,6 +46,19 @@ dreamlab:
   plan_endpoint: /plan                     # VERIFY once API docs are in
   health_endpoint: /health                 # VERIFY
   send_images: true
+
+# Closed-loop Dream-1 policy (work/14-policy.md): frames + joints + prompt in, action chunks out.
+policy:
+  backend: mock                            # mock (offline sway) | dream (real API, needs DREAMLAB_API_KEY)
+  checkpoint: dreamlabs/dream-1-beta-flash # or dreamlabs/dream-1-beta
+  prompt: "pick up the object"
+  ik_arm: openarm2_faas                    # client-side IK for the base model's end-effector answer
+  action_hz: 20
+  execution_horizon: 30
+  max_duration_s: 30
+  # Dream camera slot -> Orboh camera role (real robot). Unmapped slots get a black frame.
+  camera_map: {overhead: center, wrist_l: left_wrist, wrist_r: right_wrist}
+  sim_cameras: {overhead: tablecam, wrist_l: camera_wrist_left, wrist_r: camera_wrist_right}
 
 demos:
   dataset_root: data/demos                 # LeRobot Dataset v3.0 directory

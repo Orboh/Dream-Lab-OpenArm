@@ -32,6 +32,14 @@ def build_execution_trajectory(current_q: np.ndarray, plan: Trajectory, cfg: Saf
     return Trajectory(full, body.hz), n - 1
 
 
+def supervise(target: np.ndarray, last_cmd: np.ndarray, lo: np.ndarray, hi: np.ndarray, max_step: float) -> np.ndarray:
+    """Last line of defence: clip to joint limits and cap the per-step arm move, whatever was asked."""
+    cmd = np.clip(target, lo, hi)
+    arm = list(ARM_IDX)
+    cmd[arm] = last_cmd[arm] + np.clip(cmd[arm] - last_cmd[arm], -max_step, max_step)
+    return cmd
+
+
 @dataclass
 class ExecutionResult:
     completed: bool
@@ -66,9 +74,7 @@ class Executor:
                 return self._halt(i, len(traj), f"tracking error {err:.3f} rad on {JOINT_NAMES[j]} "
                                   f"(limit {self.cfg.runtime_max_tracking_error_rad})", max_err)
             # Supervisor: never exceed limits or the per-step velocity cap, whatever the plan says.
-            cmd = np.clip(target, self.lo, self.hi)
-            arm = list(ARM_IDX)
-            cmd[arm] = last_cmd[arm] + np.clip(cmd[arm] - last_cmd[arm], -max_step, max_step)
+            cmd = supervise(target, last_cmd, self.lo, self.hi, max_step)
             self.robot.send_joints(cmd)
             last_cmd = cmd
             if time.monotonic() - t0 > self.cfg.watchdog_s:

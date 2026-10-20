@@ -1,0 +1,3 @@
+# Dream Labs policy client + vendored IK (Dream-1). Python 3.11-3.13 only. Heavy: pulls jax, av, boto3.
+# Install with: bash scripts/setup_env.sh --dream
+dreamlabs==1.0.5

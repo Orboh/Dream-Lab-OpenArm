@@ -26,10 +26,18 @@ class LeRobotConfig(BaseModel):
     gripper_open: float = 1.0
 
 
+class RobotBridgeConfig(BaseModel):
+    """Where scripts/robot_bridge.py listens (backend: bridge)."""
+
+    endpoint: str = "tcp://127.0.0.1:5560"
+    timeout_ms: int = 2000
+
+
 class RobotConfig(BaseModel):
-    backend: Literal["sim", "lerobot"] = "sim"
+    backend: Literal["sim", "lerobot", "bridge"] = "sim"
     control_hz: float = 30
     lerobot: LeRobotConfig = Field(default_factory=LeRobotConfig)
+    bridge: RobotBridgeConfig = Field(default_factory=RobotBridgeConfig)
 
 
 class DiscoveryConfig(BaseModel):
@@ -56,6 +64,33 @@ class DreamLabConfig(BaseModel):
     # Filled from .env
     api_key: str = ""
     base_url: str = ""
+
+
+class PolicyConfig(BaseModel):
+    """Closed-loop Dream-1 policy: camera frames + joints in, action chunks out (see work/14-policy.md)."""
+
+    backend: Literal["mock", "dream"] = "mock"
+    checkpoint: str = "dreamlabs/dream-1-beta-flash"
+    prompt: str = "pick up the object"
+    ik_arm: str = "openarm2_faas"  # dream client IK arm spec; the base model answers in tool poses
+    action_hz: float = 20
+    execution_horizon: int = 30
+    timeout_ms: int = 15000
+    strict: bool = True
+    max_duration_s: float = 30
+    obs_hz: float = 5  # frames + joints handed to the client; it keeps 5 per second anyway
+    image_width: int = 320
+    image_height: int = 176
+    jpeg_quality: int = 85
+    # Dream camera slot -> Orboh camera role (real robot). A slot with no camera gets a black frame.
+    camera_map: dict[str, str | None] = Field(
+        default_factory=lambda: {"overhead": "center", "wrist_l": "left_wrist", "wrist_r": "right_wrist"})
+    # Dream camera slot -> MuJoCo camera name (sim backend)
+    sim_cameras: dict[str, str] = Field(
+        default_factory=lambda: {"overhead": "tablecam", "wrist_l": "camera_wrist_left",
+                                 "wrist_r": "camera_wrist_right"})
+    max_check_failures: int = 3  # consecutive rejected chunks before the run halts
+    starve_s: float = 3.0  # no usable chunk for this long -> halt
 
 
 class DemosConfig(BaseModel):
@@ -97,6 +132,7 @@ class Config(BaseModel):
     robot: RobotConfig = Field(default_factory=RobotConfig)
     cameras: CamerasConfig = Field(default_factory=CamerasConfig)
     dreamlab: DreamLabConfig = Field(default_factory=DreamLabConfig)
+    policy: PolicyConfig = Field(default_factory=PolicyConfig)
     demos: DemosConfig = Field(default_factory=DemosConfig)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     sim: SimConfig = Field(default_factory=SimConfig)

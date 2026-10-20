@@ -33,6 +33,7 @@ class MujocoSim:
         self.data = mujoco.MjData(self.model)
         self.lock = threading.RLock()
         self._renderer: mujoco.Renderer | None = None
+        self._render_data: mujoco.MjData | None = None  # private copy of the state, so rendering never holds the lock
         # GL contexts are bound to the thread that created them: render on one thread only.
         self._render_thread = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mujoco-render")
         self._qadr = np.zeros(NUM_JOINTS, dtype=int)
@@ -149,11 +150,15 @@ class MujocoSim:
 
     def _render(self, width: int, height: int, camera: str | int) -> np.ndarray | None:
         try:
+            if self._renderer is None or (self._renderer.width, self._renderer.height) != (width, height):
+                self._renderer = mujoco.Renderer(self.model, height, width)
+            if self._render_data is None:
+                self._render_data = mujoco.MjData(self.model)
+            # Hold the lock only for the state copy: rendering can take 200 ms on a CPU-only GL stack.
             with self.lock:
-                if self._renderer is None or (self._renderer.width, self._renderer.height) != (width, height):
-                    self._renderer = mujoco.Renderer(self.model, height, width)
-                self._renderer.update_scene(self.data, camera=camera)
-                return self._renderer.render().copy()
+                mujoco.mj_copyData(self._render_data, self.model, self.data)
+            self._renderer.update_scene(self._render_data, camera=camera)
+            return self._renderer.render().copy()
         except Exception:
             return None
 
