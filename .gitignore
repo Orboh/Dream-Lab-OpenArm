@@ -1,0 +1,11 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+.pytest_cache/
+runs/*
+!runs/.gitkeep
+data/*
+!data/.gitkeep
+config/cameras.yaml
+*.egg-info/

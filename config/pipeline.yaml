@@ -1,0 +1,78 @@
+# Orboh OpenArm one-shot manipulation pipeline.
+# Secrets (API keys, web token) live in .env, not here.
+# Lines marked VERIFY must be checked against the Orboh LeRobot fork / real hardware.
+
+robot:
+  # sim     -> MuJoCo-backed fake robot (develop the whole pipeline on a laptop)
+  # lerobot -> real bimanual OpenArm through the Orboh LeRobot fork (SocketCAN)
+  backend: sim
+  control_hz: 30
+  lerobot:
+    robot_type: bi_openarm_follower        # VERIFY: name registered in the fork
+    robot_kwargs:                          # VERIFY: passed to the fork's robot config
+      left_arm_port: can0
+      right_arm_port: can1
+    # Observation / action keys. {side} = left|right, {index} = 1..7
+    joint_key: "{side}_joint_{index}.pos"  # VERIFY
+    gripper_key: "{side}_gripper.pos"      # VERIFY
+    joint_units: radians                   # VERIFY: radians | degrees
+    # canonical_rad = sign * robot_value + offset   (per joint, defaults 1 / 0)
+    joint_signs: {}
+    joint_offsets: {}
+    gripper_closed: 0.0                    # VERIFY: robot units when fully closed
+    gripper_open: 1.0                      # VERIFY: robot units when fully open
+
+cameras:
+  expected_roles: [center, right_wrist]
+  width: 640
+  height: 480
+  fps: 30
+  # Pin serial numbers once known; discovery is then skipped.
+  pinned_serials: {}                       # e.g. {center: "123456789", right_wrist: "987654321"}
+  discovery:
+    # auto: pinned -> model heuristic (D405 = wrist) -> wiggle-test (if allowed)
+    # Opening/closing the right gripper fills much of the wrist view but is tiny in
+    # the center view, and needs no arm motion. Any joint name works here.
+    motion_joint: right_gripper
+    motion_amplitude: 0.6                  # gripper: normalized 0..1; arm joint: radians
+  output: config/cameras.yaml
+
+dreamlab:
+  backend: mock                            # mock (replays demo) | http (real API)
+  timeout_s: 120
+  plan_endpoint: /plan                     # VERIFY once API docs are in
+  health_endpoint: /health                 # VERIFY
+  send_images: true
+
+demos:
+  dataset_root: data/demos                 # LeRobot Dataset v3.0 directory
+
+recording:
+  # Teleop recording is delegated to the team's existing script. {mode} = dry | run
+  command: "bash ~/projects/openarm-orboh/scripts/collect_bimanual.sh {mode}"  # VERIFY path
+
+sim:
+  engine: mujoco
+  # Path to an MJCF file, or a path inside the openarm-mujoco package.
+  scene: pedestal/move_puck_scene.xml
+
+safety:
+  joint_limit_margin_rad: 0.05
+  max_joint_velocity_rad_s: 1.2
+  max_joint_accel_rad_s2: 8.0
+  max_gripper_velocity: 3.0                # normalized gripper units (0..1) per second
+  approach_speed_rad_s: 0.3                # speed of the move from current pose to plan start
+  max_plan_duration_s: 120
+  sim_max_tracking_error_rad: 0.25
+  runtime_max_tracking_error_rad: 0.35
+  max_state_drift_rad: 0.05                # robot moved since the sim check -> re-check
+  watchdog_s: 0.25                         # control-loop iteration budget before abort
+  allow_finger_env_contact: true
+  require_sim_pass: true
+  require_manual_approval: true
+
+web:
+  host: 0.0.0.0
+  port: 8000
+
+runs_dir: runs

@@ -1,0 +1,40 @@
+[← instruction.md](instruction.md)
+
+# 13 · Roadmap & open items
+
+## Blocked on input
+
+| Item | Needed from | Unblocks |
+|---|---|---|
+| DreamLab API docs (inputs, outputs, endpoints, auth, sync vs job) | user | `HttpDreamLabClient` ([06](06-dreamlab.md)) |
+| Orboh LeRobot fork access or details (robot type, keys, units, gripper) | team | `lerobot` backend, [VERIFY list](02-configuration.md#verify-checklist) |
+| Path and arguments of `collect_bimanual.sh` | team | recording from the console ([05](05-demos-recording.md)) |
+| Real workcell dimensions and camera poses | user | trustworthy collision checks ([07](07-simulation.md#sim-to-real-alignment)) |
+| RealSense models and serials | user | pinned camera roles ([04](04-cameras.md)) |
+
+## Next steps
+1. Wire the real DreamLab API; test offline with `orboh check` on recorded demos.
+2. Bring up on the robot box (see [12 → first bring-up](12-testing.md#on-the-robot-first-bring-up)).
+3. Build a workcell MJCF scene that matches reality.
+4. Verify success after execution: check the result with the center camera, with retries.
+5. Evaluate the success rate across object positions and new objects, using `runs/` logs.
+6. Optional:
+   - a dora-rs robot backend (team branch `feat/dora-collection`);
+   - IK, if DreamLab returns end-effector poses;
+   - an Isaac Sim engine.
+
+## Decisions log
+
+| Date | Decision | Why |
+|---|---|---|
+| 2026-10-20 | Build on the team's LeRobot fork, not ROS 2 | the team already controls Damiao/SocketCAN from Python; ROS 2 is only borrowed for `kdl_parser` |
+| 2026-10-20 | MuJoCo for the safety sim | runs on Jetson and laptops; official bimanual OpenArm MJCF exists |
+| 2026-10-20 | Canonical joint vector = MuJoCo radians + 0..1 grippers | one unit system inside; convert only at the edges |
+| 2026-10-20 | Sim checks the exact command sequence (approach + plan) and execution is fingerprint-gated | what was checked is exactly what runs |
+| 2026-10-20 | Wiggle test uses the right gripper, not an arm joint | 0.55 vs 0.03 separation in sim (an elbow move gave ~0.01 each); no arm motion needed |
+| 2026-10-20 | Mock DreamLab = replay the demo | the full flow is testable before the API is wired |
+| 2026-10-20 | Web console in vanilla JS with no build step | easy to maintain on the robot box |
+| 2026-10-20 | Docs live in `work/`; `instruction.md` ≤ 175 lines | user request: well maintained and structured |
+
+## Related
+- [instruction.md §9 status](instruction.md#9-current-status-2026-10-20) · [02 Configuration](02-configuration.md)

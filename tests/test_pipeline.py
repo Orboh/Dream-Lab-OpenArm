@@ -1,0 +1,220 @@
+import threading
+
+import numpy as np
+import pytest
+
+from orboh.cameras.discovery import assign_roles, changed_fraction, load_cameras_yaml, save_cameras_yaml
+from orboh.cameras.sources import CameraDevice
+from orboh.config import CamerasConfig, LeRobotConfig, SafetyConfig, load_config
+from orboh.demos.dataset import LeRobotDemoDataset
+from orboh.demos.sample import write_sample_dataset
+from orboh.execution.executor import Executor, build_execution_trajectory
+from orboh.robot.mapping import JointMapping
+from orboh.robot.sim_robot import SimRobot
+from orboh.safety import check_trajectory
+from orboh.sim.mujoco_sim import MujocoSim
+from orboh.types import NUM_JOINTS, Trajectory, joint_index
+
+SCENE = "pedestal/pedestal.xml"
+
+
+@pytest.fixture(scope="module")
+def sim():
+    return MujocoSim(SCENE)
+
+
+def hold(q, seconds=1.0, hz=30):
+    return Trajectory(np.repeat(q[None], int(seconds * hz), axis=0), hz)
+
+
+# ------------------------------------------------------------------ mapping
+def test_mapping_round_trip_degrees_and_signs():
+    cfg = LeRobotConfig(joint_units="degrees", joint_signs={"left_joint2": -1}, joint_offsets={"right_joint1": 0.1},
+                        gripper_closed=0, gripper_open=100)
+    m = JointMapping(cfg)
+    q = np.linspace(-0.5, 0.5, NUM_JOINTS)
+    q[[7, 15]] = [0.25, 1.0]
+    raw = m.from_canonical(q)
+    assert raw["left_gripper.pos"] == pytest.approx(25)
+    assert raw["left_joint_1.pos"] == pytest.approx(np.degrees(q[0]))
+    assert m.to_canonical(raw) == pytest.approx(q)
+
+
+def test_mapping_reports_missing_keys():
+    with pytest.raises(KeyError, match="missing keys"):
+        JointMapping(LeRobotConfig()).to_canonical({"left_joint_1.pos": 0})
+
+
+def test_resample_slows_motion():
+    t = Trajectory(np.zeros((31, NUM_JOINTS)), 30)
+    assert t.resample(speed_scale=0.5).duration == pytest.approx(2.0)
+
+
+# ------------------------------------------------------------------- safety
+def test_safe_hold_passes(sim):
+    report = check_trajectory(hold(sim.home()), sim, SafetyConfig(), sim.home())
+    assert report.passed, [c for c in report.checks if not c.passed]
+
+
+def test_joint_limit_violation_blocks_before_sim(sim):
+    q = sim.home()
+    q[joint_index("right_joint4")] = 3.0  # beyond 2.44 limit
+    report = check_trajectory(hold(q), sim, SafetyConfig(), q)
+    failed = {c.name for c in report.checks if not c.passed}
+    assert not report.passed and "joint_limits" in failed and "sim_rollout" in failed
+
+
+def test_fast_motion_fails_velocity(sim):
+    a, b = sim.home(), sim.home()
+    b[joint_index("left_joint1")] -= 0.5
+    report = check_trajectory(Trajectory(np.stack([a, b]), 30), sim, SafetyConfig(), a)  # 15 rad/s
+    assert "joint_velocity" in {c.name for c in report.checks if not c.passed}
+
+
+def test_arm_arm_collision_detected_in_sim(sim):
+    q = sim.home()
+    q[joint_index("left_joint3")], q[joint_index("right_joint3")] = 0.4, -0.4
+    traj, _ = build_execution_trajectory(sim.home(), hold(q, 0.5), SafetyConfig())
+    report = check_trajectory(traj, sim, SafetyConfig(), sim.home())
+    assert not report.passed
+    assert report.sim["first_collision"]["kind"] == "arm_arm"
+
+
+# ---------------------------------------------------------------- execution
+def test_executor_completes_and_tracks(sim):
+    robot = SimRobot(SCENE, 30)
+    robot.connect()
+    target = robot.read_joints()
+    target[joint_index("right_joint1")] += 0.3
+    traj, n_approach = build_execution_trajectory(robot.read_joints(), hold(target, 0.5), SafetyConfig())
+    assert n_approach > 0
+    lo, hi = sim.limits()
+    res = Executor(robot, SafetyConfig(), lo, hi).run(traj, threading.Event())
+    assert res.completed, res.reason
+    assert robot.read_joints()[joint_index("right_joint1")] == pytest.approx(target[joint_index("right_joint1")], abs=0.05)
+
+
+def test_executor_estop_halts_immediately(sim):
+    robot = SimRobot(SCENE, 30)
+    robot.connect()
+    stop = threading.Event()
+    stop.set()
+    lo, hi = sim.limits()
+    res = Executor(robot, SafetyConfig(), lo, hi).run(hold(robot.read_joints()), stop)
+    assert not res.completed and res.steps_sent == 0 and "E-STOP" in res.reason
+
+
+def test_supervisor_clamps_step_size(sim):
+    robot = SimRobot(SCENE, 30)
+    robot.connect()
+    sent = []
+    robot.send_joints = lambda q, _orig=robot.send_joints: (sent.append(q.copy()), _orig(q))
+    jump = robot.read_joints()
+    jump[joint_index("left_joint1")] -= 1.0  # unchecked 1 rad jump in one step
+    lo, hi = sim.limits()
+    cfg = SafetyConfig(runtime_max_tracking_error_rad=10)
+    Executor(robot, cfg, lo, hi).run(Trajectory(np.stack([jump, jump]), 30), threading.Event())
+    first_step = abs(sent[0][0] - sim.home()[0])
+    assert first_step <= cfg.max_joint_velocity_rad_s / 30 * 1.5 + 1e-6
+
+
+# ------------------------------------------------------------------ cameras
+DEVS = [CameraDevice("111", "Intel RealSense D435"), CameraDevice("222", "Intel RealSense D405")]
+
+
+def test_roles_from_wiggle_scores():
+    r = assign_roles(DEVS, CamerasConfig(), {"111": 0.03, "222": 0.55})
+    assert r.assignments == {"right_wrist": "222", "center": "111"} and r.confident
+
+
+def test_ambiguous_wiggle_needs_confirmation():
+    assert not assign_roles(DEVS, CamerasConfig(), {"111": 0.2, "222": 0.25}).confident
+
+
+def test_model_heuristic_and_pinned():
+    r = assign_roles(DEVS, CamerasConfig())
+    assert r.assignments["right_wrist"] == "222" and r.method == "model_heuristic" and not r.confident
+    pinned = assign_roles(DEVS, CamerasConfig(pinned_serials={"center": "222", "right_wrist": "111"}))
+    assert pinned.assignments == {"center": "222", "right_wrist": "111"} and pinned.confident
+
+
+def test_missing_camera_reported():
+    r = assign_roles(DEVS[:1], CamerasConfig())
+    assert any("found 1" in n for n in r.notes) and not r.confident
+
+
+def test_cameras_yaml_round_trip(tmp_path):
+    r = assign_roles(DEVS, CamerasConfig(), {"111": 0.0, "222": 0.9})
+    doc = save_cameras_yaml(r, CamerasConfig(), tmp_path / "cameras.yaml")
+    assert load_cameras_yaml(tmp_path / "cameras.yaml") == r.assignments
+    assert 'serial_number_or_name: "222"' in doc["lerobot_record_cameras_arg"]
+
+
+def test_changed_fraction():
+    a = np.zeros((10, 10, 3), np.uint8)
+    b = a.copy()
+    b[:5] = 200
+    assert changed_fraction(a, b) == pytest.approx(0.5)
+
+
+# ------------------------------------------------------------------ dataset
+def test_sample_dataset_round_trip(tmp_path, sim):
+    mapping = JointMapping(LeRobotConfig(joint_units="degrees", gripper_open=100))
+    write_sample_dataset(tmp_path, mapping, sim.home(), episodes=2)
+    ds = LeRobotDemoDataset(tmp_path, mapping)
+    eps = ds.list_episodes()
+    assert [e["index"] for e in eps] == [0, 1]
+    ep = ds.load(1)
+    assert ep.trajectory.positions.shape[1] == NUM_JOINTS
+    assert ep.trajectory.positions[0] == pytest.approx(sim.home(), abs=1e-4)  # units survived the round trip
+    assert ep.task
+
+
+# --------------------------------------------------------------------- web
+@pytest.fixture
+def client(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from orboh.pipeline import Pipeline
+    from orboh.web.server import create_app
+
+    cfg = load_config()
+    cfg.robot.backend, cfg.dreamlab.backend, cfg.web.token = "sim", "mock", "secret"
+    cfg.demos.dataset_root = str(tmp_path / "demos")
+    cfg.cameras.output = str(tmp_path / "cameras.yaml")
+    cfg.runs_dir = str(tmp_path / "runs")
+    with TestClient(create_app(Pipeline(cfg))) as c:
+        yield c
+
+
+def _wait_idle(c, h):
+    import time
+
+    for _ in range(600):
+        s = c.get("/api/state", headers=h).json()
+        if s["task"] is None:
+            return s
+        time.sleep(0.05)
+    raise TimeoutError
+
+
+def test_web_requires_token(client):
+    assert client.get("/api/state").status_code == 401
+    assert client.get("/api/state", headers={"Authorization": "Bearer secret"}).status_code == 200
+
+
+def test_web_full_flow_and_gates(client):
+    h = {"Authorization": "Bearer secret"}
+    assert client.post("/api/execute", json={"approved": True}, headers=h).status_code == 412  # nothing checked
+    client.post("/api/demos/sample", headers=h)
+    _wait_idle(client, h)
+    client.post("/api/plan", json={"episode": 0}, headers=h)
+    _wait_idle(client, h)
+    client.post("/api/check", json={"speed_scale": 1.0}, headers=h)
+    s = _wait_idle(client, h)
+    assert s["report"]["passed"], s["report"]["checks"]
+    assert client.post("/api/execute", json={"approved": False}, headers=h).status_code == 412  # no approval
+    assert client.post("/api/execute", json={"approved": True}, headers=h).status_code == 200
+    client.post("/api/estop", headers=h)
+    s = _wait_idle(client, h)
+    assert s["estopped"] and s["execution"] and not s["execution"]["completed"]

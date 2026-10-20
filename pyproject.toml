@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "orboh"
+version = "0.1.0"
+description = "Bimanual OpenArm one-shot manipulation pipeline (DreamLab API + MuJoCo safety check + web console)"
+requires-python = ">=3.10"
+dependencies = [
+  "numpy",
+  "pyyaml",
+  "python-dotenv",
+  "pydantic>=2",
+  "fastapi",
+  "uvicorn[standard]",
+  "httpx",
+  "pyarrow",
+  "pillow",
+  "mujoco>=3.2",
+  "openarm-mujoco>=2.3",
+]
+
+[project.optional-dependencies]
+realsense = ["pyrealsense2"]  # x86 only; on Jetson build librealsense with Python bindings
+dev = ["pytest"]
+
+[project.scripts]
+orboh = "orboh.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["orboh*"]
+
+[tool.setuptools.package-data]
+"orboh.web" = ["static/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

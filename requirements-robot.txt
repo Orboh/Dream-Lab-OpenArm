@@ -1,0 +1,7 @@
+# Extra libraries for the robot box only (on top of requirements.txt).
+#   .venv/bin/pip install -r requirements-robot.txt
+# pyrealsense2: x86_64 wheels only. On Jetson/aarch64 build librealsense with
+#   -DBUILD_PYTHON_BINDINGS=ON instead and remove the line below.
+pyrealsense2==2.59.1.11053
+# Orboh LeRobot fork (branch feat/bi-openarm-soft-move-to) is installed from its checkout,
+# not from PyPI:  .venv/bin/pip install -e ~/projects/lerobot
