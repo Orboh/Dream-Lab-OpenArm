@@ -35,6 +35,7 @@ from orboh.execution.executor import Executor, build_execution_trajectory
 from orboh.execution.policy_runner import PolicyResult, PolicyRunner
 from orboh.execution.slew import slew_limit, slowed
 from orboh.robot import make_robot
+from orboh.robot.base import Robot
 from orboh.robot.mapping import JointMapping
 from orboh.robot.sim_robot import SimRobot
 from orboh.safety import CheckResult, SafetyReport, check_trajectory, fingerprint
@@ -85,6 +86,8 @@ class Pipeline:
         self.exec_traj: Trajectory | None = None
         self.policy_dry_ok: tuple[str, str] | None = None  # (prompt, backend) of the last dry-run in which a plan passed
         self.policy_chunks: list[dict] = []
+        self._warned_extrinsics = False
+        self.snapshot_frames: dict[str, bytes] = {}  # one frame per camera slot, taken when the latest task was started
         self.sim_run: SimRobot | None = None  # the simulated robot of the latest simulation-only run (for the live view)
         self.approach_steps = 0
         self.report: SafetyReport | None = None
@@ -200,12 +203,19 @@ class Pipeline:
 
     def _open_cameras(self, assignments: dict[str, str]) -> None:
         by_serial = {d.serial: d for d in self._devices()}
-        sources = {}
+        sources, missing = {}, []
         for role, serial in assignments.items():
             if serial not in by_serial:
-                raise RuntimeError(f"camera {serial} for role {role} not connected")
+                missing.append(f"{role} ({serial})")  # one unplugged camera must not take the others down with it
+                continue
             sources[role] = self._make_source(by_serial[serial], role)
+            if getattr(sources[role], "depth_failed", False):
+                self.log(f"camera '{role}': the depth stream delivers nothing (colour only for now); reset it: scripts/reset_realsense.py", "warn")
         self.cameras.open(sources)
+        if missing:
+            self.log("camera(s) not connected, check their USB cables then restart the console: " + ", ".join(missing), "warn")
+        if not sources:
+            raise RuntimeError("no camera connected")
 
     def discover_cameras(self, wiggle: bool) -> None:
         self._set_step("cameras", "running")
@@ -332,7 +342,8 @@ class Pipeline:
         if rgbd is None:
             raise GateError(f"camera '{role}' has no depth stream: set cameras.depth_roles and open the cameras (see work/16)")
         ext = load_extrinsics(self.cfg.path(self.cfg.cameras.extrinsics), self.cameras.sources[role].device.serial)
-        if ext is None:
+        if ext is None and not self._warned_extrinsics:
+            self._warned_extrinsics = True  # the console polls this every few seconds: say it once, not every time
             self.log("no camera extrinsics: positions are in the camera frame only (scripts/calibrate_camera.py)", "warn")
         return attach_base_positions(BlockFinder(self.cfg.perception).find(rgbd), ext[0] if ext else None)
 
@@ -429,6 +440,25 @@ class Pipeline:
         return lambda: {slot: self.cameras.snapshot(role, max_age_s=0.05) if role else None
                         for slot, role in pc.camera_map.items()}
 
+    def _save_snapshot(self, prompt: str, frames: dict[str, bytes | None], robot: Robot, info: dict) -> None:
+        """Keep one frame from every camera at the moment a task starts: saved in the run folder and shown in the chat.
+        (Dream-1 itself still gets live frames while it works: it plans in a loop from what it currently sees.)"""
+        got = {slot: jpg for slot, jpg in frames.items() if jpg}
+        self.snapshot_frames = got
+        folder = self.run_dir / "snapshot"
+        folder.mkdir(parents=True, exist_ok=True)
+        for slot, jpg in got.items():
+            (folder / f"{slot}.jpg").write_bytes(jpg)
+        try:
+            joints = [round(float(v), 4) for v in robot.read_joints()]
+        except Exception:
+            joints = []
+        meta = {"time": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "prompt": prompt, "slots": list(got),
+                "no_frame": [s for s, j in frames.items() if not j], "joints": joints, **info}
+        (folder / "snapshot.json").write_text(json.dumps(meta, indent=2))
+        self.log(f"snapshot of {len(got)} camera feed(s) kept in {folder}" + (f" (no frame from {meta['no_frame']})" if meta["no_frame"] else ""))
+        self._emit("snapshot", slots=list(got), no_frame=meta["no_frame"], folder=str(folder), at=meta["time"])
+
     def policy_gate(self, prompt: str, backend: str | None, dry_run: bool, approved: bool,
                     need_dry_first: bool = False, gripper: str | None = None) -> tuple[str, str]:
         """Resolve (prompt, backend) and refuse a real run that lacks approval or a passed dry-run of the same thing."""
@@ -503,7 +533,10 @@ class Pipeline:
 
         speed = min(1.0, max(0.1, speed if speed else pc.speed_scale))
         self.log(f"movement speed {speed:.0%} of the safety limits (max {self.cfg.safety.max_joint_velocity_rad_s * speed:.2f} rad/s per joint)")
-        runner = PolicyRunner(robot, client, self._policy_snapshots(robot.sim if simulate else None), pc, slowed(self.cfg.safety, speed), self.lo, self.hi,
+        snapshots = self._policy_snapshots(robot.sim if simulate else None)
+        self._save_snapshot(prompt, snapshots(), robot, {"speed": speed, "backend": backend, "gripper": gripper,
+                                                         "dry_run": dry_run, "simulation": simulate})
+        runner = PolicyRunner(robot, client, snapshots, pc, slowed(self.cfg.safety, speed), self.lo, self.hi,
                               self.check_sim, execute=not dry_run, log=self.log, on_progress=progress, on_chunk=on_chunk)
         try:
             result = runner.run(prompt, seconds, self.stop_event)

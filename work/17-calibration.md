@@ -38,6 +38,19 @@ About **25 mm**. The floor is the demos themselves: the operator does not grasp 
 ([18](18-grasp-planner.md)), so this calibration is good enough to plan, to dry-run and to approach, **not to close the gripper blind**.
 Do not trust a real grasp on it without a refinement.
 
+## Has the camera moved? `calibrate_camera.py check` (2026-10-20 incident)
+`.venv/bin/python scripts/calibrate_camera.py check` (camera free) compares the camera's live height above the table and its tilt, both
+measured from depth, with the saved calibration: more than 15 mm or 3° apart = the camera moved and the calibration is **wrong**. On
+2026-10-20 evening it had moved: **48 mm higher** (0.375 → 0.423 m), tilt about the same (48° → 46°); the live image shows the box larger and
+lower than in the recordings. The old file was set aside as `config/camera_extrinsics.yaml.stale-2026-10-20` so the console shows camera-frame
+positions only (it had put the block 5 cm too low in the robot frame).
+**Redoing it from the old demos is invalid**: `from-demos` mixes the *live* table plane with *recorded* pixels, so it needs demos recorded with
+the camera where it is now. The numbers it printed anyway (camera z 0.746 m, fit 19 mm) mix two poses and were not saved.
+**Tried and rejected: the box's four corner pieces as landmarks.** Validated on the old frame (known answer) it was off by 105 mm / 14.6°
+(four almost-flat points at assumed positions cannot fix the tilt), so it is not usable.
+**To recalibrate:** leave the camera where it will stay, record ≥ 6 pick demos ([15](15-real-robot.md), stop the bridge first), then
+`scripts/calibrate_camera.py from-demos --dataset <new dataset> --save`, then `check`.
+
 ## Refinement (next, hands-on)
 Touch-point method (`kabsch` already supports it): with torque off, put the fingertip on 4+ known spots on the carpet while
 the camera sees the fingertip in depth; the fingertip's base-frame position comes from forward kinematics. Target: < 8 mm. A second

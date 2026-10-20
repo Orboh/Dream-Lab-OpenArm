@@ -31,6 +31,7 @@
 | 2026-10-20 | Dream-1 decides and executes any prompt typed in the web console; our own grasp planner is parked | user decision. Dream-1 takes only frames, joint state and a prompt (no object-position input); our planner could not yet pass the safety check |
 | 2026-10-20 | Classical (depth-plane) block finder first; GoPro out of scope | one object on plain carpet; live: 20/20 frames, 0.1 mm jitter; no model/GPU needed |
 | 2026-10-20 | Camera calibration from depth plane + recorded demos (~25 mm) | no hands-on step needed; the 0.700 m camera height independently confirms `sim.table_drop_m` 0.075; hands-on touch refinement is the next step |
+| 2026-10-20 | Calibration set aside as stale; `calibrate_camera.py check` added | the chest camera moved 48 mm after calibration; redoing from the old demos is invalid; a box-corner PnP alternative failed validation (105 mm / 14.6°). Needs new demos |
 | 2026-10-20 | Gripper values taken from the 8 real demos (open = negative, contact ≈ −32°, squeeze ≈ −16°) | measured, not assumed ([18](18-grasp-planner.md)) |
 | 2026-10-20 | Build on the team's LeRobot fork, not ROS 2 | the team already controls Damiao/SocketCAN from Python; ROS 2 is only borrowed for `kdl_parser` |
 | 2026-10-20 | MuJoCo for the safety sim | runs on Jetson and laptops; official bimanual OpenArm MJCF exists |

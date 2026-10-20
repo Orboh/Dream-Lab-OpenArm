@@ -147,6 +147,31 @@ def from_demos(args) -> int:
     return 0
 
 
+def check(args) -> int:
+    """Has the chest camera moved since it was calibrated? Compares its live height above the table (from depth) with the saved one."""
+    from orboh.perception.calibration import load_extrinsics
+
+    cfg = load_config(None)
+    serial = cfg.cameras.pinned_serials["center"]
+    ext = load_extrinsics(PROJECT_ROOT / cfg.cameras.extrinsics, serial)
+    if ext is None:
+        print("no calibration saved: run `from-demos --save` after recording demos with the camera where it will stay")
+        return 2
+    import yaml
+
+    saved = yaml.safe_load((PROJECT_ROOT / cfg.cameras.extrinsics).read_text())[serial]
+    _, normal, d = live_table_plane(cfg, serial)
+    expected = float(ext[0][2, 3]) - float(saved["table_top_z"])
+    pitch_saved = float(np.degrees(np.arcsin(-ext[0][2, 2])))
+    pitch_live = float(np.degrees(np.arcsin(abs(normal[2]))))
+    print(f"camera height above the table: calibrated {expected:.3f} m, now {d:.3f} m (difference {abs(d - expected) * 1000:.0f} mm)")
+    print(f"camera tilt below horizontal:  calibrated {pitch_saved:.0f} deg, now {pitch_live:.0f} deg")
+    moved = abs(d - expected) > 0.015 or abs(pitch_saved - pitch_live) > 3
+    print("=> THE CAMERA HAS MOVED: the saved calibration is wrong. Record new demos and re-run from-demos --save." if moved
+          else "=> consistent with the saved calibration (within 15 mm / 3 deg).")
+    return 1 if moved else 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -155,6 +180,8 @@ def main() -> int:
     s.add_argument("--block-height-mm", type=float, default=47.0, help="height of the pieces the demos picked")
     s.add_argument("--save", action="store_true", help="write config/camera_extrinsics.yaml")
     s.set_defaults(fn=from_demos)
+    s = sub.add_parser("check", help="has the camera moved since the saved calibration? (needs the camera free)")
+    s.set_defaults(fn=check)
     args = ap.parse_args()
     return args.fn(args)
 

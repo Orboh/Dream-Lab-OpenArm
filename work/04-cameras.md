@@ -61,5 +61,13 @@ A RealSense device can only be opened by one process. The pipeline therefore:
 - closes all streams before discovery, then reopens them;
 - closes streams before teleop recording and reopens them afterwards.
 
+## No camera feed? (2026-10-20 incident)
+Check in this order. (1) The console log / `GET /api/state` `cameras.roles` lists which cameras opened; a warning names any that are **not
+connected**: one missing camera no longer stops the others (it used to). `lsusb | grep 8086` should show three RealSense devices; a
+missing one is a **cable or connector** problem (the right-wrist D405 `352122273417` dropped off the bus after the right arm moved in a real
+run; reseat its USB cable, then restart the console). (2) A camera that opens but never delivers (here the D435i's **depth** stream): the
+source falls back to colour-only with a warning; `.venv/bin/python scripts/reset_realsense.py` hardware-resets the cameras (stop the console first),
+then restart the console. (3) Browsers allow ~6 connections per host and every MJPEG view keeps one open: avoid several tabs of the console.
+
 ## Related
 - [05 Demos & recording](05-demos-recording.md) · [06 DreamLab](06-dreamlab.md) (images sent with plan requests) · [10 Pipeline](10-pipeline.md)

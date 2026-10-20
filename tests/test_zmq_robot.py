@@ -60,3 +60,18 @@ def test_unreachable_bridge_raises():
     with pytest.raises(BridgeError):
         r.connect()
     assert not r.is_connected
+
+
+def test_bus_problem_flags_a_bus_whose_motors_stopped_answering():
+    """Regression 2026-10-20: both follower buses went ERROR-PASSIVE (motors off) while the fork kept returning stale joint values."""
+    import importlib.util
+    import json
+
+    spec = importlib.util.spec_from_file_location("robot_bridge", BRIDGE)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    link = lambda state: json.dumps([{"linkinfo": {"info_data": {"state": state}}}])
+    assert mod.bus_problem(link("ERROR-ACTIVE")) is None
+    assert "ERROR-PASSIVE" in mod.bus_problem(link("ERROR-PASSIVE"))
+    assert "BUS-OFF" in mod.bus_problem(link("BUS-OFF"))
+    assert "cannot read" in mod.bus_problem("not json")

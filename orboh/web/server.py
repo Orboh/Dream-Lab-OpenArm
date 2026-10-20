@@ -225,6 +225,13 @@ def create_app(pipeline: Pipeline) -> FastAPI:
             raise HTTPException(404, "no simulation run yet")
         return Response(jpg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
+    @app.get("/api/policy/snapshot/{slot}.jpg", dependencies=auth)
+    def policy_snapshot(slot: str):
+        jpg = pipeline.snapshot_frames.get(slot)
+        if jpg is None:
+            raise HTTPException(404, f"no snapshot frame for camera slot '{slot}'")
+        return Response(jpg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
     @app.get("/api/policy/chunks", dependencies=auth)
     def policy_chunks():
         return pipeline.policy_chunks

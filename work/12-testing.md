@@ -21,7 +21,7 @@
 | Speed | `test_slowed_scales_the_speed_limits_and_the_runner_obeys_them` (`tests/test_policy.py`) | `slowed()` scales the limits (never above 1, floor 0.1) and the commands that reach the robot never exceed the slowed velocity / gripper caps |
 | Retries | `test_rejected_plan_is_fed_back_to_dream_and_retried_until_safe`, `test_retry_hint_names_the_problem` (`tests/test_policy.py`) | a rejected plan is explained to the policy and re-requested; a safe one then runs and the hint is cleared |
 | Gripper mode | `test_snap_gripper_uses_demo_values_with_hysteresis` (`tests/test_policy.py`), `test_web_gripper_mode_is_part_of_the_dry_run_and_simple_page_is_served` | Dream's decision becomes the demo open/close value without chatter; the gripper mode is part of the dry-run gate; `/simple` is served |
-| Web policy | `test_web_policy_dry_run_then_gated_real_run` | dry-run moves nothing and unlocks only the same prompt; a real run needs approval; the dry-run is used up |
+| Web policy | `test_web_policy_dry_run_then_gated_real_run` (also: the camera snapshot is served and saved with the prompt and 16 joints) | dry-run moves nothing and unlocks only the same prompt; a real run needs approval; the dry-run is used up |
 | Robot bridge | `test_roundtrip_converts_units`, `test_unreachable_bridge_raises` (`tests/test_zmq_robot.py`) | `ZmqRobot` ↔ `robot_bridge.py --fake` round trip converts degrees ↔ canonical; a dead bridge raises instead of hanging |
 | Web | `test_web_requires_token`, `test_web_full_flow_and_gates` | auth; the gates refuse an unchecked run (412) and an unapproved run (412); E-STOP aborts a live run |
 

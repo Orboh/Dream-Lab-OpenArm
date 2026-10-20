@@ -73,6 +73,17 @@ class RealSenseSource(CameraSource):
         if depth:
             cfg.enable_stream(rs.stream.depth, width, height, rs.format.z16, fps)
         profile = self._pipe.start(cfg)
+        self.depth_failed = False
+        if depth:
+            try:  # a wedged depth stream opens fine but never delivers (USB hiccup): the colour feed must still work
+                self._pipe.wait_for_frames(3000)
+            except RuntimeError:
+                self._pipe.stop()
+                cfg2 = rs.config()
+                cfg2.enable_device(device.serial)
+                cfg2.enable_stream(rs.stream.color, width, height, rs.format.rgb8, fps)
+                profile = self._pipe.start(cfg2)
+                depth, self.depth_failed = False, True
         self._align = rs.align(rs.stream.color) if depth else None
         self._depth_scale = profile.get_device().first_depth_sensor().get_depth_scale() if depth else 0.0
 

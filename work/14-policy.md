@@ -31,6 +31,12 @@ A chunk that fails the sim check is dropped and the arms hold. Three rejections 
 or no usable chunk for `starve_s` halt the run. Every row sent to the robot also passes the runtime supervisor
 ([08](08-safety.md)).
 
+## Snapshot of the cameras when a task starts
+`Pipeline._save_snapshot`: at the start of every run one frame per Dream camera slot (`overhead`, `wrist_l`, `wrist_r`; the same frames
+Dream is given, so a missing camera shows up as a slot with no frame, "Dream-1 gets a black frame there") is saved to
+`runs/<time>_policy/snapshot/` with `snapshot.json` (prompt, time, 16 joint values, speed, backend, gripper mode, dry-run/simulation) and
+announced as a `snapshot` event. It is a record and a chat preview, not Dream's input: Dream-1 keeps getting live frames during the run.
+
 ## Movement speed (slow by default)
 `policy.speed_scale` (0.3 by default; the *speed* select in both web views, `run-policy --speed`, `POST /api/policy/run {speed}`) scales the
 safety speed limits for a run: joint velocity and gripper speed × scale, acceleration × scale (gentler starts). At 0.3 an arm joint

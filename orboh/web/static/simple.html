@@ -95,6 +95,16 @@ function ask(t) {
   say(`Asking Dream-1 about "${t}" as a dry-run: it looks at the cameras and plans, the safety check judges each step, nothing moves.`);
   run(t, true, false, false);
 }
+function showSnapshot(e) {
+  const d = document.createElement("div"); d.className = "m bot note";
+  d.append(`Kept one frame from every camera at ${new Date(e.at).toLocaleTimeString()} (saved in ${e.folder}):`);
+  const row = document.createElement("div"); row.style.cssText = "display:flex;gap:6px;margin-top:6px;flex-wrap:wrap";
+  e.slots.forEach(s => { const f = document.createElement("figure"); f.style.margin = 0;
+    f.innerHTML = `<img src="/api/policy/snapshot/${s}.jpg?t=${Date.now()}&${q()}" style="height:90px;border-radius:6px;border:1px solid var(--line)"><figcaption style="font-size:11px">${s}</figcaption>`; row.appendChild(f); });
+  d.appendChild(row);
+  if (e.no_frame.length) d.append(`No frame from: ${e.no_frame.join(", ")} (Dream-1 gets a black frame there)`);
+  $("msgs").appendChild(d); $("msgs").scrollTop = 1e9;
+}
 function describe(x) {
   const g = x.gripper === "demos" ? "gripper amounts from the demos" : "gripper decided by Dream";
   const where = x.simulation ? "simulation" : x.dry_run ? "dry-run" : "robot run";
@@ -114,6 +124,7 @@ function connect() {
       const again = !e.ok && e.retry < e.max_retries ? `\n↻ I told Dream-1 what went wrong and asked it again (retry ${e.retry}/${e.max_retries - 1})` : !e.ok ? "\n✖ out of retries" : "";
       say(`plan ${e.index}: ${e.ok ? "✔ safe" : "✖ " + e.reason.slice(0, 110)}${again}`, "bot", (e.ok ? "ok " : "bad ") + "note");
     }
+    else if (e.type === "snapshot" && running) showSnapshot(e);
     else if (e.type === "log" && e.level === "info" && /safe plan after/.test(e.msg)) say("✔ " + e.msg, "bot", "ok note");
     else if (e.type === "log" && e.level === "warn") say(e.msg, "bot", "warn note");
     else if (e.type === "state") onState(e.state);

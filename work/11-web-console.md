@@ -10,6 +10,10 @@
 a chat on the right. Type a task in plain words: it is **dry-run** with Dream-1 first (nothing moves) and the chat reports each plan
 and the verdict. If the first plan passed, type **go** to run it on the real robot (typing it is the approval), **sim** to watch it in the
 simulation, **stop** to E-STOP (**release** lifts it). If Dream-1's plan is rejected, the chat shows it, Dream-1 is told why and asked again (retries), and **retry** asks it again after a failure. Header selects: real robot | simulation only, speed (very slow | **slow** (default) | medium | full), gripper (Dream decides | amounts from demos), model.
+**Snapshot:** when a task starts (dry-run, simulation or real run) one frame from every camera is kept: the chat shows thumbnails and
+the frames are saved in `runs/<time>_policy/snapshot/` (`overhead.jpg`, `wrist_l.jpg`, `wrist_r.jpg`, `snapshot.json` with the prompt,
+time, joint state, speed and mode). `GET /api/policy/snapshot/{slot}.jpg` serves the latest. Dream-1 still sees **live** frames while it
+works (it plans in a loop; freezing its view would make it blind to its own movement), the snapshot is the record of the moment it was asked.
 It uses the same endpoints and the same gates as the main console below (dry-run of the same prompt, gripper mode and model first).
 
 ## Dream-1 panel (the top card, "tell the robot what to do")

@@ -25,7 +25,9 @@ import argparse
 import json
 import logging
 import signal
+import subprocess
 import sys
+import time
 from pathlib import Path
 
 import yaml
@@ -88,19 +90,44 @@ class RealArms:
         cfg = BiOpenArmFollowerConfig(id="follower", left_arm_config=arm(left_port, "left", left_pose),
                                       right_arm_config=arm(right_port, "right", right_pose))
         self._robot = BiOpenArmFollower(cfg)
+        self._ports, self._bus_checked = (left_port, right_port), 0.0
 
     def connect(self) -> None:
         self._robot.connect()
 
+    def _check_buses(self) -> None:
+        now = time.monotonic()
+        if now - self._bus_checked < 0.5:
+            return
+        self._bus_checked = now
+        for port in self._ports:
+            out = subprocess.run(["ip", "-details", "-json", "link", "show", port], capture_output=True, text=True).stdout
+            if (why := bus_problem(out)) is not None:
+                raise RuntimeError(f"{port}: {why}")
+
     def read(self) -> dict[str, float]:
+        self._check_buses()
         return {k: float(v) for k, v in self._robot.get_observation().items() if k.endswith(".pos")}
 
     def send(self, action: dict[str, float]) -> dict[str, float]:
+        self._check_buses()
         return {k: float(v) for k, v in self._robot.send_action(action).items()}
 
     def disconnect(self) -> None:
         if self._robot.is_connected:
             self._robot.disconnect()
+
+
+def bus_problem(link_json: str) -> str | None:
+    """Why a CAN interface cannot be trusted, from `ip -details -json link show <iface>` (None = healthy).
+
+    When the motors lose power or the cable comes off, nobody acknowledges the frames: the bus goes ERROR-PASSIVE / BUS-OFF and the fork
+    keeps returning the *last known* joint values, so the arms would look fine while being blind. Refuse to read or command then."""
+    try:
+        state = json.loads(link_json)[0]["linkinfo"]["info_data"]["state"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return "cannot read the CAN interface state"
+    return None if state == "ERROR-ACTIVE" else f"CAN bus is {state}: the motors are not answering (power off? cable?)"
 
 
 def handle(arms, req: dict) -> dict:

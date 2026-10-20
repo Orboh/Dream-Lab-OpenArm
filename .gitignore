@@ -9,4 +9,5 @@ data/*
 !data/.gitkeep
 config/cameras.yaml
 config/camera_extrinsics.yaml
+config/camera_extrinsics.yaml.stale-*
 *.egg-info/
