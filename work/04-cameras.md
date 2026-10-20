@@ -4,16 +4,16 @@
 
 **Code:** `orboh/cameras/sources.py`, `orboh/cameras/discovery.py`, with orchestration in `orboh/pipeline.py`.
 
-## Expected hardware
-- **center:** Intel RealSense mounted in the middle of the OpenArm body
-- **right_wrist:** Intel RealSense above the right wrist (right side only)
+## Expected hardware (Kitakyushu rig)
+- **center:** D435i `344422070898` on a homemade chest mount (~700 mm above the plate, 45° tilt); also streams depth (`cameras.depth_roles`)
+- **left_wrist:** D405 `409122272149`; **right_wrist:** D405 `352122273417` (colour only)
 
 ## Sources (`sources.py`)
 
 | Class | Use |
 |---|---|
 | `list_realsense()` | enumerate devices: serial, name, USB type, physical port, firmware |
-| `RealSenseSource` | color stream of one device (`rgb8`, configured resolution/fps) |
+| `RealSenseSource` | color stream of one device (`rgb8`, configured resolution/fps); with `depth=True` also depth aligned to colour (`read_rgbd()` → `RGBD`, see [16](16-perception.md)) |
 | `SimCameraSource` | MuJoCo render; in sim, `camera_wrist_right` and `tablecam` stand in for the real cameras |
 | `CameraManager` | holds open sources **by role**, caches the latest JPEG for the UI |
 

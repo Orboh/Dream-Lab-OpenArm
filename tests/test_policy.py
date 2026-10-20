@@ -183,3 +183,80 @@ def test_runner_halts_when_policy_goes_silent(sim):
     runner, _ = make_runner(Silent(lambda q0: np.tile(q0, (4, 1))), sim)
     res = runner.run("test", 10.0, threading.Event())
     assert not res.completed and "network down" in res.reason
+
+
+def test_snap_gripper_uses_demo_values_with_hysteresis():
+    """gripper_mode 'demos': Dream's open/close decision becomes the demo open (0.74) / squeeze (0.25) value, no chatter."""
+    from orboh.config import PolicyConfig
+    from orboh.execution.policy_runner import snap_gripper
+    from orboh.types import GRIPPER_IDX
+
+    cfg = PolicyConfig(gripper_mode="demos")
+    pos = np.zeros((7, 16))
+    pos[:, GRIPPER_IDX[1]] = [0.8, 0.7, 0.5, 0.3, 0.45, 0.55, 0.7]  # right gripper: open ... closes below 0.40 ... reopens above 0.60
+    pos[:, GRIPPER_IDX[0]] = 0.5  # left stays in the dead band: keeps the carried-over state
+    out, state = snap_gripper(pos, cfg, (True, False))
+    assert out[:, GRIPPER_IDX[1]].tolist() == [0.74, 0.74, 0.74, 0.25, 0.25, 0.25, 0.74]
+    assert out[:, GRIPPER_IDX[0]].tolist() == [0.25] * 7 and state == (True, False)
+    assert (out[:, [i for i in range(16) if i not in GRIPPER_IDX]] == 0).all()  # arm joints untouched
+
+
+def test_rejected_plan_is_fed_back_to_dream_and_retried_until_safe(sim):
+    """Dream-1 sorts out its own failures: a rejected plan is explained to it and it is asked again; a safe one then runs."""
+    seen = []
+
+    class Flaky(FixedChunkPolicy):
+        def get_chunk(self):
+            self.make_chunk = collide if self.calls < 2 else (lambda q0: np.tile(q0, (48, 1)))  # two bad plans, then a safe one
+            return super().get_chunk()
+
+        def feedback(self, text):
+            seen.append(text)
+
+    runner, robot = make_runner(Flaky(collide), sim, cfg=PolicyConfig(max_check_failures=5))
+    res = runner.run("test", 6.0, threading.Event())
+    assert res.completed and res.chunks_rejected == 2, res.reason
+    assert [s is None for s in seen] == [False, False, True]  # a hint after each rejection, cleared once it got it right
+    assert "collide" in seen[0] and any("retry" in e for e in res.events) and any("safe plan after 2 retries" in e for e in res.events)
+
+
+def test_retry_hint_names_the_problem():
+    from orboh.execution.policy_runner import retry_hint
+
+    assert "table" in retry_hint("sim_collisions: 12 colliding steps; first at t=1s: env table <-> openarm_left_link6")
+    assert "arms" in retry_hint("sim_collisions: x arm_arm openarm_left_link3 <-> openarm_right_link3")
+    assert "slower" in retry_hint("sim_tracking: max tracking error 1.2 rad")
+
+
+def test_slowed_scales_the_speed_limits_and_the_runner_obeys_them(sim):
+    """speed_scale: the arms may move at a fraction of the safety limits, and the commands that reach the robot respect it."""
+    from orboh.execution.slew import slowed
+
+    slow = slowed(SAFETY, 0.3)
+    assert slow.max_joint_velocity_rad_s == pytest.approx(SAFETY.max_joint_velocity_rad_s * 0.3)
+    assert slow.max_joint_accel_rad_s2 == pytest.approx(SAFETY.max_joint_accel_rad_s2 * 0.3)
+    assert slowed(SAFETY, 5.0).max_joint_velocity_rad_s == SAFETY.max_joint_velocity_rad_s  # never faster than the limits
+    assert slowed(SAFETY, 0.0).max_joint_velocity_rad_s == pytest.approx(SAFETY.max_joint_velocity_rad_s * 0.1)
+
+    sent = []
+
+    class Recording(SimRobot):
+        def send_joints(self, q):
+            sent.append(np.asarray(q).copy())
+            super().send_joints(q)
+
+    def stride(q0):  # asks for a big move: 1 rad on right joint 1 within the chunk
+        out = np.tile(q0, (48, 1))
+        out[:, joint_index("right_joint1")] += np.linspace(0, 1.0, 48)
+        return out
+
+    robot = Recording(SCENE, HZ)
+    robot.connect()
+    lo, hi = sim.limits()
+    runner = PolicyRunner(robot, FixedChunkPolicy(stride), lambda: {}, PolicyConfig(), slow, lo, hi, MujocoSim(SCENE), execute=True)
+    res = runner.run("test", 4.0, threading.Event())
+    assert res.completed, res.reason
+    d = np.abs(np.diff(np.array(sent[:-1]), axis=0)) * HZ  # the last command is the end-of-run 'hold the measured pose', not motion
+    peak = d[:, list(ARM_IDX)].max()
+    assert d[:, list(GRIPPER_IDX)].max() <= slow.max_gripper_velocity * 1.05
+    assert 0.05 < peak <= slow.max_joint_velocity_rad_s * 1.05, peak  # it moved, and never faster than the slowed limit

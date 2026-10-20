@@ -35,6 +35,8 @@ Dream client (`dreamlabs` declares `Requires-Python >=3.11,<3.14`; a forced inst
    (`cameras.pinned_serials`: D435i = `center`, D405 `409122272149` = `left_wrist`, D405 `352122273417` =
    `right_wrist`). On a different rig run `orboh discover-cameras --wiggle` and pin the result ([04](04-cameras.md)).
    Look at them: `.venv/bin/python scripts/camera_probe_web.py` → <http://127.0.0.1:8765>.
+5b. **Perception + calibration** ([16](16-perception.md), [17](17-calibration.md)): `camera_probe_web.py` shows the block box and base-frame xyz;
+   `scripts/calibrate_camera.py from-demos --save` after a recording (re-run whenever the chest camera is touched).
 6. **Fake bridge + dry-run (no hardware moves).**
    ```bash
    bash scripts/start_bridge.sh fake        # terminal 1
@@ -48,6 +50,11 @@ Dream client (`dreamlabs` declares `Requires-Python >=3.11,<3.14`; a forced inst
    move to the start pose.** Then `orboh --backend bridge run-policy … --dry-run` once more (now with the real
    joint state), and only then `--approve` with a short `--seconds`, e-stop in reach.
    Stop the bridge with Ctrl-C: it disconnects and **releases torque, so the arms go limp** — support them first.
+
+## Using it: the web console
+`orboh --backend bridge serve --host 127.0.0.1` (bridge fake or real running) → <http://127.0.0.1:8000>. Top card: type the task,
+**Dry-run**, read the chunk verdicts, then approve **Run on robot** ([11](11-web-console.md)). With the real bridge the arms move.
+Stop the console (Ctrl-C) before recording demos: it holds the cameras.
 
 ## Settings to check on a new rig (all in `config/pipeline.yaml`)
 
@@ -78,6 +85,7 @@ Dream client (`dreamlabs` declares `Requires-Python >=3.11,<3.14`; a forced inst
 | Follower J6 unresponsive, LED solid red | J6 cable unplugged; reseat it (enactic/openarm#471) |
 | Wrist J7 spins ≈−80° when the hold releases | leader wrist falls under gravity (rest L 21.6°, R −15°); start-pose J7 must be that angle |
 | Dataset unreadable after a recording | not finalized: always press esc and wait for shutdown before power-off (LeRobot v3 closes the parquet at finalize) |
+| Red LED on a motor | a Damiao motor reports an error code (or just sits disabled). Disabled motors only report "disabled", so passively listening shows nothing. Read the real code: with teleop/record/bridge stopped, `~/projects/lerobot/.venv/bin/python scripts/damiao_probe_state.py can_fol_l joint_6 --repeat 1` (in `openarm-orboh`; enable once at zero torque, read, disable). `state=0x1 enabled` = no latched error; `0x8`–`0xE` = the error type, then `damiao_errcheck.py <bus> --clear-motor <bus>:<joint>`, else power-cycle the arm (off, 10 s, on). Check the cable first (the 2026-10-20 J6 case was an unplugged cable). There is no software "lock" to release. 2026-10-20 check: all 16 follower motors `enabled`, 27–33 °C, no error |
 | `bridge at … did not answer` | bridge not running / wrong endpoint; `ZmqRobot` closes the stuck socket, call `connect()` again |
 | Every dry-run chunk fails `sim_collisions` at t≈0.2 s | bridge started from the fork's default pose; pass the pose files |
 | `no camera for Dream slot(s)` | cameras not opened: pin serials, or another process (viewer, `lerobot-record`) holds them |

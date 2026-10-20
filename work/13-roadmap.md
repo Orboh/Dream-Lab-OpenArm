@@ -28,6 +28,10 @@
 
 | Date | Decision | Why |
 |---|---|---|
+| 2026-10-20 | Dream-1 decides and executes any prompt typed in the web console; our own grasp planner is parked | user decision. Dream-1 takes only frames, joint state and a prompt (no object-position input); our planner could not yet pass the safety check |
+| 2026-10-20 | Classical (depth-plane) block finder first; GoPro out of scope | one object on plain carpet; live: 20/20 frames, 0.1 mm jitter; no model/GPU needed |
+| 2026-10-20 | Camera calibration from depth plane + recorded demos (~25 mm) | no hands-on step needed; the 0.700 m camera height independently confirms `sim.table_drop_m` 0.075; hands-on touch refinement is the next step |
+| 2026-10-20 | Gripper values taken from the 8 real demos (open = negative, contact ≈ −32°, squeeze ≈ −16°) | measured, not assumed ([18](18-grasp-planner.md)) |
 | 2026-10-20 | Build on the team's LeRobot fork, not ROS 2 | the team already controls Damiao/SocketCAN from Python; ROS 2 is only borrowed for `kdl_parser` |
 | 2026-10-20 | MuJoCo for the safety sim | runs on Jetson and laptops; official bimanual OpenArm MJCF exists |
 | 2026-10-20 | Canonical joint vector = MuJoCo radians + 0..1 grippers | one unit system inside; convert only at the edges |
@@ -37,6 +41,8 @@
 | 2026-10-20 | Web console in vanilla JS with no build step | easy to maintain on the robot box |
 | 2026-10-20 | Robot bridge process (ZMQ) instead of one interpreter | `dreamlabs` needs Python ≥3.11 (forced 3.10 install fails on scipy); the LeRobot venv is separate; option chosen by the user |
 | 2026-10-20 | Always dry-run from the real start pose | the fork's default pose failed every chunk in the twin; the real pose set passes |
+| 2026-10-20 | MuJoCo renders on the NVIDIA GPU via EGL when available | CPU (Mesa) rendering took ~150 ms per frame and blocked the physics step: with the console's live views open the sim run tripped the 250 ms watchdog and the arm never moved. GPU: ~2 ms |
+| 2026-10-20 | MuJoCo renders through EGL by default (`orboh/sim/__init__.py`) | incident: with GLFW the "simulated" camera image was a desktop screenshot, and one simulation-only test run sent such frames to Dream-1. Fixed + regression test |
 | 2026-10-20 | Docs live in `work/`; `instruction.md` ≤ 175 lines | user request: well maintained and structured |
 
 ## Related

@@ -8,4 +8,5 @@ runs/*
 data/*
 !data/.gitkeep
 config/cameras.yaml
+config/camera_extrinsics.yaml
 *.egg-info/

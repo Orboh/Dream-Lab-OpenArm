@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orboh · Tell the robot</title>
+<style>
+  :root { --bg:#0e1116; --panel:#161b22; --line:#2a3340; --text:#e6edf3; --muted:#8b97a6; --accent:#4aa3ff; --ok:#3fb950; --warn:#d29922; --fail:#f85149; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui,sans-serif; height:100vh; display:flex; flex-direction:column; }
+  header { display:flex; gap:14px; align-items:center; flex-wrap:wrap; padding:10px 18px; border-bottom:1px solid var(--line); background:#0b0e12; }
+  header h1 { font-size:16px; margin:0; } header a { color:var(--muted); font-size:13px; }
+  .spacer { flex:1; } label { color:var(--muted); font-size:13px; display:inline-flex; gap:6px; align-items:center; }
+  select,input[type=text] { background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 10px; font:inherit; }
+  button { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:7px 14px; font:inherit; cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#04111f; font-weight:600; }
+  #estop { background:var(--fail); border:0; color:#fff; font-weight:800; letter-spacing:1px; padding:10px 20px; box-shadow:0 0 0 3px #f8514933; }
+  main { flex:1; display:grid; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:14px; padding:14px 18px; min-height:0; }
+  @media (max-width:900px) { main { grid-template-columns:1fr; } }
+  .cam { background:#000; border:1px solid var(--line); border-radius:12px; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .cam img.big { width:100%; flex:1; min-height:0; object-fit:contain; background:#000; }
+  .cam .row { display:flex; gap:6px; padding:6px; background:var(--panel); }
+  .cam .row img { height:70px; border-radius:6px; border:1px solid var(--line); }
+  .cam .meta { padding:8px 12px; background:var(--panel); color:var(--muted); font-size:13px; border-top:1px solid var(--line); }
+  .chat { display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--line); border-radius:12px; min-height:0; }
+  #msgs { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:8px; }
+  .m { max-width:92%; padding:8px 12px; border-radius:12px; white-space:pre-wrap; overflow-wrap:anywhere; }
+  .me { align-self:flex-end; background:#1f3a5f; } .bot { align-self:flex-start; background:#1c232d; }
+  .ok { border-left:3px solid var(--ok); } .bad { border-left:3px solid var(--fail); } .warn { border-left:3px solid var(--warn); } .note { color:var(--muted); font-size:13px; }
+  #chips { display:flex; gap:6px; flex-wrap:wrap; padding:0 14px 8px; } #chips button { font-size:12px; padding:4px 10px; color:var(--muted); }
+  form { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); } form input { flex:1; }
+  #auth { display:none; padding:10px 18px; background:#3a2a12; } body.need-auth #auth { display:block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tell the robot</h1><a href="/">full console</a>
+  <label>run on <select id="mode"><option value="robot">real robot</option><option value="sim">simulation only</option></select></label>
+  <label>gripper <select id="gripper"><option value="model">Dream decides</option><option value="demos">amounts from demos</option></select></label>
+  <label>speed <select id="speed"><option value="0.2">very slow</option><option value="0.3" selected>slow</option><option value="0.6">medium</option><option value="1">full</option></select></label>
+  <label>model <select id="backend"><option value="dream">Dream-1</option><option value="mock">mock (offline)</option></select></label>
+  <span class="spacer"></span><span id="conn" class="note">connecting…</span>
+  <button id="estop" onclick="stop()">E-STOP</button>
+</header>
+<div id="auth">This console controls a robot: enter the token <input type="text" id="token" placeholder="ORBOH_WEB_TOKEN"> <button onclick="saveToken()">Connect</button></div>
+<main>
+  <div class="cam">
+    <img class="big" id="cam" alt="RealSense centre camera">
+    <div class="row"><img id="cam-l" alt="left wrist"><img id="cam-r" alt="right wrist"><img id="sim" alt="simulation" style="display:none"></div>
+    <div class="meta" id="block">block finder: …</div>
+  </div>
+  <div class="chat">
+    <div id="msgs"></div>
+    <div id="chips"></div>
+    <form onsubmit="send(event)"><input type="text" id="in" placeholder="What should the robot do? e.g. Pick up the wood and place it in the box" autocomplete="off"><button class="primary">Send</button></form>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let token = localStorage.getItem("orboh_token") || "", S = null, pending = null, running = null, lastTask = null, lastPrompt = null;
+const q = () => token ? `token=${encodeURIComponent(token)}` : "";
+const H = () => token ? {Authorization: "Bearer " + token} : {};
+function say(text, who = "bot", cls = "") { const d = document.createElement("div"); d.className = `m ${who} ${cls}`; d.textContent = text; $("msgs").appendChild(d); $("msgs").scrollTop = 1e9; }
+async function call(path, body) {
+  const r = await fetch(path, body === undefined ? {headers: H()} : {method: "POST", headers: {"Content-Type": "application/json", ...H()}, body: JSON.stringify(body)});
+  if (r.status === 401) { document.body.classList.add("need-auth"); throw new Error("token needed"); }
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.status); return j;
+}
+function saveToken() { token = $("token").value.trim(); localStorage.setItem("orboh_token", token); location.reload(); }
+const opts = () => ({backend: $("backend").value, gripper: $("gripper").value, speed: parseFloat($("speed").value), seconds: 40});
+async function run(prompt, dry, approved, sim) {
+  try {
+    await call("/api/policy/run", {prompt, dry_run: dry, approved, mode: sim ? "sim" : "robot", ...opts()});
+    running = {prompt, dry, sim};
+  } catch (e) { say(`Can't do that: ${e.message}`, "bot", "bad"); }
+}
+function stop() { call("/api/estop", {}).then(() => say("E-STOP pressed: the arms hold their position. Type  release  when it is safe to continue.", "bot", "warn")); }
+function send(ev) {
+  ev.preventDefault(); const t = $("in").value.trim(); if (!t) return; $("in").value = ""; say(t, "me");
+  const w = t.toLowerCase().replace(/[.!]/g, "");
+  if (["go", "yes", "run", "do it", "approve"].includes(w)) {
+    if (!pending) return say("Nothing is waiting for approval. Tell me a task first.");
+    return run(pending, false, true, false), say("Running on the robot. Type stop (or press E-STOP) to halt it.", "bot", "warn");
+  }
+  if (["sim", "simulate", "simulation"].includes(w)) { if (!pending) return say("Tell me a task first."); return run(pending, false, false, true); }
+  if (["stop", "halt", "estop", "e-stop"].includes(w)) return stop();
+  if (["release", "resume", "unlock", "release estop"].includes(w)) return call("/api/estop/reset", {}).then(() => say("E-STOP released. The arms are free to follow the next approved run.", "bot", "ok")).catch(e => say(`Could not release: ${e.message}`, "bot", "bad"));
+  if (w === "help") return say("Type a task and I dry-run it with Dream-1 (nothing moves). If the check passes, type  go  to run it on the robot, or  sim  to watch it in the simulation. Type  retry  after a failure to ask Dream-1 again, and  stop  anytime (then  release  to continue).");
+  if (["retry", "again", "try again"].includes(w)) { if (!lastPrompt) return say("Nothing to retry yet. Tell me a task first."); return ask(lastPrompt); }
+  ask(t);
+}
+function ask(t) {
+  lastPrompt = t; pending = null;
+  if ($("mode").value === "sim") { say(`Running "${t}" in the simulation (nothing real moves).`); return run(t, false, false, true); }
+  say(`Asking Dream-1 about "${t}" as a dry-run: it looks at the cameras and plans, the safety check judges each step, nothing moves.`);
+  run(t, true, false, false);
+}
+function describe(x) {
+  const g = x.gripper === "demos" ? "gripper amounts from the demos" : "gripper decided by Dream";
+  const where = x.simulation ? "simulation" : x.dry_run ? "dry-run" : "robot run";
+  const ok = x.completed;
+  say(`${ok ? "✔" : "✖"} ${where}: ${x.reason}\n${x.chunks_received} Dream plans, ${x.chunks_rejected} rejected by the safety check · ${x.steps_sent} steps · speed ${Math.round((x.speed || 1) * 100)}% · ${g}`, "bot", ok ? "ok" : "bad");
+  if (!ok && !x.simulation && !x.dry_run) say("Dream-1 could not get a safe plan through. The arms are holding. Type  retry  to ask it again, or give it a different task.", "bot", "warn");
+  else if (!ok && x.simulation) say("Dream-1 could not get a safe plan through in the simulation. Type  retry  to ask it again.", "bot", "warn");
+  if (x.dry_run && x.first_chunk_ok) { pending = x.prompt; say(`A plan passed the safety check (after any retries). Type  go  to run it on the real robot (workspace clear, hand near E-STOP), or  sim  to watch it in the simulation.`); }
+  else if (x.dry_run) say("No plan passed the safety check, so I won't offer a real run. Try rephrasing, or  sim  to look at it in the simulation.", "bot", "warn");
+}
+function connect() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws?${q()}`);
+  ws.onopen = () => $("conn").textContent = "live"; ws.onclose = e => { $("conn").textContent = "reconnecting…"; if (e.code === 4401) document.body.classList.add("need-auth"); else setTimeout(connect, 1500); };
+  ws.onmessage = m => {
+    const e = JSON.parse(m.data);
+    if (e.type === "chunk" && running) {
+      const again = !e.ok && e.retry < e.max_retries ? `\n↻ I told Dream-1 what went wrong and asked it again (retry ${e.retry}/${e.max_retries - 1})` : !e.ok ? "\n✖ out of retries" : "";
+      say(`plan ${e.index}: ${e.ok ? "✔ safe" : "✖ " + e.reason.slice(0, 110)}${again}`, "bot", (e.ok ? "ok " : "bad ") + "note");
+    }
+    else if (e.type === "log" && e.level === "info" && /safe plan after/.test(e.msg)) say("✔ " + e.msg, "bot", "ok note");
+    else if (e.type === "log" && e.level === "warn") say(e.msg, "bot", "warn note");
+    else if (e.type === "state") onState(e.state);
+  };
+}
+function onState(s) {
+  S = s;
+  if (lastTask && s.task === null && s.execution && running) { describe(s.execution); running = null; }
+  lastTask = s.task;
+  $("sim").style.display = s.sim_live && $("mode").value === "sim" ? "" : "none";
+  if (s.policy && !onState.init) { onState.init = 1; $("speed").value = String(s.policy.speed_scale); $("gripper").value = s.policy.gripper_mode; $("backend").value = s.policy.api_key_set ? "dream" : s.policy.backend; }
+}
+async function pollBlock() {
+  try { const d = await call("/api/detect"); $("block").textContent = d.length ? `block finder: ${d[0].matches[0] || "object"} · ${d[0].height_mm.toFixed(0)} mm tall · ` +
+    (d[0].base_xyz ? `robot frame (${d[0].base_xyz.map(v => v.toFixed(2)).join(", ")}) m` : `camera frame (${d[0].cam_xyz.map(v => v.toFixed(2)).join(", ")}) m`) : "block finder: nothing on the table"; }
+  catch (e) { $("block").textContent = "block finder: no depth stream"; }
+}
+$("cam").src = `/api/cameras/center/stream?fps=10&${q()}`; $("cam-l").src = `/api/cameras/left_wrist/stream?fps=4&${q()}`; $("cam-r").src = `/api/cameras/right_wrist/stream?fps=4&${q()}`;
+setInterval(() => { if (!document.hidden && $("sim").style.display !== "none") $("sim").src = `/api/sim/live.jpg?t=${Date.now()}&${q()}`; }, 500);
+["Pick up the wood and place it in the box", "Pick up the wood", "Push the wood to the left"].forEach(t => { const b = document.createElement("button"); b.textContent = t; b.onclick = () => { $("in").value = t; $("in").focus(); }; $("chips").appendChild(b); });
+say("Hi. Tell me what to do with the block, in plain words. I'll ask Dream-1 to plan it as a dry-run first (nothing moves), then you decide: go (real robot) or sim (simulation). Type help for the short version.");
+call("/api/state").then(onState).catch(() => {}); setInterval(pollBlock, 2500); pollBlock(); connect();
+</script>
+</body>
+</html>

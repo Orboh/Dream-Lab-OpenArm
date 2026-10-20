@@ -33,10 +33,14 @@ from orboh.dreamlab.client import DreamLabClient, PlanRequest, make_dreamlab
 from orboh.dreamlab.policy import PolicyError, make_policy
 from orboh.execution.executor import Executor, build_execution_trajectory
 from orboh.execution.policy_runner import PolicyResult, PolicyRunner
-from orboh.execution.slew import slew_limit
+from orboh.execution.slew import slew_limit, slowed
 from orboh.robot import make_robot
 from orboh.robot.mapping import JointMapping
+from orboh.robot.sim_robot import SimRobot
 from orboh.safety import CheckResult, SafetyReport, check_trajectory, fingerprint
+from orboh.perception.block_finder import BlockFinder
+from orboh.perception.calibration import attach_base_positions, load_extrinsics
+from orboh.perception.types import Detection
 from orboh.sim.mujoco_sim import MujocoSim
 from orboh.types import ARM_IDX, JOINT_NAMES, Plan, Trajectory, joint_index
 
@@ -55,7 +59,7 @@ class Pipeline:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.robot = make_robot(cfg)
-        self.check_sim = MujocoSim(cfg.sim.scene, cfg.sim.table_drop_m, cfg.sim.torso_tolerance_m)  # separate twin used only for checks
+        self.check_sim = MujocoSim(cfg.sim.scene, cfg.sim.table_drop_m, cfg.sim.torso_tolerance_m, cfg.sim.box)  # separate twin used only for checks
         self.lo, self.hi = self.check_sim.limits()
         self.mapping = JointMapping(cfg.robot.lerobot)
         self.cameras = CameraManager()
@@ -79,6 +83,9 @@ class Pipeline:
         self.demo = None
         self.plan: Plan | None = None
         self.exec_traj: Trajectory | None = None
+        self.policy_dry_ok: tuple[str, str] | None = None  # (prompt, backend) of the last dry-run in which a plan passed
+        self.policy_chunks: list[dict] = []
+        self.sim_run: SimRobot | None = None  # the simulated robot of the latest simulation-only run (for the live view)
         self.approach_steps = 0
         self.report: SafetyReport | None = None
         self.execution: dict | None = None
@@ -318,6 +325,17 @@ class Pipeline:
         self._set_step("plan", "ok", f"{self.plan.source}: {len(tr)} steps, {tr.duration:.1f}s "
                                      f"(took {time.time() - t0:.1f}s)")
 
+    # ------------------------------------------------------------ perception
+    def find_block(self, role: str = "center") -> list[Detection]:
+        """Detect objects on the table with the depth camera; `base_xyz` is filled when a calibration exists."""
+        rgbd = self.cameras.snapshot_rgbd(role)
+        if rgbd is None:
+            raise GateError(f"camera '{role}' has no depth stream: set cameras.depth_roles and open the cameras (see work/16)")
+        ext = load_extrinsics(self.cfg.path(self.cfg.cameras.extrinsics), self.cameras.sources[role].device.serial)
+        if ext is None:
+            self.log("no camera extrinsics: positions are in the camera frame only (scripts/calibrate_camera.py)", "warn")
+        return attach_base_positions(BlockFinder(self.cfg.perception).find(rgbd), ext[0] if ext else None)
+
     def _conform_plan(self) -> None:
         """Make the plan respect velocity / acceleration / joint limits, and log how far that moved it.
 
@@ -393,11 +411,15 @@ class Pipeline:
         return Executor(self.robot, self.cfg.safety, self.lo, self.hi, progress)
 
     # --------------------------------------------------------------- policy
-    def _policy_snapshots(self) -> Callable[[], dict[str, bytes | None]]:
-        """A function returning one JPEG per Dream camera slot (None when the slot has no camera)."""
+    def _policy_snapshots(self, sim: MujocoSim | None = None) -> Callable[[], dict[str, bytes | None]]:
+        """A function returning one JPEG per Dream camera slot (None when the slot has no camera).
+
+        `sim`: render the slots from this MuJoCo twin instead of the real cameras (a simulation-only run)."""
         pc = self.cfg.policy
-        if self.cfg.robot.backend == "sim":
-            srcs = {slot: SimCameraSource(self.robot.sim, CameraDevice(f"sim-{cam}", f"MuJoCo {cam}"),
+        if sim is None and self.cfg.robot.backend == "sim":
+            sim = self.robot.sim
+        if sim is not None:
+            srcs = {slot: SimCameraSource(sim, CameraDevice(f"sim-{cam}", f"MuJoCo {cam}"),
                                           pc.image_width, pc.image_height)
                     for slot, cam in pc.sim_cameras.items()}
             return lambda: {slot: to_jpeg(src.read(), pc.jpeg_quality) for slot, src in srcs.items()}
@@ -407,24 +429,67 @@ class Pipeline:
         return lambda: {slot: self.cameras.snapshot(role, max_age_s=0.05) if role else None
                         for slot, role in pc.camera_map.items()}
 
+    def policy_gate(self, prompt: str, backend: str | None, dry_run: bool, approved: bool,
+                    need_dry_first: bool = False, gripper: str | None = None) -> tuple[str, str]:
+        """Resolve (prompt, backend) and refuse a real run that lacks approval or a passed dry-run of the same thing."""
+        prompt = prompt.strip() or self.cfg.policy.prompt
+        backend = backend or self.cfg.policy.backend
+        if not dry_run:
+            if self.cfg.safety.require_manual_approval and not approved:
+                raise GateError("running the policy needs explicit operator approval")
+            if need_dry_first and self.cfg.policy.require_dry_run_first and self.policy_dry_ok != (prompt, backend, gripper or self.cfg.policy.gripper_mode):
+                raise GateError("do a dry-run first with this exact prompt and backend; a plan must pass the safety check (retries allowed)")
+        return prompt, backend
+
+    def _sim_robot_for_run(self) -> SimRobot:
+        """A fresh simulated robot for a simulation-only run: starts where the real arms are, with the block where the camera sees it."""
+        r = SimRobot(self.cfg.sim.scene, self.cfg.robot.control_hz, self.cfg.sim.table_drop_m,
+                     self.cfg.sim.torso_tolerance_m, self.cfg.sim.box)
+        r.connect()
+        try:
+            r.sim.reset(self.robot.read_joints())
+        except Exception:
+            pass  # no readable robot: the twin's home pose
+        try:
+            det = next(d for d in self.find_block() if d.base_xyz is not None)
+            r.sim.set_object(det.base_xyz, (det.size_mm[0] / 2000, det.size_mm[1] / 2000, det.height_mm / 2000))
+        except Exception:
+            pass  # no depth camera / calibration: the scene's default object
+        return r
+
+    def sim_live_jpeg(self) -> bytes | None:
+        """The latest view of the simulated robot (during or after a simulation-only run)."""
+        if self.sim_run is None:
+            return None
+        img = self.sim_run.sim.render(640, 480, "tablecam")
+        return to_jpeg(img if img is not None else np.full((480, 640, 3), 40, np.uint8))
+
     def run_policy(self, prompt: str = "", seconds: float | None = None, approved: bool = False,
-                   dry_run: bool = False) -> PolicyResult:
+                   dry_run: bool = False, backend: str | None = None, need_dry_first: bool = False,
+                   simulate: bool = False, gripper: str | None = None, speed: float | None = None) -> PolicyResult:
         """Drive the arms with the Dream-1 policy; each chunk is slew-limited and sim-checked before it moves anything.
 
         dry_run: query the policy and check its chunks against the current pose, but send nothing to the robot.
         """
-        if not dry_run and self.cfg.safety.require_manual_approval and not approved:
-            raise GateError("running the policy needs explicit operator approval")
-        pc = self.cfg.policy
+        if simulate:  # simulated arms + rendered cameras only: nothing real can move, so no approval gate
+            prompt, backend = prompt.strip() or self.cfg.policy.prompt, backend or self.cfg.policy.backend
+            dry_run = False
+        else:
+            prompt, backend = self.policy_gate(prompt, backend, dry_run, approved, need_dry_first, gripper)
+        gripper = gripper or self.cfg.policy.gripper_mode
+        pc = self.cfg.policy.model_copy(update={"backend": backend, "gripper_mode": gripper})
         try:
             client = make_policy(pc, self.cfg.dreamlab.api_key)
         except PolicyError as e:
             raise GateError(str(e)) from e
-        prompt = prompt or pc.prompt
+        self.policy_chunks = []
         self.stop_event.clear()
         self.run_dir = self.cfg.path(self.cfg.runs_dir) / time.strftime("%Y%m%d-%H%M%S_policy")
         self.run_dir.mkdir(parents=True, exist_ok=True)
-        self._set_step("execute", "running", f"policy '{prompt}' ({client.name}{', dry-run' if dry_run else ''})")
+        robot = self.robot
+        if simulate:
+            self.sim_run = robot = self._sim_robot_for_run()
+        self._set_step("execute", "running", f"policy '{prompt}' ({client.name}{', dry-run' if dry_run else ''}{', SIMULATION' if simulate else ''})")
         self.log(f"policy {client.name} / {pc.checkpoint}: '{prompt}' for {seconds or pc.max_duration_s:g}s"
                  + (" (dry-run: robot will not move)" if dry_run else ""))
 
@@ -432,13 +497,25 @@ class Pipeline:
             self.progress = {"done": done, "total": total}
             self._emit("progress", **self.progress)
 
-        runner = PolicyRunner(self.robot, client, self._policy_snapshots(), pc, self.cfg.safety, self.lo, self.hi,
-                              self.check_sim, execute=not dry_run, log=self.log, on_progress=progress)
+        def on_chunk(chunk: dict) -> None:
+            self.policy_chunks = (self.policy_chunks + [chunk])[-24:]
+            self._emit("chunk", **chunk)
+
+        speed = min(1.0, max(0.1, speed if speed else pc.speed_scale))
+        self.log(f"movement speed {speed:.0%} of the safety limits (max {self.cfg.safety.max_joint_velocity_rad_s * speed:.2f} rad/s per joint)")
+        runner = PolicyRunner(robot, client, self._policy_snapshots(robot.sim if simulate else None), pc, slowed(self.cfg.safety, speed), self.lo, self.hi,
+                              self.check_sim, execute=not dry_run, log=self.log, on_progress=progress, on_chunk=on_chunk)
         try:
             result = runner.run(prompt, seconds, self.stop_event)
         except PolicyError as e:
             result = PolicyResult(False, str(e), dry_run=dry_run)
-        self.execution = result.__dict__
+        self.execution = result.__dict__ | {"prompt": prompt, "backend": client.name, "simulation": simulate, "gripper": gripper, "speed": speed}
+        if simulate:
+            pass  # a simulation run neither unlocks nor uses up a real run
+        elif dry_run and result.first_chunk_ok:
+            self.policy_dry_ok = (prompt, backend, gripper)
+        elif not dry_run:
+            self.policy_dry_ok = None  # a real run uses up the dry-run: look again before the next one
         (self.run_dir / "policy_run.json").write_text(json.dumps(
             {"prompt": prompt, "checkpoint": pc.checkpoint, "backend": client.name, **result.__dict__}, indent=2))
         self.log(("✔ " if result.completed else "✖ ") + result.reason, "info" if result.completed else "error")
@@ -496,7 +573,14 @@ class Pipeline:
             "execution": self.execution,
             "progress": self.progress,
             "recording": self._record_proc is not None,
+            "sim_live": self.sim_run is not None,
+            "sim_joints": [round(float(v), 4) for v in self.sim_run.read_joints()] if self.sim_run is not None else None,
             "safety": {"require_manual_approval": self.cfg.safety.require_manual_approval},
+            "policy": {"backend": self.cfg.policy.backend, "api_key_set": bool(self.cfg.dreamlab.api_key), "checkpoint": self.cfg.policy.checkpoint,
+                       "prompt": self.cfg.policy.prompt, "max_duration_s": self.cfg.policy.max_duration_s,
+                       "gripper_mode": self.cfg.policy.gripper_mode, "speed_scale": self.cfg.policy.speed_scale,
+                       "dry_ok": list(self.policy_dry_ok) if self.policy_dry_ok else None,
+                       "require_dry_run_first": self.cfg.policy.require_dry_run_first},
             "run_dir": str(self.run_dir) if self.run_dir else None,
         }
 

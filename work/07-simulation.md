@@ -42,7 +42,12 @@ this is "closed → open" on the real gripper.
 ## Rendering & threads
 GL contexts are bound to the thread that created them, so all rendering runs on one dedicated
 thread (`_render_thread`). Without that, camera streams from web worker threads came out black.
-Set `MUJOCO_GL=egl` (GPU) or `osmesa` (CPU).
+Rendering defaults to `MUJOCO_GL=egl` on the NVIDIA GPU when its EGL vendor file exists (set when `orboh.sim` is imported; opt out with
+`ORBOH_SOFTWARE_GL=1`; `osmesa` for CPU-only). **Why the GPU matters:** Mesa's EGL fell back to the CPU, ~150 ms per frame, and a render blocks
+the physics step: the console's live views pushed the simulation control loop past its 250 ms watchdog and the simulated arm never moved
+(GPU: ~2 ms per frame). **Never rely on the default GLFW
+backend:** on 2026-10-20 it returned a screenshot of the desktop instead of the simulated scene, and a simulation-only run sent those
+screenshots to Dream-1 as camera frames. If no GL context is available the renders fail and callers use a grey frame.
 
 ## Sim-to-real alignment
 The collision check is only as good as the model of your workcell:

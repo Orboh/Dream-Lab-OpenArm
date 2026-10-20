@@ -39,6 +39,14 @@
 | `require_sim_pass` / `require_manual_approval` | true / true | execution gates (keep on) |
 | `sim.table_drop_m` | 0.075 | lowers the twin's table by this many metres = how much higher the real arms stand than the twin assumes (estimated from a real demo; see [07](07-simulation.md)) |
 | `sim.torso_tolerance_m` | 0.02 | arm-vs-torso overlap allowed in the check (twin's torso mesh is stricter than reality); table etc. stay strict |
+| `cameras.extrinsics` | `config/camera_extrinsics.yaml` | camera → base transform, per machine ([17](17-calibration.md)) |
+| `cameras.depth_roles` | `[center]` | roles that also stream depth ([16](16-perception.md)) |
+| `perception.*` | see file | block finder ROI, heights, tolerances ([16](16-perception.md)) |
+| `policy.speed_scale` | 0.3 | fraction of the safety speed limits a Dream-1 run may use, 0.1..1 ([14](14-policy.md)) |
+| `policy.max_check_failures` / `retry_hint` / `starve_s` | 8 / true / 25 | rejected plans tolerated (each is a retry with feedback to Dream-1), whether the reason is sent to Dream, time budget ([14](14-policy.md)) |
+| `policy.gripper_mode` | `model` | `model` or `demos`: gripper amounts from Dream or from the recorded demos (`demo_gripper_open/close`, thresholds) ([14](14-policy.md)) |
+| `policy.require_dry_run_first` | true | web only: a real Dream-1 run needs a passed dry-run of the same prompt/backend ([11](11-web-console.md)) |
+| `grasp.*` | see file | parked grasp planner ([18](18-grasp-planner.md)) |
 | `conform_plan` | true | slew-limit + clip every plan to the limits before the checks; logs the max deviation (`plan.meta.conformed_max_deviation_rad`) |
 
 ## VERIFY checklist

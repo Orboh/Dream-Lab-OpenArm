@@ -2,8 +2,14 @@
 
 # 18 · Grasp planner (block → joint trajectory)
 
-**Status:** gripper data measured from real demos (below); the planner itself (`orboh/planning/grasp.py`) is Phase 3 of the
-perception plan and is not written yet. See [16 Perception](16-perception.md) for how the block position is obtained.
+**Status: PARKED, unfinished (2026-10-20).** The decision was to let Dream-1 decide and execute ([14](14-policy.md), [11](11-web-console.md)).
+`orboh/planning/grasp.py` (tool-point waypoints → `mink` IK on the twin → straight Cartesian moves) exists and solves unobstructed
+poses to < 1 mm, but it is **not wired into the pipeline, has no tests, and does not yet produce a path that passes the safety check**:
+with collision avoidance on, IK cannot follow the start-pose → pre-grasp line (the left arm folds into the torso; blocks near the
+centre line also sit on joint-2's limit). Next steps if resumed: a better "ready" posture/intermediate waypoint, per-arm choice by
+reachability, then `Pipeline.plan_pick` + `orboh pick`. Useful independent of the planner: the gripper measurements below, the box
+and block placement in the twin (`sim.box`, `MujocoSim.set_object`), and `scripts/calibrate_camera.py` ([17](17-calibration.md)).
+See [16 Perception](16-perception.md) for how the block position is obtained.
 
 ## Gripper values measured from the leader demos (2026-10-20)
 

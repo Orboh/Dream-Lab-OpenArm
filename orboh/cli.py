@@ -81,7 +81,7 @@ def cmd_run_policy(args):
     p.subscribe(lambda e: e["type"] == "log" and e["level"] != "debug" and print(f"[{e['level']}] {e['msg']}"))
     p.start()
     try:
-        res = p.run_policy(args.prompt, args.seconds, approved=args.approve, dry_run=args.dry_run)
+        res = p.run_policy(args.prompt, args.seconds, approved=args.approve, dry_run=args.dry_run, speed=args.speed)
     except GateError as e:
         print(f"refused: {e}", file=sys.stderr)
         p.shutdown()
@@ -116,6 +116,7 @@ def main(argv=None):
     s.add_argument("--dry-run", action="store_true", help="query + safety-check chunks, never move the robot")
     s.add_argument("--approve", action="store_true", help="operator approval to move the arms")
     s.add_argument("--policy-backend", choices=["mock", "dream"], help="override policy.backend")
+    s.add_argument("--speed", type=float, help="fraction of the safety speed limits, 0.1..1 (default policy.speed_scale 0.3)")
     s.set_defaults(fn=cmd_run_policy)
     args = ap.parse_args(argv)
     args.fn(args)

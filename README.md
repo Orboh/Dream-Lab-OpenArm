@@ -41,7 +41,7 @@ bash scripts/setup_env.sh --robot  # + pyrealsense2 and the Orboh LeRobot fork (
 bash scripts/start_bridge.sh fake  # terminal 1 (use `real` only with CAN up and the e-stop in reach)
 orboh --backend bridge preflight
 orboh --backend bridge run-policy --policy-backend dream --dry-run --prompt "Pick up the wood and place it in the box"
-orboh --backend bridge serve       # reachable from your PC at http://<robot-box>:8000
+orboh --backend bridge serve       # http://<robot-box>:8000 (top card = Dream-1) · /simple = camera + chat: type a task, dry-run, then go / sim / stop
 ```
 
 ## Console steps

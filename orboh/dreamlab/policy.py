@@ -50,6 +50,10 @@ class PolicyClient(ABC):
         """Whether the next get_chunk() should start now (called once per executed row)."""
         return remaining <= 0
 
+    def feedback(self, text: str | None) -> None:
+        """Tell the policy why its last plan was rejected (None = clear). Dream-1 has no feedback channel except its prompt,
+        so the real client appends the text to the prompt it observes with; the others ignore it."""
+
     def health(self) -> tuple[bool, str]:
         return True, "ok"
 
@@ -123,7 +127,7 @@ class DreamPolicyClient(PolicyClient):
                 "ik": {"arm": c.ik_arm, "head": "eef"}, "embodiment": self._embodiment()}
 
     def open(self, prompt: str) -> None:
-        self._prompt = prompt
+        self._prompt, self._hint = prompt, None
         try:
             self._client.policy(self._config())
         except self._dream.DreamError as e:
@@ -144,7 +148,7 @@ class DreamPolicyClient(PolicyClient):
     def observe(self, q: np.ndarray, jpegs: dict[str, bytes | None]) -> None:
         frames = {f"video.{slot}": self._encode(jpegs.get(slot)) for slot in self._slots}
         try:
-            self._client.set_observation(frames, {**_canonical_state(q), "prompt": self._prompt},
+            self._client.set_observation(frames, {**_canonical_state(q), "prompt": self._prompt + (f" ({self._hint})" if self._hint else "")},
                                          timestamp=time.monotonic())
         except self._dream.DreamError as e:
             raise PolicyError(f"observation rejected: {e}") from e
@@ -156,6 +160,9 @@ class DreamPolicyClient(PolicyClient):
             raise PolicyError(f"get_action refused: {e}", bool(e.retryable), e.retry_after_s) from e
         except self._dream.DreamError as e:
             raise PolicyError(f"get_action failed: {e}") from e
+
+    def feedback(self, text: str | None) -> None:
+        self._hint = text
 
     def refill_due(self, executed: int, remaining: int) -> bool:
         return self._client.refill_due(executed, remaining)
@@ -198,6 +205,10 @@ class MockPolicyClient(PolicyClient):
         self._phase = 0.0
         self._last_get = 0.0
         self.observations = 0
+        self.last_feedback: str | None = None
+
+    def feedback(self, text: str | None) -> None:
+        self.last_feedback = text
 
     def open(self, prompt: str) -> None:
         self._prompt, self._phase, self._anchor = prompt, 0.0, None

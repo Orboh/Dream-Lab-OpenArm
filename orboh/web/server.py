@@ -42,6 +42,17 @@ class ExecuteBody(BaseModel):
     approved: bool = False
 
 
+class PolicyBody(BaseModel):
+    prompt: str = ""
+    seconds: float | None = None
+    dry_run: bool = True  # the safe default: query Dream and check its chunks, move nothing
+    approved: bool = False
+    backend: str | None = None  # mock | dream; default from policy.backend
+    speed: float | None = None  # fraction of the safety speed limits, 0.1..1 (default policy.speed_scale)
+    gripper: str | None = None  # "model" (Dream decides) | "demos" (open/close amounts from the recorded demos); default from policy.gripper_mode
+    mode: str = "robot"  # "robot" (the real arms, gated) | "sim" (MuJoCo twin only: nothing real moves, no gates)
+
+
 def create_app(pipeline: Pipeline) -> FastAPI:
     token = pipeline.cfg.web.token
     sockets: set[WebSocket] = set()
@@ -91,6 +102,10 @@ def create_app(pipeline: Pipeline) -> FastAPI:
     @app.get("/")
     def index():
         return FileResponse(STATIC / "index.html")
+
+    @app.get("/simple")
+    def simple():
+        return FileResponse(STATIC / "simple.html")
 
     @app.get("/api/state", dependencies=auth)
     def state():
@@ -180,6 +195,46 @@ def create_app(pipeline: Pipeline) -> FastAPI:
         except GateError as e:
             raise HTTPException(412, str(e))
         return task("execute", lambda: pipeline.execute(body.approved))
+
+    @app.post("/api/policy/run", dependencies=auth)
+    def policy_run(body: PolicyBody):
+        if body.gripper not in (None, "model", "demos"):
+            raise HTTPException(422, f"unknown gripper mode '{body.gripper}' (model | demos)")
+        if body.mode == "sim":
+            backend = body.backend or pipeline.cfg.policy.backend
+            if backend not in ("mock", "dream"):
+                raise HTTPException(422, f"unknown policy backend '{backend}'")
+            return task("Dream-1 simulation", lambda: pipeline.run_policy(body.prompt, body.seconds, backend=backend, simulate=True,
+                                                                          gripper=body.gripper, speed=body.speed))
+        if body.mode != "robot":
+            raise HTTPException(422, f"unknown mode '{body.mode}' (robot | sim)")
+        try:
+            prompt, backend = pipeline.policy_gate(body.prompt, body.backend, body.dry_run, body.approved, need_dry_first=True, gripper=body.gripper)
+        except GateError as e:
+            raise HTTPException(412, str(e))
+        if backend not in ("mock", "dream"):
+            raise HTTPException(422, f"unknown policy backend '{backend}'")
+        label = "Dream-1 dry-run" if body.dry_run else "Dream-1 run"
+        return task(label, lambda: pipeline.run_policy(prompt, body.seconds, approved=body.approved,
+                                                       dry_run=body.dry_run, backend=backend, need_dry_first=True, gripper=body.gripper, speed=body.speed))
+
+    @app.get("/api/sim/live.jpg", dependencies=auth)
+    def sim_live():
+        jpg = pipeline.sim_live_jpeg()
+        if jpg is None:
+            raise HTTPException(404, "no simulation run yet")
+        return Response(jpg, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+    @app.get("/api/policy/chunks", dependencies=auth)
+    def policy_chunks():
+        return pipeline.policy_chunks
+
+    @app.get("/api/detect", dependencies=auth)
+    def detect():
+        try:
+            return [d.to_dict() for d in pipeline.find_block()]
+        except GateError as e:
+            raise HTTPException(409, str(e))
 
     @app.post("/api/home", dependencies=auth)
     def home():

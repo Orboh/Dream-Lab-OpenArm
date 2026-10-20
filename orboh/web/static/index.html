@@ -112,6 +112,7 @@
   <span class="chip">robot <b id="chip-robot">–</b></span>
   <span class="chip">DreamLab <b id="chip-dl">–</b></span>
   <span class="chip">task <b id="chip-task">idle</b></span>
+  <a href="/simple" style="color:var(--muted);font-size:13px">simple chat view</a>
   <span class="spacer"></span>
   <button id="estop-release" onclick="api('/api/estop/reset')">Release E-STOP</button>
   <button id="estop" onclick="api('/api/estop')" title="Space bar">E-STOP</button>
@@ -125,6 +126,42 @@
       <h2>Access token</h2>
       <p class="hint">This console controls a robot. Enter <code>ORBOH_WEB_TOKEN</code> from the robot box's <code>.env</code>.</p>
       <div class="row"><input type="text" id="token" placeholder="token"><button class="primary" onclick="saveToken()">Connect</button></div>
+    </section>
+
+    <section class="card" id="card-dream">
+      <h2><span class="n">★</span> Dream-1: tell the robot what to do</h2>
+      <p class="hint">Type any task. Dream-1 looks at the cameras and decides how to reach, grasp and move; the robot only follows
+        action chunks that pass the MuJoCo safety check. <b>Always dry-run first</b> (nothing moves), then approve a real run.</p>
+      <div class="row"><input type="text" id="dream-prompt" placeholder="e.g. Pick up the wood and place it in the box"></div>
+      <div class="row" id="dream-examples"></div>
+      <div class="row">
+        <label class="check"><b>Run on:</b></label>
+        <label class="check"><input type="radio" name="dream-mode" value="robot" checked onchange="renderDream(S)"> real robot</label>
+        <label class="check"><input type="radio" name="dream-mode" value="sim" onchange="renderDream(S)"> simulation only</label>
+        <label class="check">seconds <input type="text" id="dream-secs" value="20" style="flex:0 0 60px"></label>
+        <label class="check">speed <select id="dream-speed"><option value="0.2">very slow</option><option value="0.3">slow</option><option value="0.6">medium</option><option value="1">full</option></select></label>
+        <label class="check">gripper <select id="dream-gripper"><option value="model">Dream decides</option><option value="demos">amounts from demos</option></select></label>
+        <label class="check">model <select id="dream-backend"><option value="dream">Dream-1 (real API)</option><option value="mock">mock (offline)</option></select></label>
+      </div>
+      <div id="robot-controls">
+        <div class="row"><button class="primary" id="btn-dry" onclick="policyRun(true)">Dry-run (no motion)</button></div>
+        <div class="row">
+          <label class="check"><input type="checkbox" id="dream-approve"> workspace clear, E-STOP in reach, I approve this motion</label>
+          <button class="go" id="btn-run" onclick="policyRun(false)" disabled>Run on robot</button>
+        </div>
+      </div>
+      <div id="sim-controls" class="row" style="display:none">
+        <button class="primary" id="btn-sim" onclick="policyRun(false, true)">Run in simulation</button>
+        <span class="hint" style="margin:0">Simulated arms and rendered cameras: nothing real moves, no approval needed. Dream-1 sees the simulated scene, not your real table.</span>
+      </div>
+      <div id="dream-verdict"></div>
+      <div class="cams">
+        <div class="cam" id="sim-view" style="display:none"><img id="dream-sim" alt="simulation"><div class="meta"><span>simulation (MuJoCo twin)</span><b>no real motion</b></div></div>
+        <div class="cam"><img id="dream-cam" alt="center camera"><div class="meta"><span>center camera</span><b id="dream-block">–</b></div></div>
+        <div><canvas id="chunk-plot" width="600" height="240"></canvas>
+          <div class="legend"><span>latest chunk, joint targets (rad): solid = left arm, dashed = right arm</span></div></div>
+      </div>
+      <ul class="checks" id="chunk-list"></ul>
     </section>
 
     <section class="card" id="card-preflight">
@@ -212,7 +249,7 @@
 
   <aside>
     <section class="card">
-      <h2>Joints</h2>
+      <h2 id="joints-title">Joints</h2>
       <div id="joints"></div>
     </section>
     <section class="card">
@@ -257,9 +294,72 @@ function checksHtml(list) {
   }).join("");
 }
 
+const EXAMPLES = ["Pick up the wood and place it in the box", "Pick up the wood", "Push the wood to the left", "Move the wood next to the box"];
+let chunks = [], dreamCamSet = false;
+$("dream-examples").innerHTML = EXAMPLES.map(t => `<button onclick="$('dream-prompt').value=this.textContent">${esc(t)}</button>`).join("");
+
+const dreamMode = () => document.querySelector('input[name="dream-mode"]:checked').value;
+
+function policyRun(dry, sim = false) {
+  const prompt = $("dream-prompt").value.trim(), approved = $("dream-approve").checked;
+  if (!sim && !dry && !approved) return addLog({level: "error", msg: "tick the approval box first", t: Date.now() / 1000});
+  chunks = []; renderChunks();
+  api("/api/policy/run", {prompt, seconds: parseFloat($("dream-secs").value) || null, dry_run: dry, approved: !sim && !dry && approved,
+                          backend: $("dream-backend").value, gripper: $("dream-gripper").value, speed: parseFloat($("dream-speed").value), mode: sim ? "sim" : "robot"}).catch(() => {});
+  if (!dry) $("dream-approve").checked = false;
+}
+
+function renderDream(s) {
+  const p = s.policy; if (!p) return;
+  if (!$("dream-prompt").value) { $("dream-prompt").value = p.prompt; $("dream-backend").value = p.api_key_set ? "dream" : p.backend; $("dream-gripper").value = p.gripper_mode; $("dream-speed").value = String(p.speed_scale); $("dream-secs").value = 40; $("dream-secs").value = Math.min(20, p.max_duration_s); }
+  const busy = s.task !== null, prompt = $("dream-prompt").value.trim() || p.prompt, backend = $("dream-backend").value;
+  const dryOk = !p.require_dry_run_first || (p.dry_ok && p.dry_ok[0] === prompt && p.dry_ok[1] === backend && p.dry_ok[2] === $("dream-gripper").value);
+  const sim = dreamMode() === "sim";
+  $("robot-controls").style.display = sim ? "none" : ""; $("sim-controls").style.display = sim ? "" : "none";
+  $("sim-view").style.display = sim || s.sim_live ? "" : "none";
+  $("btn-sim").disabled = busy;
+  $("btn-dry").disabled = busy || s.estopped;
+  $("btn-run").disabled = busy || s.estopped || !dryOk;
+  $("btn-run").title = dryOk ? "" : "Dry-run this exact prompt first (a plan must pass the safety check, retries allowed)";
+  const x = s.execution;
+  if (x && x.chunks_received !== undefined) {
+    const cls = x.completed ? "ok" : "fail";
+    $("dream-verdict").innerHTML = `<div class="verdict ${cls}">${x.simulation ? "Simulation run" : x.dry_run ? "Dry-run" : "Run"} (${esc(x.backend || "")}): ${esc(x.reason)}<br>
+      <span style="font-weight:400">${x.simulation ? "SIMULATION · " : ""}${x.chunks_received} chunks, ${x.chunks_rejected} rejected · ${x.steps_sent} steps sent · ${x.duration_s.toFixed(1)} s</span></div>` +
+      (dryOk && x.dry_run ? `<div class="hint">A plan passed the safety check: you can approve a real run of this prompt.</div>` : "");
+  }
+  if (!dreamCamSet && s.cameras.roles.includes("center")) { dreamCamSet = true; $("dream-cam").src = `/api/cameras/center/stream?fps=8&${q()}`; }
+}
+
+function renderChunks() {
+  $("chunk-list").innerHTML = chunks.slice(-8).map(c => `<li><span class="ic-${c.ok ? "ok" : "fail"}">${c.ok ? "✔" : "✖"}</span>
+    <span class="k">chunk ${c.index}</span><span class="v">${c.rows} rows${c.ok ? "" : " · " + esc(c.reason)}</span></li>`).join("");
+  const cv = $("chunk-plot"), g = cv.getContext("2d"), W = cv.width, H = cv.height;
+  g.clearRect(0, 0, W, H);
+  const last = chunks[chunks.length - 1]; if (!last) return;
+  const P = last.positions, T = P.length - 1 || 1;
+  g.strokeStyle = "#2a3340"; g.beginPath(); g.moveTo(0, H / 2); g.lineTo(W, H / 2); g.stroke();
+  for (let j = 0; j < 16; j++) {
+    g.strokeStyle = `hsl(${(j % 8) * 45},70%,${j < 8 ? 65 : 50}%)`; g.setLineDash(j < 8 ? [] : [5, 3]); g.beginPath();
+    P.forEach((row, t) => { const x = t / T * W, y = H / 2 - row[j] * H / 4; t ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke();
+  }
+  g.setLineDash([]);
+}
+
+async function pollBlock() {
+  if (document.hidden || !S) return;
+  try {
+    const d = await get("/api/detect");
+    $("dream-block").textContent = d.length ? `${d[0].matches[0] || "object"} ${d[0].height_mm.toFixed(0)} mm` +
+      (d[0].base_xyz ? ` · base (${d[0].base_xyz.map(v => v.toFixed(2)).join(", ")})` : ` · cam (${d[0].cam_xyz.map(v => v.toFixed(2)).join(", ")})`) : "no block found";
+  } catch (e) { $("dream-block").textContent = "no depth stream"; }
+}
+setInterval(pollBlock, 2500);
+setInterval(() => { if (S && !document.hidden && $("sim-view").style.display !== "none" && (S.sim_live || S.task)) $("dream-sim").src = `/api/sim/live.jpg?t=${Date.now()}&${q()}`; }, 500);
+
 function render(s) {
   const prevReport = S && S.report && S.report.fingerprint, prevPlan = S && S.plan && S.plan.steps;
-  S = s;
+  S = s; renderDream(s);
   document.body.classList.toggle("estopped", s.estopped);
   $("chip-robot").textContent = s.robot_backend; $("chip-dl").textContent = s.dreamlab_backend || "not configured";
   $("chip-task").textContent = s.task || (s.estopped ? "E-STOPPED" : "idle");
@@ -320,8 +420,10 @@ function render(s) {
   $("exec-info").textContent = s.execution ? `${s.execution.completed ? "✔" : "✖"} ${s.execution.reason} · ${s.execution.steps_sent}/${s.execution.total_steps} steps · max tracking error ${s.execution.max_tracking_error_rad} rad` : "";
 
   // joints
-  if (s.joints.length) {
-    $("joints").innerHTML = s.joints.map((v, i) => {
+  const simJ = dreamMode() === "sim" && s.sim_joints, J = simJ || s.joints;  // simulation mode shows the simulated arms
+  $("joints-title").textContent = simJ ? "Joints (simulation)" : "Joints";
+  if (J.length) {
+    $("joints").innerHTML = J.map((v, i) => {
       const nm = (traj?.names?.[i]) || ["L1","L2","L3","L4","L5","L6","L7","L grip","R1","R2","R3","R4","R5","R6","R7","R grip"][i];
       const grip = i === 7 || i === 15, pct = grip ? v * 100 : (v + 3.5) / 7 * 100;
       return `<div><span>${esc(nm.replace("_joint", " j").replace("_gripper", " grip"))}</span> ${v.toFixed(3)}<div class="bar"><i style="left:${Math.max(0, Math.min(100, pct))}%"></i></div></div>`;
@@ -393,12 +495,14 @@ function connect() {
     if (e.type === "state") { render(e.state); if (e.state.task === null) loadDemos(); }
     else if (e.type === "log") addLog(e);
     else if (e.type === "progress") { $("prog").max = e.total; $("prog").value = e.done; }
+    else if (e.type === "chunk") { chunks.push(e); renderChunks(); }
   };
 }
 async function boot() {
-  try { render(await get("/api/state")); (await get("/api/logs")).forEach(addLog); loadDemos(); } catch (e) {}
+  try { render(await get("/api/state")); (await get("/api/logs")).forEach(addLog); loadDemos();
+        chunks = await get("/api/policy/chunks"); renderChunks(); } catch (e) {}
 }
-setInterval(() => { if (S && !document.hidden) get("/api/state").then(render).catch(() => {}); }, 1000);
+setInterval(() => { if (S && !document.hidden) get("/api/state").then(render).catch(() => {}); }, 500);
 connect(); boot();
 </script>
 </body>

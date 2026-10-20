@@ -13,6 +13,14 @@ from orboh.config import SafetyConfig
 from orboh.types import ARM_IDX, GRIPPER_IDX
 
 
+def slowed(cfg: SafetyConfig, scale: float) -> SafetyConfig:
+    """The same safety limits at a fraction of the speed: velocity and gripper speed x scale, acceleration x scale (gentler starts)."""
+    s = min(1.0, max(0.1, float(scale)))
+    return cfg.model_copy(update={"max_joint_velocity_rad_s": cfg.max_joint_velocity_rad_s * s,
+                                  "max_joint_accel_rad_s2": cfg.max_joint_accel_rad_s2 * s,
+                                  "max_gripper_velocity": cfg.max_gripper_velocity * s})
+
+
 def slew_limit(q0: np.ndarray, v0: np.ndarray, targets: np.ndarray, hz: float, cfg: SafetyConfig,
                lo: np.ndarray, hi: np.ndarray, margin_scale: float = 0.9) -> tuple[np.ndarray, np.ndarray]:
     """Follow `targets` (T, 16) from state (q0, v0) under velocity/acceleration caps.

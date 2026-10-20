@@ -243,3 +243,76 @@ def test_table_drop_lowers_table_and_puck():
     flat, dropped = MujocoSim("pedestal/move_puck_scene.xml"), MujocoSim("pedestal/move_puck_scene.xml", 0.02)
     for body in ("table", "puck"):
         assert flat.model.body(body).pos[2] - dropped.model.body(body).pos[2] == pytest.approx(0.02)
+
+
+def test_web_policy_dry_run_then_gated_real_run(client):
+    """Dream-1 panel: dry-run moves nothing and unlocks a real run of the SAME prompt only, which then needs approval."""
+    h = {"Authorization": "Bearer secret"}
+    run = lambda **kw: client.post("/api/policy/run", json={"backend": "mock", "seconds": 2, **kw}, headers=h)
+    assert run(prompt="pick the block", dry_run=False, approved=True).status_code == 412  # no dry-run yet
+    assert run(prompt="pick the block", dry_run=True).status_code == 200
+    s = _wait_idle(client, h)
+    assert s["execution"]["dry_run"] and s["execution"]["completed"] and s["execution"]["steps_sent"] == 0
+    assert s["policy"]["dry_ok"] == ["pick the block", "mock", "model"]
+    chunks = client.get("/api/policy/chunks", headers=h).json()
+    assert chunks and chunks[0]["ok"] and len(chunks[0]["positions"][0]) == 16
+    assert run(prompt="pick the block", dry_run=False, approved=False).status_code == 412  # needs approval
+    assert run(prompt="push the block", dry_run=False, approved=True).status_code == 412  # a different prompt
+    assert run(prompt="pick the block", dry_run=False, approved=True).status_code == 200
+    s = _wait_idle(client, h)
+    assert not s["execution"]["dry_run"] and s["execution"]["steps_sent"] > 0
+    assert s["policy"]["dry_ok"] is None  # a real run uses up the dry-run
+
+
+def test_web_policy_simulation_mode_needs_no_gates_and_moves_only_the_twin(client):
+    """'Simulation only' runs the policy on a fresh MuJoCo robot: no dry-run or approval needed, the real robot stays put."""
+    h = {"Authorization": "Bearer secret"}
+    r = client.post("/api/policy/run", json={"backend": "mock", "seconds": 2, "mode": "sim", "dry_run": False}, headers=h)
+    assert r.status_code == 200 and r.json()["started"] == "Dream-1 simulation"
+    s = _wait_idle(client, h)
+    assert s["execution"]["simulation"] and s["execution"]["completed"] and s["execution"]["steps_sent"] > 0
+    assert s["sim_live"] and client.get("/api/sim/live.jpg", headers=h).status_code == 200
+    assert s["policy"]["dry_ok"] is None  # a simulation neither unlocks nor uses up a real run
+    assert client.post("/api/policy/run", json={"backend": "mock", "mode": "nope"}, headers=h).status_code == 422
+
+
+def test_importing_the_sim_defaults_to_offscreen_egl_rendering():
+    """Regression: the default GLFW backend returned a desktop screenshot as the simulated camera image."""
+    import os
+    import subprocess
+    import sys
+
+    env = {k: v for k, v in os.environ.items() if k != "MUJOCO_GL"}
+    out = subprocess.run([sys.executable, "-c", "import orboh.sim.mujoco_sim, os; print(os.environ['MUJOCO_GL'])"],
+                         env=env, capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "egl"
+
+
+def test_sim_prefers_the_nvidia_egl_vendor_when_installed():
+    """Regression: Mesa/CPU rendering (~150 ms a frame) blocked the physics step and tripped the control-loop watchdog."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    env = {k: v for k, v in os.environ.items() if k not in ("MUJOCO_GL", "__EGL_VENDOR_LIBRARY_FILENAMES", "ORBOH_SOFTWARE_GL")}
+    code = "import orboh.sim, os; print(os.environ.get('__EGL_VENDOR_LIBRARY_FILENAMES', ''))"
+    out = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True).stdout.strip()
+    nvidia = Path("/usr/share/glvnd/egl_vendor.d/10_nvidia.json")
+    assert out == (str(nvidia) if nvidia.exists() else "")
+    env["ORBOH_SOFTWARE_GL"] = "1"  # the opt-out leaves the system default alone
+    assert subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, check=True).stdout.strip() == ""
+
+
+def test_web_gripper_mode_is_part_of_the_dry_run_and_simple_page_is_served(client):
+    h = {"Authorization": "Bearer secret"}
+    run = lambda **kw: client.post("/api/policy/run", json={"backend": "mock", "seconds": 2, "prompt": "pick", **kw}, headers=h)
+    assert run(gripper="nope").status_code == 422
+    assert run(dry_run=True, gripper="demos").status_code == 200
+    s = _wait_idle(client, h)
+    assert s["execution"]["gripper"] == "demos" and s["policy"]["dry_ok"] == ["pick", "mock", "demos"]
+    assert run(dry_run=False, approved=True, gripper="model").status_code == 412  # different gripper mode: look again first
+    assert run(dry_run=False, approved=True, gripper="demos").status_code == 200
+    _wait_idle(client, h)
+    page = client.get("/simple")
+    assert page.status_code == 200 and "Tell the robot" in page.text

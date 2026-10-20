@@ -27,9 +27,17 @@ def resolve_scene(scene: str) -> str:
 
 
 class MujocoSim:
-    def __init__(self, scene: str, table_drop_m: float = 0.0, torso_tolerance_m: float = 0.0):
+    def __init__(self, scene: str, table_drop_m: float = 0.0, torso_tolerance_m: float = 0.0,
+                 box: dict | None = None):
         self.scene = resolve_scene(scene)
-        self.model = mujoco.MjModel.from_xml_path(self.scene)
+        self._init_args = (scene, table_drop_m, box)
+        if box:
+            spec = mujoco.MjSpec.from_file(self.scene)
+            self._add_box(spec, box, table_drop_m)
+            self.model = spec.compile()
+        else:
+            self.model = mujoco.MjModel.from_xml_path(self.scene)
+        self._object: tuple[np.ndarray, float] | None = None  # (xyz, yaw) of the manipulated object, applied on reset
         if table_drop_m:
             for body in ("table", "puck"):  # the puck rests on the table
                 self.model.body(body).pos[2] -= table_drop_m
@@ -62,6 +70,48 @@ class MujocoSim:
             self._tolerate_torso()
         self.reset()
 
+    @staticmethod
+    def _add_box(spec, box: dict, table_drop_m: float) -> None:
+        """An open-topped box on the table (floor + 4 walls): `center` [x, y], `size` [depth_x, width_y, height] in metres."""
+        table_top = 0.40 - table_drop_m  # the pedestal scenes' table top, lowered like the table itself
+        cx, cy = box["center"]
+        dx, dy, h = box["size"]
+        t = float(box.get("wall", 0.01))
+        walls = {"floor": ((0, 0, t / 2), (dx / 2, dy / 2, t / 2)),
+                 "wall_n": ((dx / 2, 0, h / 2), (t / 2, dy / 2, h / 2)), "wall_s": ((-dx / 2, 0, h / 2), (t / 2, dy / 2, h / 2)),
+                 "wall_e": ((0, dy / 2, h / 2), (dx / 2, t / 2, h / 2)), "wall_w": ((0, -dy / 2, h / 2), (dx / 2, t / 2, h / 2))}
+        for name, (off, half) in walls.items():
+            spec.worldbody.add_geom(name=f"box_{name}", type=mujoco.mjtGeom.mjGEOM_BOX, size=list(half),
+                                    pos=[cx + off[0], cy + off[1], table_top + off[2]], rgba=[0.8, 0.8, 0.9, 0.35],
+                                    contype=1, conaffinity=1)
+
+    def planning_copy(self) -> "MujocoSim":
+        """The same scene with the torso kept in the contact pass: collision-aware IK needs it (the check sim relaxes it)."""
+        scene, drop, box = self._init_args
+        return MujocoSim(scene, drop, 0.0, box)
+
+    @property
+    def table_top(self) -> float:
+        g = self.model.geom("table_top")
+        return float(self.data.geom_xpos[g.id][2] + g.size[2])
+
+    def set_object(self, xyz, half_extents=(0.0235, 0.0235, 0.0235), yaw: float = 0.0) -> None:
+        """Put the manipulated object (the scene's free body, 'puck') at `xyz`, resized to a box of `half_extents`."""
+        gid = self.model.geom("puck_geom").id
+        self.model.geom_size[gid] = half_extents
+        self._object = (np.asarray(xyz, float), float(yaw))
+        self.reset(self.joints())
+
+    def _place_object(self) -> None:
+        if self._object is None:
+            return
+        body = self.model.body("puck")
+        adr = int(self.model.jnt_qposadr[self.model.body_jntadr[body.id]])
+        xyz, yaw = self._object
+        self.data.qpos[adr:adr + 3] = xyz
+        self.data.qpos[adr + 3:adr + 7] = [np.cos(yaw / 2), 0, 0, np.sin(yaw / 2)]
+        self.data.qvel[:] = 0
+
     # ------------------------------------------------------------------ state
     def limits(self) -> tuple[np.ndarray, np.ndarray]:
         lo = np.zeros(NUM_JOINTS)
@@ -93,6 +143,7 @@ class MujocoSim:
                 if i in GRIPPER_IDX:  # second finger joint is coupled; mirror it
                     self.data.qpos[self._qadr[i] + 1] = sim_q[i]
             self.data.ctrl[self._act] = sim_q
+            self._place_object()
             mujoco.mj_forward(self.model, self.data)
 
     def set_command(self, q: np.ndarray) -> None:

@@ -22,6 +22,7 @@ from orboh.cameras.sources import list_realsense, RealSenseSource, to_jpeg
 from orboh.config import load_config
 from orboh.dreamlab.policy import DreamPolicyClient, PolicyError
 from orboh.perception.block_finder import BlockFinder
+from orboh.perception.calibration import attach_base_positions, load_extrinsics
 from PIL import ImageDraw
 
 cfg = load_config(None)
@@ -35,6 +36,7 @@ clean: dict[str, bytes] = {}  # untouched frames: this is what Dream gets
 lock = threading.Lock()
 
 finder = BlockFinder(cfg.perception)
+ext = load_extrinsics(cfg.path(cfg.cameras.extrinsics), cfg.cameras.pinned_serials.get("center", ""))  # None = no calibration yet
 last_det: dict = {"detections": []}
 
 
@@ -48,7 +50,8 @@ def annotate(rgbd, dets):
         dr.rectangle([xs.min(), ys.min(), xs.max(), ys.max()], outline=(255, 0, 0), width=3)
         x, y, z = d.cam_xyz
         dr.text((xs.min(), max(0, ys.min() - 26)), f"{d.height_mm:.0f}mm {d.size_mm[0]:.0f}x{d.size_mm[1]:.0f} {','.join(d.matches) or '?'}", fill=(255, 255, 0))
-        dr.text((xs.min(), max(0, ys.min() - 13)), f"cam xyz {x:.3f} {y:.3f} {z:.3f} m", fill=(255, 255, 0))
+        base = f" | base {d.base_xyz[0]:.3f} {d.base_xyz[1]:.3f} {d.base_xyz[2]:.3f}" if d.base_xyz is not None else ""
+        dr.text((xs.min(), max(0, ys.min() - 13)), f"cam {x:.3f} {y:.3f} {z:.3f}{base} m", fill=(255, 255, 0))
     return np.asarray(im)
 
 
@@ -61,7 +64,7 @@ def pump(slot, serial):
             rgbd = src.read_rgbd()
             if rgbd is None:
                 continue
-            dets = finder.find(rgbd)
+            dets = attach_base_positions(finder.find(rgbd), ext[0] if ext else None)
             last_det["detections"] = [d.to_dict() for d in dets]
             img = annotate(rgbd, dets)
         else:

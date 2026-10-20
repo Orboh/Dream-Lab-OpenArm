@@ -88,6 +88,9 @@ sim:
   # Arm-vs-torso overlap allowed, metres. The twin's torso mesh is ~1-2 cm stricter than the real robot (a real demo
   # overlaps it by up to 15 mm). Only the arm links vs the torso; table and everything else stay strict. 0 = strict.
   torso_tolerance_m: 0.02
+  # The wood box (W320 x D215 x H130 mm, centred left-right). x is where the demos released over it (0.49-0.51); the near edge
+  # is then 0.39 m from the base axis, i.e. the plate tip is at x ~ 0.01 m (scene file: 380 mm from the plate tip). ESTIMATED.
+  box: {center: [0.4975, 0.0], size: [0.215, 0.32, 0.13]}
 
 safety:
   joint_limit_margin_rad: 0.05

@@ -30,8 +30,11 @@ Everything is driven from a **web console**.
 | 11 | [Web console](11-web-console.md) | REST / WebSocket API, UI, auth token |
 | 12 | [Testing](12-testing.md) | test suite, what each test proves, how to add tests |
 | 13 | [Roadmap & open items](13-roadmap.md) | what's blocked, next steps, decisions log |
-| 14 | [Dream-1 policy](14-policy.md) | closed-loop policy client, `run-policy`, reading a dry-run |
+| 14 | [Dream-1 policy](14-policy.md) | **main path**: type a task in the console, Dream-1 does it; dry-run first |
 | 15 | [Real robot via the bridge](15-real-robot.md) | **new-setup guide**: CAN, cameras, bridge, dry-run, real run, troubleshooting |
+| 16 | [Perception](16-perception.md) | depth stream, block finder (position of the object), live results |
+| 17 | [Calibration](17-calibration.md) | camera → robot transform from depth + recorded demos, accuracy limits |
+| 18 | [Grasp planner](18-grasp-planner.md) | parked planner; gripper values measured from real demos |
 
 ---
 
@@ -68,11 +71,7 @@ bash scripts/setup_env.sh && source .venv/bin/activate
 orboh sample-demos                         # synthetic demos
 MUJOCO_GL=egl orboh serve --host 127.0.0.1 # open http://127.0.0.1:8000
 ```
-Robot box:
-1. Follow [01 → robot box](01-environment-setup.md#robot-box).
-2. Set `robot.backend: lerobot` in the config.
-3. Clear every `VERIFY` line ([02](02-configuration.md#verify-checklist)).
-4. Run `orboh preflight`.
+Robot box: follow the new-setup guide [15](15-real-robot.md) (bridge, cameras, dry-run), then `orboh preflight`.
 
 ---
 
@@ -169,7 +168,7 @@ Details and rationale: [08 Safety](08-safety.md).
 ## 9. Current status (2026-10-20)
 
 - ✅ Full flow works in sim: preflight → cameras → demo → plan → sim check → execute → E-STOP.
-- ✅ 35 tests pass. Real cameras + real Dream-1 + fake bridge: dry-run chunks 1–3 pass the safety check ([14](14-policy.md)).
+- ✅ 53 tests pass. Console Dream-1 panel works end to end on the fake bridge with real cameras + real Dream-1 ([11](11-web-console.md)).
 - ⏳ **Next:** twin scene matching the real table/box, dry-run on the real arms, then a short approved run ([15](15-real-robot.md)).
 
 See [13 Roadmap](13-roadmap.md).
