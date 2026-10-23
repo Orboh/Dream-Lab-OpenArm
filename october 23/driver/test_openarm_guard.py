@@ -239,3 +239,70 @@ def test_guard_does_not_enforce_the_painted_area(monkeypatch, tmp_path):
     far = [[5.0, 5.0]]  # a painted area nowhere near the hanging hand
     g, _ = make_guard(monkeypatch, tmp_path, left_reach=far)
     g.check(np.zeros(7))  # allowed: Dream clips to the area, and Home/Stop moves cross it
+
+
+def test_guard_refuses_a_pose_outside_the_allowed_region(monkeypatch, tmp_path):
+    q = np.zeros(7)
+    tcp = zones.ArmKinematics("left").points(q)["tcp"]
+    inside = {"lo": (tcp - 0.8).tolist(), "hi": (tcp + 0.8).tolist()}
+    g, _ = make_guard(monkeypatch, tmp_path)
+    raw = zones_dict()
+    raw["arms"]["left"]["region"] = inside
+    path = tmp_path / "zones.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    monkeypatch.setenv("OPENARM_ZONES", str(path))
+    guard.Guard("left", clock=lambda: NOW).check(q)  # inside: fine
+    raw["arms"]["left"]["region"] = {"lo": (tcp + 0.1).tolist(), "hi": (tcp + 0.5).tolist()}  # the hand is below its floor
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(errors.ArmError, match="region"):
+        guard.Guard("left", clock=lambda: NOW).check(q)
+
+
+# -- a recorded home path (from the teach session) replaces the built-in ready path -------------------------------------------------
+
+def teach_path(side="left"):
+    rest = list(poses.REST_DEG[side])
+    mid = [rest[0] + (25.0 if side == "left" else -25.0), rest[1], rest[2], rest[3] + 20.0, rest[4], rest[5], rest[6]]
+    home = [rest[0] + (40.0 if side == "left" else -40.0), rest[1], rest[2], rest[3] + 55.0, rest[4], rest[5], rest[6]]
+    return [rest, mid, home]
+
+
+def write_zones_with_path(tmp_path, monkeypatch, side="left", path=None):
+    path = path or teach_path(side)
+    raw = zones_dict(captured=dt.datetime.now(dt.timezone.utc))
+    raw["home"] = {"left": [0.0] * 7, "right": [0.0] * 7}
+    raw["home"][side] = [math.radians(v) for v in path[-1]]
+    raw["home_path"] = {side: path}
+    file = tmp_path / "zones.yaml"
+    file.write_text(yaml.safe_dump(raw))
+    monkeypatch.setenv("OPENARM_ZONES", str(file))
+    return path
+
+
+def test_zones_parse_a_home_path_and_refuse_a_short_or_wrong_one():
+    raw = zones_dict()
+    raw["home"] = {"left": [0.0] * 7, "right": [0.0] * 7}
+    raw["home_path"] = {"left": teach_path("left")}
+    assert zones.parse_zones(raw).home_path["left"][0] == pytest.approx(poses.REST_DEG["left"])
+    for bad in ([teach_path()[0]], [[0.0] * 6, [1.0] * 6]):
+        raw["home_path"] = {"left": bad}
+        with pytest.raises(ValueError, match="home_path"):
+            zones.parse_zones(raw)
+
+
+def test_arm_raises_to_a_taught_home_along_the_recorded_path_and_parks_back(make_arm, monkeypatch, tmp_path):
+    from test_openarm_v2 import as_logical, joints_of
+    monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
+    path = write_zones_with_path(tmp_path, monkeypatch)
+    arm, bus = make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True, home=[math.radians(v) for v in path[-1]])
+    assert joints_of(bus) == pytest.approx(path[-1], abs=0.2)  # at the taught home, not at the built-in ready pose
+    arm.torque_off()
+    assert joints_of(bus) == pytest.approx(poses.REST_DEG["left"], abs=0.2) and not any(bus.enabled.values())
+
+
+def test_a_home_that_matches_neither_path_leaves_the_arm_where_it_is(make_arm, monkeypatch, tmp_path):
+    from test_openarm_v2 import as_logical, joints_of
+    monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
+    write_zones_with_path(tmp_path, monkeypatch)
+    arm, bus = make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True, home=[0.5] * 7)
+    assert joints_of(bus) == pytest.approx(poses.REST_DEG["left"], abs=0.05)

@@ -152,6 +152,7 @@ class ArmZones:
 
     reach: np.ndarray | None
     keep_out: list[dict[str, Any]]
+    region: dict[str, list[float]] | None = None
 
 
 @dataclasses.dataclass
@@ -163,17 +164,19 @@ class Zones:
     arms: dict[str, ArmZones]
     raw: dict[str, Any]
     home: dict[str, list[float]] | None = None
+    home_path: dict[str, list[list[float]]] | None = None
 
     def age_hours(self, now: dt.datetime | None = None) -> float:
         """Hours since the zones were captured."""
         now = now or dt.datetime.now(self.captured_at.tzinfo)
         return (now - self.captured_at).total_seconds() / 3600.0
 
-    def violations(self, side: str, points: dict[str, np.ndarray], check_reach: bool = True) -> list[str]:
+    def violations(self, side: str, points: dict[str, np.ndarray], check_reach: bool = True, check_region: bool = True) -> list[str]:
         """Why an arm pose is not allowed, one text per problem; empty when it is.
 
         @param side `"left"` or `"right"`.
         @param points The pose's points from #ArmKinematics.points().
+        @param check_region Also require every point to be inside the arm's allowed `region` box, when it has one.
         @param check_reach Also require the grasp point to be over the painted work area (the driver guard does not: Dream clips to it).
         @return The violations: a point inside or too close to a keep-out zone, or the grasp point off the painted area.
         """
@@ -194,6 +197,12 @@ class Zones:
                     distance = distance_to_capsule(point, center, float(zone["radius"]), float(zone["height"]))
                 if distance < reach:
                     out.append(f"{side} {name} is {distance * 100:.1f} cm from keep-out zone '{zone.get('name', zone['kind'])}'")
+        if check_region and zones.region is not None:
+            lo, hi = np.asarray(zones.region["lo"]), np.asarray(zones.region["hi"])
+            for name, point in points.items():
+                outside = float(np.max(np.maximum(lo - point, point - hi)))
+                if outside > 0.0:
+                    out.append(f"{side} {name} is {outside * 100:.1f} cm outside the allowed region")
         if check_reach and zones.reach is not None:
             miss = distance_to_reach(points["tcp"][:2], zones.reach)
             if miss > REACH_RADIUS_M + REACH_SLACK_M:
@@ -237,15 +246,30 @@ def parse_zones(raw: dict[str, Any]) -> Zones:
                     if entry["radius"] <= 0 or entry["height"] <= 0:
                         raise ValueError("keep_out capsule radius and height must be above 0")
                 keep_out.append(entry)
-            arms[side] = ArmZones(reach, keep_out)
+            region = None
+            if section.get("region") is not None:
+                lo = [float(v) for v in section["region"]["lo"]]
+                hi = [float(v) for v in section["region"]["hi"]]
+                if len(lo) != 3 or len(hi) != 3 or any(a >= b for a, b in zip(lo, hi, strict=True)):
+                    raise ValueError("region needs lo and hi, three numbers each, with lo below hi on every axis")
+                region = {"lo": lo, "hi": hi}
+            arms[side] = ArmZones(reach, keep_out, region)
         home = None
         if raw.get("home") is not None:
             home = {side: [float(v) for v in raw["home"][side]] for side in ("left", "right")}
             if any(len(h) != JOINTS for h in home.values()):
                 raise ValueError(f"home needs {JOINTS} joint angles (radians) per arm")
-        return Zones(captured, str(raw.get("source", "?")), arms, raw, home)
+        home_path = None
+        if raw.get("home_path"):
+            home_path = {}
+            for side, path in raw["home_path"].items():
+                points = [[float(v) for v in p] for p in path]
+                if side not in ("left", "right") or len(points) < 2 or any(len(p) != JOINTS for p in points):
+                    raise ValueError(f"home_path of the {side} arm needs at least two poses of {JOINTS} joint angles (degrees)")
+                home_path[side] = points
+        return Zones(captured, str(raw.get("source", "?")), arms, raw, home, home_path)
     except (KeyError, TypeError) as exc:
-        raise ValueError(f"zones file is missing or has a bad key: {exc!r}") from exc
+        raise ValueError(f"zones file is missing or has a bad key (region, keep_out, home...): {exc!r}") from exc
 
 
 def load_zones(path: str | pathlib.Path) -> Zones:

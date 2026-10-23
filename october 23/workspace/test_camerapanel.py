@@ -67,7 +67,7 @@ def test_a_camera_that_cannot_open_is_reported_not_raised():
     worker.start()
     assert wait_for(lambda: any("cannot open" in s for s in status))
     assert not wait_for(lambda: worker.running, 0.2)
-    assert frames[-1] is None
+    assert wait_for(lambda: bool(frames) and frames[-1] is None)  # the panel is cleared right after the status text
 
 
 def test_a_camera_that_fails_while_running_is_closed_and_reported():

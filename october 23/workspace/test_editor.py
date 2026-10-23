@@ -13,10 +13,16 @@ import zonebuild as zb
 NOW = dt.datetime(2026, 10, 23, 12, 0, tzinfo=dt.timezone.utc)
 
 
+def test_editor_works_in_the_robot_body_frame_and_the_arm_bases_are_shifted():
+    assert ed.BASE_OFFSET["left"] == pytest.approx([0.0, 0.031, 0.698]) and ed.BASE_OFFSET["right"] == pytest.approx([0.0, -0.031, 0.698])
+    assert ed.to_base("left", (0.5, 0.2, 0.4)) == pytest.approx([0.5, 0.169, -0.298])
+    assert ed.to_world("right", (0.5, 0.2, -0.298)) == pytest.approx([0.5, 0.169, 0.4])
+
+
 def test_defaults_put_the_table_top_30_cm_above_the_hanging_hand():
     state = ed.EditorState.default()
-    hanging_tcp_z = zones.ArmKinematics("left").points(np.zeros(7))["tcp"][2]
-    assert state.table.top_z == pytest.approx(hanging_tcp_z + 0.30, abs=0.01)
+    hanging_tcp_z = zones.ArmKinematics("left").points(np.zeros(7))["tcp"][2]  # in the arm base frame
+    assert state.table.top_z == pytest.approx(hanging_tcp_z + 0.698 + 0.30, abs=0.01)  # body frame
     assert state.arms["left"].home == pytest.approx(poses.ready_rad("left"))
 
 
@@ -78,7 +84,7 @@ def test_clashes_name_the_zone_and_the_pose_and_clear_when_the_zone_moves():
     state = ed.EditorState.default()
     assert state.clashes() == []  # default table is in front of the arms
     tcp = zones.ArmKinematics("left").points(np.radians(poses.READY_DEG["left"]))["tcp"]
-    state.add_box("in_the_way", tuple(tcp), (0.2, 0.2, 0.2), side="left")
+    state.add_box("in_the_way", tuple(ed.to_world("left", tcp)), (0.2, 0.2, 0.2), side="left")
     found = state.clashes()
     assert found and any("in_the_way" in c and "ready" in c for c in found)
     state.move_box("in_the_way", (2.0, 2.0, 2.0))
@@ -89,7 +95,7 @@ def test_clashes_include_a_live_pose():
     state = ed.EditorState.default()
     live = np.zeros(7)
     tcp = zones.ArmKinematics("left").points(live)["tcp"]
-    state.add_box("post", tuple(tcp), (0.1, 0.1, 0.1), side="left")
+    state.add_box("post", tuple(ed.to_world("left", tcp)), (0.1, 0.1, 0.1), side="left")
     assert any("live" in c and "post" in c for c in state.clashes(live={"left": live}))
 
 
@@ -102,8 +108,12 @@ def test_bundle_matches_the_documented_output_format_and_loads():
     assert raw["frame"] == zb.FRAME_NOTE
     assert set(raw["home"]) == {"left", "right"} and len(raw["home"]["left"]) == 7
     left = raw["arms"]["left"]
-    assert left["table_z"] == pytest.approx(state.table.top_z)
+    assert left["table_z"] == pytest.approx(state.table.top_z - 0.698)  # stored in the arm base frame
+    assert raw["arms"]["right"]["table_z"] == pytest.approx(state.table.top_z - 0.698)
     assert [z["name"] for z in left["keep_out"]] == ["table", "torso"]
+    # the same physical table is shifted by the base offset: left base is +0.031 in y, right base -0.031
+    lt = left["keep_out"][0]["center"][1]; rt = raw["arms"]["right"]["keep_out"][0]["center"][1]
+    assert lt - rt == pytest.approx(-0.062)
     assert left["reach"]
     zones.parse_zones(raw)  # the driver and apply read it as is
 
@@ -116,3 +126,34 @@ def test_round_trip_from_a_bundle():
     again = ed.EditorState.from_bundle(raw)
     assert [b.name for b in again.boxes] == ["torso"] and again.table.top_z == pytest.approx(state.table.top_z)
     assert again.to_bundle(operator="k", now=NOW)["arms"] == raw["arms"]
+
+
+# -- saving and exporting ---------------------------------------------------------------------------------------------------
+
+import outputs  # noqa: E402
+import yaml  # noqa: E402
+
+
+def test_save_bundle_writes_the_yaml_and_the_layout_picture_side_by_side(tmp_path):
+    state = ed.EditorState.default()
+    state.add_box("torso", (-0.15, 0.0, 0.35), (0.2, 0.5, 0.7))
+    yaml_path, png_path = outputs.save_bundle(state, "kota", tmp_path, now=NOW)
+    assert yaml_path.name == "zones-20261023-1200.yaml" and png_path.name == "layout-20261023-1200.png"
+    raw = yaml.safe_load(yaml_path.read_text())
+    zones.parse_zones(raw)
+    assert raw["operator"] == "kota" and raw["source"] == "editor" and png_path.stat().st_size > 1000
+
+
+def test_export_station_keys_has_home_reach_and_keep_out_per_arm_and_nothing_else(tmp_path):
+    state = ed.EditorState.default()
+    state.set_work_area("left", (0.4, 0.6), (0.0, 0.2))
+    state.add_box("torso", (-0.15, 0.0, 0.35), (0.2, 0.5, 0.7))
+    raw = state.to_bundle("k", NOW)
+    path = outputs.export_station_keys(raw, tmp_path / "station_keys.yaml")
+    keys = yaml.safe_load(path.read_text())
+    assert set(keys) == {"follower_l", "follower_r"}
+    for key in keys.values():
+        assert set(key) == {"home", "reach", "keep_out"} and len(key["home"]) == 7
+        assert all(set(z) == {"kind", "center", "size"} for z in key["keep_out"])
+    assert keys["follower_l"]["keep_out"][1]["size"] == [0.2, 0.5, 0.7]
+    assert path.read_text().startswith("#")  # a header says what it is and where it goes

@@ -15,3 +15,4 @@
 | [log-011.md](log-011.md) | Implemented "swing back then rise to the ready pose" at station start and parking at rest on stop (tested on the fake bus only). |
 | [log-012.md](log-012.md) | Daily safety area part 1: zones schema and FK, hard driver guard, one-arm lock (`arms.py`), tests only. |
 | [log-012.md](log-012.md) | Daily safety area: zones, guard, one-arm lock, capture/verify/build/apply tool and 3D viewer (tests only; viewer demo running read-only). |
+| [log-013.md](log-013.md) | Round 2: real OpenArm model in the browser, visual zone editor, fixed output format (home pose + allowed/forbidden coordinates, station keys, layout picture). |

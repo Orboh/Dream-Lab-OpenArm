@@ -43,6 +43,7 @@ import numpy.typing as npt
 import openarm_guard
 import openarm_lock
 import openarm_poses as poses
+import openarm_zones as zones_module
 from robots import config, damiao, errors, followers, robstride
 
 _log = logging.getLogger(__name__)
@@ -480,13 +481,35 @@ class Arm(ReadOnlyArm):
         """The seven joints as last read, logical degrees."""
         return [self._deg[n] for n in JOINTS]
 
-    def _should_go_ready(self) -> bool:
-        """True when the config's home is this arm's ready pose and the arm sits at rest: then the station start raises it."""
+    def _taught_path(self) -> list[list[float]] | None:
+        """The recorded rest-to-home path in the zones in force (degrees), when it ends at the config's home."""
         if self._home_deg is None or len(self._home_deg) != len(JOINTS):
+            return None
+        try:
+            taught = zones_module.load_zones(openarm_guard.zones_path()).home_path
+        except (OSError, ValueError):
+            return None
+        path = (taught or {}).get(self.side)
+        if path and float(np.max(np.abs(self._home_deg - np.asarray(path[-1])))) <= READY_HOME_TOLERANCE_DEG:
+            return path
+        return None
+
+    def _home_path(self) -> list[list[float]] | None:
+        """The path from rest to the config's home: the taught one, else the built-in ready path when home is the ready pose, else None."""
+        taught = self._taught_path()
+        if taught is not None:
+            return taught
+        if self._home_deg is not None and len(self._home_deg) == len(JOINTS) and \
+                float(np.max(np.abs(self._home_deg - np.asarray(poses.READY_DEG[self.side])))) <= READY_HOME_TOLERANCE_DEG:
+            return poses.path_to_ready(self.side)
+        return None
+
+    def _should_go_ready(self) -> bool:
+        """True when a path to the config's home is known and the arm sits at rest: then the station start raises it along that path."""
+        path = self._home_path()
+        if path is None:
             return False
-        if float(np.max(np.abs(self._home_deg - np.asarray(poses.READY_DEG[self.side])))) > READY_HOME_TOLERANCE_DEG:
-            return False
-        index, distance = poses.nearest(poses.path_to_ready(self.side), self._joint_pose())
+        index, distance = poses.nearest(path, self._joint_pose())
         return index == 0 and distance <= REST_TOLERANCE_DEG
 
     def _follow(self, points: list[list[float]]) -> None:
@@ -521,7 +544,8 @@ class Arm(ReadOnlyArm):
         @throws ArmError As #_follow.
         """
         _log.info("arm %s: rest -> ready along %d waypoints", self.side, len(poses.WAYPOINTS_DEG[self.side]))
-        self._follow([self._joint_pose(), *poses.path_to_ready(self.side)[1:]])
+        path = self._home_path() or poses.path_to_ready(self.side)
+        self._follow([self._joint_pose(), *path[1:]])
 
     def _park(self) -> None:
         """Brings a raised arm back to the rest pose along the same path, so it does not fall when switched off.
@@ -531,7 +555,7 @@ class Arm(ReadOnlyArm):
         if self._limp or self._deg is None:
             return
         self._logical()
-        path = poses.path_to_ready(self.side)
+        path = self._home_path() or poses.path_to_ready(self.side)
         here = self._joint_pose()
         index, distance = poses.nearest(path, here)
         if distance > PARK_TOLERANCE_DEG:

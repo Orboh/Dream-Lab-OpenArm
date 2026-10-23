@@ -326,6 +326,41 @@ def cmd_view(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_design(args: argparse.Namespace) -> int:
+    """The visual editor: the real OpenArm model, the table and danger boxes you drag, Save and Export. Starts from the newest bundle unless --new."""
+    import camerapanel
+    import designer
+    import editor
+
+    newest = None if args.new else (pathlib.Path(args.zones) if args.zones else newest_zones())
+    state = editor.EditorState.from_bundle(load_raw(newest)) if newest else editor.EditorState.default()
+    print(f"starting from {newest.name if newest else 'the defaults (table top 30 cm above the hanging hand)'}")
+    cameras = camerapanel.cameras_from_station(STATION) if args.cameras else None
+    arms, read_q, observers, observer_status = {}, None, {}, None
+    if args.live != "none" or cameras is not None or args.observe:
+        refuse_if_station_running()
+    if args.live != "none" and args.observe:
+        sys.exit("choose one: --live reads the limp arms (it sends queries); --observe only listens while the teleop runs")
+    if args.live != "none":
+        arms, read_q, _ = open_sources(args.live, ["left", "right"])
+    if args.observe:
+        import canobserver
+
+        observers = {side: canobserver.PassiveArm(side) for side in ("left", "right")}
+        for obs in observers.values():
+            obs.start()
+        read_q = lambda side: observers[side].q_rad()  # noqa: E731
+        observer_status = lambda: "  \n".join(o.status() for o in observers.values())  # noqa: E731
+    try:
+        designer.serve_designer(state, ZONES_DIR, args.operator, port=args.port, detail=args.detail, read_q=read_q, cameras=cameras,
+                                observer_status=observer_status)
+    finally:
+        close_all(arms)
+        for obs in observers.values():
+            obs.stop()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
@@ -351,6 +386,16 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--live", choices=["none", "follower", "leader"], default="none")
             p.add_argument("--cameras", action="store_true", help="offer the station file's RealSense cameras as switchable feeds (station must be stopped)")
         p.set_defaults(func=func)
+    p = sub.add_parser("design", help="visual editor on the real OpenArm model (Save writes the bundle and the layout picture)")
+    p.add_argument("--zones", help="start from this bundle (default: the newest)")
+    p.add_argument("--new", action="store_true", help="start from the defaults, not from a saved bundle")
+    p.add_argument("--live", choices=["none", "follower", "leader"], default="none", help="read the limp arms (or leaders) to pose the model and use their pose")
+    p.add_argument("--observe", action="store_true", help="TEACH: only LISTEN to the follower's CAN frames while your teleop runs (sends nothing)")
+    p.add_argument("--cameras", action="store_true", help="offer the station file's RealSense cameras as switchable feeds")
+    p.add_argument("--detail", choices=["visual", "collision"], default="visual")
+    p.add_argument("--port", type=int, default=8080)
+    p.add_argument("--operator", default=getpass.getuser())
+    p.set_defaults(func=cmd_design)
     p = sub.add_parser("status", help="zones in force, age, active arms")
     p.set_defaults(func=cmd_status)
     args = parser.parse_args(argv)

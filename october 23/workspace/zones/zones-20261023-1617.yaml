@@ -1,0 +1,33 @@
+version: 1
+captured_at: '2026-10-23T16:17:20+09:00'
+source: editor
+operator: kota-ueda
+frame: each arm's base frame = the robot body frame shifted by (0, +0.031, 0.698)
+  m for the left arm and (0, -0.031, 0.698) m for the right, no rotation; x forward,
+  y left, z up; metres
+home:
+  left: [1.0083, -0.0597, -0.0268, 1.6342, -0.0398, -0.0355, -0.6555]
+  right: [-0.9545, 0.0048, 0.2009, 1.3104, -0.179, 0.1037, 1.2019]
+arms:
+  left:
+    table_z: -0.295
+    reach: null
+    keep_out:
+    - name: table
+      kind: box
+      allow_tcp_touch: true
+      center: [0.575, -0.031, -0.445]
+      size: [0.45, 0.6, 0.3]
+  right:
+    table_z: -0.295
+    reach: null
+    keep_out:
+    - name: table
+      kind: box
+      allow_tcp_touch: true
+      center: [0.575, 0.031, -0.445]
+      size: [0.45, 0.6, 0.3]
+references:
+  left: []
+  right: []
+verify: {status: unverified, worst_m: null, checked_at: null}

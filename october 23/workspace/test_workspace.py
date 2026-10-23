@@ -355,3 +355,309 @@ def test_home_pose_is_checked_against_the_zones_like_rest_and_ready():
 def ws_check(raw):
     import workspace as ws
     return ws.check_free_poses(raw)
+
+
+# -- the visual editor panel (no robot meshes, real viser server) ---------------------------------------------------------------
+
+import socket  # noqa: E402
+
+import designer  # noqa: E402
+import editor as ed  # noqa: E402
+
+
+@pytest.fixture
+def panel(tmp_path):
+    import viser
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = viser.ViserServer(port=port)
+    p = designer.EditorPanel(server, ed.EditorState.default(), tmp_path / "out", "tester")
+    yield p
+    server.stop()
+
+
+def test_panel_starts_clear_and_describes_it(panel):
+    assert "No clash" in panel.status.content
+    assert panel.f_select.value == "(none)"
+
+
+def test_panel_add_select_edit_and_delete_a_box(panel):
+    panel.f_name.value = "post"
+    panel.add_box_clicked()
+    assert [b.name for b in panel.state.boxes] == ["post"] and panel.selected == "post"
+    panel.f_center.value = (0.5, 0.1, 0.6)
+    panel._box_fields_changed()
+    assert panel.state.boxes[0].center == (0.5, 0.1, 0.6)
+    panel.f_name.value = "post"
+    panel.add_box_clicked()  # a taken name gets a number instead of an error
+    assert [b.name for b in panel.state.boxes] == ["post", "post 2"]
+    panel.delete_clicked()
+    assert [b.name for b in panel.state.boxes] == ["post"]
+
+
+def test_panel_table_numbers_and_work_area_rectangle(panel):
+    panel.set_table(0.45, (0.3, 0.9), (-0.4, 0.4), 0.25)
+    t = panel.state.table
+    assert t.top_z == 0.45 and t.x_range == (0.3, 0.9) and t.thickness == 0.25
+    panel.f_area["left"][0].value, panel.f_area["left"][1].value = (0.4, 0.5), (0.0, 0.1)
+    panel.fill_area("left")
+    assert panel.state.arms["left"].reach
+    panel.clear_area("left")
+    assert not panel.state.arms["left"].reach
+
+
+def test_panel_reports_a_clash_with_a_zone_on_the_ready_pose(panel):
+    tcp = zones.ArmKinematics("right").points(np.radians(poses.READY_DEG["right"]))["tcp"]
+    panel.state.add_box("blocker", tuple(ed.to_world("right", tcp)), (0.2, 0.2, 0.2), side="right")
+    panel.redraw()
+    assert "CLASH" in panel.status.content and "blocker" in panel.status.content
+
+
+def test_panel_home_buttons_and_live_pose_message(panel):
+    panel.use_home("left", "rest")
+    assert panel.state.arms["left"].home == pytest.approx(np.radians(poses.REST_DEG["left"]))
+    panel.use_home("left", "live")
+    assert "No live arm" in panel.out_msg.content
+    panel.read_q = lambda side: np.full(7, 0.1)
+    panel.use_home("right", "live")
+    assert panel.state.arms["right"].home == pytest.approx([0.1] * 7)
+
+
+def test_panel_save_and_export_write_the_files(panel, tmp_path):
+    panel.add_box_clicked()
+    panel.save_clicked()
+    yaml_path, png_path = panel.last_saved
+    assert yaml_path.exists() and png_path.exists() and "Saved" in panel.out_msg.content
+    keys = panel.export_clicked()
+    assert keys.exists() and "follower_l" in keys.read_text()
+
+
+def test_save_warns_when_there_is_a_clash(panel):
+    tcp = zones.ArmKinematics("left").points(np.radians(poses.READY_DEG["left"]))["tcp"]
+    panel.state.add_box("blocker", tuple(ed.to_world("left", tcp)), (0.2, 0.2, 0.2), side="left")
+    panel.save_clicked()
+    assert "clash" in panel.out_msg.content.lower()
+
+
+def test_the_real_model_and_dreams_model_agree_once_the_base_offset_is_applied():
+    """The meshes (v10 URDF in the body frame) and the zones (Dream's arm base frames) share one world: wrist positions match to 1e-5 m (the URDF writes pi/2 with 12 digits)."""
+    import yourdfpy
+
+    urdf = yourdfpy.URDF.load(str(designer.URDF), load_meshes=False, build_scene_graph=True, load_collision_meshes=False)
+    rng = np.random.default_rng(11)
+    for side in ("left", "right"):
+        kin = zones.ArmKinematics(side)
+        for _ in range(10):
+            q = rng.uniform(-0.8, 0.8, 7)
+            cfg = {f"openarm_{s}_joint{i + 1}": 0.0 for s in ("left", "right") for i in range(7)}
+            cfg.update({f"openarm_{side}_joint{i + 1}": float(q[i]) for i in range(7)})
+            urdf.update_cfg(np.array([cfg.get(n, 0.0) for n in urdf.actuated_joint_names]))
+            for link, point in ((f"openarm_{side}_link7", "wrist"),):  # intermediate frames differ by up to 3 cm between the two models; the wrist is the shared point
+                world = urdf.get_transform(link, "world")[:3, 3]
+                assert world == pytest.approx(ed.to_world(side, kin.points(q)[point]), abs=1e-5), (side, point)
+
+
+# -- region: the allowed box (round 3) ---------------------------------------------------------------------------------------
+
+REGION = {"lo": [0.1, -0.3, -0.45], "hi": [0.6, 0.3, -0.05]}
+
+
+def region_zones(region=REGION, side="left"):
+    raw = zb.build_zones(capture_fixture(), source="teach", operator="k", now=NOW)
+    raw["arms"][side]["region"] = region
+    return raw
+
+
+def test_region_is_parsed_and_checked_for_every_point():
+    parsed = zones.parse_zones(region_zones())
+    assert parsed.arms["left"].region == {"lo": [0.1, -0.3, -0.45], "hi": [0.6, 0.3, -0.05]} and parsed.arms["right"].region is None
+    inside = {"elbow": np.array([0.3, 0.0, -0.2]), "tcp": np.array([0.5, 0.1, -0.4])}
+    assert parsed.violations("left", inside, check_reach=False) == []
+    outside = {"elbow": np.array([0.3, 0.0, -0.2]), "tcp": np.array([0.5, 0.1, -0.5])}  # 5 cm below the floor of the box
+    found = parsed.violations("left", outside, check_reach=False)
+    assert found and "tcp" in found[0] and "region" in found[0]
+    assert parsed.violations("left", outside, check_reach=False, check_region=False) == []
+    assert parsed.violations("right", outside, check_reach=False) == []  # no region on the right arm
+
+
+def test_a_bad_region_is_refused():
+    for bad in ({"lo": [0.1, 0, 0], "hi": [0.0, 1, 1]}, {"lo": [0.1, 0], "hi": [1, 1, 1]}, {"lo": [0, 0, 0]}):
+        with pytest.raises(ValueError, match="region"):
+            zones.parse_zones(region_zones(region=bad))
+
+
+def test_pose_violations_check_the_region_only_for_home_and_live_poses():
+    kin = zones.ArmKinematics("left")
+    raw = region_zones(region={"lo": [0.2, -0.1, -0.1], "hi": [0.3, 0.1, 0.0]})  # a small box far from the hanging arm
+    parsed = zones.parse_zones(raw)
+    named = {"rest": poses.REST_DEG["left"], "home": poses.READY_DEG["left"]}
+    found = zb.pose_violations(parsed, "left", named, kin)
+    assert any(f.startswith("home") and "region" in f for f in found)       # home is outside this box
+    assert not any(f.startswith("rest") for f in found)                      # rest hangs below the table: never held to the region
+
+
+def test_station_fragment_and_apply_carry_the_region(tmp_path):
+    raw = region_zones()
+    frag = zb.station_fragment(raw, homes={"left": (0.05, 0.12), "right": (0.05, -0.12)})
+    assert frag["left"]["region"] == REGION and "region" not in frag["right"]
+    station = tmp_path / "station.yaml"
+    station.write_text("body: custom\nfollower_l: {can_channel: can_fol_l, home: [0.0]}\nfollower_r: {can_channel: can_fol_r, home: [0.0]}\n")
+    zb.apply_to_station(station, frag)
+    new = yaml.safe_load(station.read_text())
+    assert new["follower_l"]["region"] == REGION and "region" not in new["follower_r"]
+
+
+# -- the teach folder of the editor panel (the leader moves the follower; the panel only listens) --------------------------------
+
+import teach as th  # noqa: E402
+
+
+def feed(panel, side, j1_list, j4=40.0):
+    rest = np.radians(poses.REST_DEG[side])
+    for a in j1_list:
+        q = rest.copy()
+        q[0], q[3] = np.radians(a if side == "left" else -a), np.radians(j4)
+        panel.live_q = {side: q}
+        panel.teach_tick({side: q})
+
+
+def test_teach_without_a_live_source_says_so(panel):
+    panel.set_home_from_follower("left")
+    assert "No live" in panel.out_msg.content or "no live" in panel.out_msg.content.lower()
+
+
+def test_sweeping_the_follower_builds_the_region_and_save_writes_it(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.sweep_changed("left", True)
+    feed(panel, "left", range(0, 40, 3))
+    panel.sweep_changed("left", False)
+    panel.apply_sweep_clicked()
+    region = panel.state.arms["left"].region
+    assert region and region["lo"][2] < region["hi"][2] and panel.state.arms["left"].reach
+    assert panel.state.arms["right"].region is None
+    panel.save_clicked()
+    raw = yaml.safe_load(panel.last_saved[0].read_text())
+    assert raw["arms"]["left"]["region"] == region and "region" not in raw["arms"]["right"]
+
+
+def test_home_from_the_follower_records_the_path_from_rest(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    feed(panel, "left", [0], j4=poses.REST_DEG["left"][3])  # the arm sits at its rest pose
+    panel.start_path_clicked("left")
+    assert panel.teach.recording_path("left")
+    feed(panel, "left", range(0, 60, 4))
+    panel.set_home_from_follower("left")
+    arm = panel.state.arms["left"]
+    assert arm.home_path and arm.home_path[0] == pytest.approx(poses.REST_DEG["left"], abs=0.5)
+    assert arm.home == pytest.approx(list(panel.live_q["left"]))
+
+
+def test_path_recording_refuses_to_start_away_from_rest(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    feed(panel, "left", [60])
+    panel.start_path_clicked("left")
+    assert not panel.teach.recording_path("left") and "rest" in panel.out_msg.content
+
+
+def test_mark_here_adds_a_labelled_point(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    feed(panel, "left", [30])
+    panel.f_mark.value = "far edge"
+    panel.mark_clicked("left")
+    assert panel.teach.marks("left")[0][0] == "far edge"
+
+
+# -- round 4: the card (tab) page ------------------------------------------------------------------------------------------------
+
+def rest_q(side):
+    return np.radians(poses.REST_DEG[side])
+
+
+def moving_q(side, j1, j4=None):
+    q = rest_q(side).copy()
+    sign = 1.0 if side == "left" else -1.0
+    q[0] = q[0] + np.radians(sign * j1)
+    q[3] = q[3] + np.radians(j1 * 0.8 if j4 is None else j4)
+    return q
+
+
+def test_page_has_the_four_cards_in_order_and_the_top_strip(panel):
+    assert panel.tab_labels == ["1 Position", "2 Home", "3 Danger area", "4 Save"]
+    assert "No clash" in panel.status.content and "waiting" in panel.status.content.lower()
+
+
+def test_position_cards_show_live_joints_and_waiting_for_the_arm_that_is_silent(panel):
+    q = moving_q("left", 30)
+    panel.update_position_cards({"left": q}, {"left": True, "right": False})
+    left, right = panel.pos_cards["left"].content, panel.pos_cards["right"].content
+    assert "LEFT" in left and f"{np.degrees(q)[0]:.1f}" in left and "hand" in left
+    assert "waiting" in right.lower() and "J1" not in right
+    assert "receiving" in panel.status.content.lower()
+
+
+def test_set_home_records_the_path_and_the_cards_and_checklist_follow(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    for _ in range(4):
+        panel.live_q = {"left": rest_q("left")}; panel.teach_tick(panel.live_q)
+    for a in range(0, 50, 2):
+        panel.live_q = {"left": moving_q("left", a)}; panel.teach_tick(panel.live_q)
+    panel.set_home_clicked("left")
+    arm = panel.state.arms["left"]
+    assert arm.home_source == "teach" and arm.home_path and arm.home_path[0] == pytest.approx(poses.REST_DEG["left"], abs=0.5)
+    assert "path from rest recorded" in panel.home_cards["left"].content
+    assert "&#10004;" in panel.check_html.content and "Left home set" in panel.check_html.content
+
+
+def test_set_home_without_a_path_says_so_on_the_card(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.live_q = {"right": moving_q("right", 40)}
+    panel.teach_tick(panel.live_q)                  # the arm was never seen at rest or ready
+    panel.set_home_clicked("right")
+    assert "NO path" in panel.home_cards["right"].content
+
+
+def test_set_home_without_a_live_follower_says_how_to_start_the_listener(panel):
+    panel.set_home_clicked("left")
+    assert "--observe" in panel.out_msg.content
+
+
+def test_record_extremes_toggle_follows_the_chosen_arms_and_builds_the_region_live(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.record_side.value = "right"
+    panel.record_toggle_clicked()                   # start
+    assert panel.teach.sweeping("right") and not panel.teach.sweeping("left")
+    for a in range(0, 60, 3):
+        panel.live_q = {"right": moving_q("right", a)}; panel.teach_tick(panel.live_q)
+    assert panel.state.arms["right"].region and panel.state.arms["left"].region is None   # the box grew while sweeping, no Apply press
+    panel.record_toggle_clicked()                   # stop
+    assert not panel.teach.sweeping("right")
+    panel.record_side.value = "both"
+    panel.record_toggle_clicked()
+    assert panel.teach.sweeping("left") and panel.teach.sweeping("right")
+
+
+def test_table_numbers_are_in_cm_and_mark_the_table_as_placed(panel):
+    hanging_z = zones.ArmKinematics("left").points(np.zeros(7))["tcp"][2] + ed.BASE_OFFSET["left"][2]
+    panel.f_height_cm.value, panel.f_front_cm.value, panel.f_depth_cm.value, panel.f_width_cm.value = 30.0, 40.0, 50.0, 70.0
+    panel.table_cards_changed()
+    t = panel.state.table
+    assert t.top_z == pytest.approx(hanging_z + 0.30, abs=1e-6) and t.x_range == pytest.approx((0.40, 0.90)) and t.y_range == pytest.approx((-0.35, 0.35))
+    assert panel.state.table_set
+
+
+def test_danger_box_size_is_edited_in_cm(panel):
+    panel.add_box_clicked()
+    panel.f_size_cm.value = (20.0, 10.0, 40.0)
+    panel._box_fields_changed()
+    assert panel.state.boxes[0].size == pytest.approx((0.2, 0.1, 0.4))
+
+
+def test_save_tab_checklist_lists_what_is_missing_and_ticks_off_what_is_done(panel):
+    html = panel.check_html.content
+    assert "Left home set" in html and "Table placed" in html and "&#10008;" in html
+    panel.set_table(0.45, (0.3, 0.9), (-0.4, 0.4), 0.25)
+    panel.state.table_set = True
+    panel.refresh_checklist()
+    assert panel.check_html.content.count("&#10004;") >= 2   # table placed and no clash

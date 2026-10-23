@@ -134,6 +134,8 @@ def station_fragment(raw: dict[str, Any], homes: dict[str, tuple[float, float]])
         out[side] = {"reach": cells_to_points(cells), "keep_out": keep_out}
         if raw.get("home"):
             out[side]["home"] = [float(v) for v in raw["home"][side]]
+        if raw["arms"][side].get("region"):
+            out[side]["region"] = {"lo": list(raw["arms"][side]["region"]["lo"]), "hi": list(raw["arms"][side]["region"]["hi"])}
     return out
 
 
@@ -148,7 +150,9 @@ def pose_violations(parsed: zones.Zones, side: str, named_poses: dict[str, list[
     """
     out: list[str] = []
     for name, pose in named_poses.items():
-        for text in parsed.violations(side, kin.points(np.radians(pose)), check_reach=False):
+        # the allowed region holds the work poses (home, live); rest and the raise/park path hang below the table and are exempt from it
+        in_region = name == "home" or name.startswith("live")
+        for text in parsed.violations(side, kin.points(np.radians(pose)), check_reach=False, check_region=in_region):
             out.append(f"{name}: {text}")
     return out
 
@@ -194,6 +198,10 @@ def apply_to_station(station: pathlib.Path, fragment: dict[str, dict[str, Any]])
         data[key]["keep_out"] = fragment[side]["keep_out"]
         if "home" in fragment[side]:
             data[key]["home"] = fragment[side]["home"]
+        if "region" in fragment[side]:
+            data[key]["region"] = fragment[side]["region"]
+        else:
+            data[key].pop("region", None)
     station.write_text(header + yaml.safe_dump(data, sort_keys=False, default_flow_style=None))
     return backup
 
