@@ -23,6 +23,8 @@ class FakeBus:
         self.enabled = {n: False for n in drv.MOTORS}
         self.sent: list[tuple[int, bytes]] = []
         self.fd_flags: list[bool] = []
+        self.history: list[tuple[str, float, float]] = []   # (motor, MIT target in degrees, kp) of every MIT frame
+        self.temps: dict[str, int] = {}
         self.mit_targets: dict[str, float] = {}
         self.queue: list = []
         self.silent: set[str] = set()
@@ -43,7 +45,7 @@ class FakeBus:
         tau = robstride.float_to_uint(0.0, -tmax, tmax, 12)
         status = self.fault.get(name, damiao.STATUS_ENABLED if self.enabled[name] else damiao.STATUS_DISABLED)
         data = bytes([(status << 4) | drv.CAN_IDS[name], q >> 8, q & 0xFF, dq >> 4, ((dq & 0xF) << 4) | (tau >> 8),
-                      tau & 0xFF, self.temp, self.temp])
+                      tau & 0xFF, self.temps.get(name, self.temp), self.temps.get(name, self.temp)])
         self.queue.append(types.SimpleNamespace(arbitration_id=0x10 + drv.CAN_IDS[name], data=data))
 
     def send(self, message, timeout=None) -> None:
@@ -64,6 +66,8 @@ class FakeBus:
             pmax = damiao.MOTOR_LIMITS[drv.MODELS[name]][0]
             q = (data[0] << 8) | data[1]
             self.mit_targets[name] = math.degrees(robstride.uint_to_float(q, -pmax, pmax, 16))
+            kp = robstride.uint_to_float(((data[3] & 0xF) << 8) | data[4], 0.0, 500.0, 12)
+            self.history.append((name, self.mit_targets[name], kp))
             if self.follow and name not in self.frozen:
                 self.native[name] = self.mit_targets[name]
             self._reply(name)
@@ -89,17 +93,19 @@ def make_arm(tmp_path, monkeypatch):
             json.dumps({n: {"homing_offset": o} for n, o in OFFSETS.items()}))
     monkeypatch.setattr(drv, "CALIBRATION_DIR", tmp_path)
 
-    def build(cls, side="left", ends=(0.0, -65.0), channel="can_fol_l", logical=None, follow=False, home=None, frozen=()):
+    def build(cls, side="left", ends=(0.0, -65.0), channel="can_fol_l", logical=None, follow=False, home=None, frozen=(), smooth=False, sync_dt=0.01, temps=None):
         start = {**LOGICAL, **(logical or {})}
         bus = FakeBus({n: start[n] + OFFSETS[n] for n in drv.MOTORS})
         bus.follow = follow
         bus.frozen = set(frozen)
+        bus.temps = dict(temps or {})
         def opener(opened_channel):
             bus.opened_channel = opened_channel
             return bus
 
         monkeypatch.setattr(cls, "open_can_bus", staticmethod(opener))
         cfg = types.SimpleNamespace(can_channel=channel, gripper_closed_deg=ends[0], gripper_open_deg=ends[1])
+        cfg.smooth, cfg.sync, cfg.sync_dt = smooth, True, sync_dt
         if home is not None:
             cfg.home = home
         return cls(cfg, side), bus

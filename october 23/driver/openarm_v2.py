@@ -34,6 +34,7 @@ import logging
 import math
 import os
 import pathlib
+import threading
 import time
 from typing import Any
 
@@ -41,6 +42,7 @@ import numpy as np
 import numpy.typing as npt
 
 import openarm_guard
+import openarm_motion as motion
 import openarm_lock
 import openarm_poses as poses
 import openarm_zones as zones_module
@@ -81,7 +83,8 @@ damiao.MOTOR_LIMITS.update(
 )
 
 ## MIT gains per motor, the fork's `position_kp` / `position_kd`.
-KP = dict(zip(MOTORS, (240.0, 240.0, 240.0, 240.0, 24.0, 31.0, 25.0, 25.0), strict=True))
+## The gripper's gain is the lowered value of 2026-09-21 (kp 25 held a squeeze long enough to latch the coil over-temperature protection).
+KP = dict(zip(MOTORS, (240.0, 240.0, 240.0, 240.0, 24.0, 31.0, 25.0, 12.0), strict=True))
 KD = dict(zip(MOTORS, (3.0, 3.0, 3.0, 3.0, 0.2, 0.2, 0.2, 0.2), strict=True))
 
 ## Logical joint limits, degrees, the fork's per-side defaults (the arm's physical range).
@@ -140,6 +143,18 @@ REST_TOLERANCE_DEG = 12.0
 PARK_TOLERANCE_DEG = 20.0
 ## The config's home counts as the ready pose within this, degrees.
 READY_HOME_TOLERANCE_DEG = 2.0
+
+## Smooth motion: the limits table (speed, acceleration, torque budget) and the monitors' thresholds. "Gentle" is the chosen style.
+LIMITS = motion.build_limits(KP, MODELS)
+CONTROL_PERIOD = 0.01   # the control thread's tick, seconds (100 Hz)
+## A motor this hot, degrees C, is logged; at the stop temperature the arm holds and `alarm()` says why (so Dream ends the run); below RESUME it may move again.
+TEMP_WARN_C, TEMP_STOP_C, TEMP_RESUME_C = 60.0, 70.0, 65.0
+## A gripper that leads its measured angle by more than this, degrees, for this long, seconds, is blocked or squeezing: its target is relaxed and `alarm()` says so.
+GRIPPER_STALL_DEG, GRIPPER_STALL_S = 4.0, 2.0
+## Soft start: the gains start at this share and reach full over this many seconds.
+SOFT_START_GAIN0, SOFT_START_S = 0.4, 0.5
+## Soft limits: a target stays this far inside a joint's limits, degrees (the gripper's margin is smaller).
+GRIPPER_LIMIT_MARGIN_DEG = 1.0
 
 ## Tries to confirm a motor switched off: leaving one energized is not acceptable.
 DISABLE_TRIES = 5

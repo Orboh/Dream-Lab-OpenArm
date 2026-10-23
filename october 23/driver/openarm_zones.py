@@ -26,6 +26,8 @@ CLEARANCE_M = 0.02
 ## Dream's reach disk around each painted point, and the slack the guard allows beyond it, metres.
 REACH_RADIUS_M = 0.04
 REACH_SLACK_M = 0.02
+## A point may be this far outside the allowed region before it counts as outside, metres (the box is stored to 0.1 mm and the arm's own readings are no better).
+REGION_TOLERANCE_M = 0.001
 ## A keep-out zone marked `allow_tcp_touch` (the table) may be touched by the grasp point to this depth, metres.
 TOUCH_TOLERANCE_M = 0.005
 
@@ -201,7 +203,7 @@ class Zones:
             lo, hi = np.asarray(zones.region["lo"]), np.asarray(zones.region["hi"])
             for name, point in points.items():
                 outside = float(np.max(np.maximum(lo - point, point - hi)))
-                if outside > 0.0:
+                if outside > REGION_TOLERANCE_M:
                     out.append(f"{side} {name} is {outside * 100:.1f} cm outside the allowed region")
         if check_reach and zones.reach is not None:
             miss = distance_to_reach(points["tcp"][:2], zones.reach)

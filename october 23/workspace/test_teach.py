@@ -197,3 +197,86 @@ def test_pressing_set_home_at_the_ready_pose_gives_the_built_in_path():
         s.observe("right", ready)
     path = s.set_home("right", ready)
     assert path[0] == pytest.approx(poses.REST_DEG["right"]) and path[-1] == pytest.approx(poses.READY_DEG["right"])
+
+
+# -- recorded points define the safe place (round 5) ---------------------------------------------------------------------------
+
+def hand_xy(q, side="left"):
+    return zones.ArmKinematics(side).points(q)["tcp"][:2]
+
+
+def corner_poses():
+    return [pose_with(j1=a, j4=b) for a, b in ((0, 20), (40, 20), (40, 80), (0, 80))]
+
+
+def test_the_default_margin_is_zero_so_the_region_is_exactly_the_recorded_points():
+    assert th.TeachSession().margin == 0.0
+
+
+def test_recorded_points_define_the_region_as_their_bounding_box():
+    s = th.TeachSession()
+    kin = zones.ArmKinematics("left")
+    for q in corner_poses():
+        s.add_point("left", q)
+    pts = np.array([p for q in corner_poses() for p in kin.points(q).values()])
+    box = s.region("left")
+    assert box["lo"] == pytest.approx(pts.min(axis=0).tolist(), abs=1e-4) and box["hi"] == pytest.approx(pts.max(axis=0).tolist(), abs=1e-4)
+    assert s.point_count("left") == 4 and s.point_count("right") == 0
+
+
+def test_one_point_is_not_enough_for_a_region_two_are():
+    s = th.TeachSession()
+    s.add_point("left", pose_with(j1=10, j4=30))
+    assert s.region("left") is None
+    s.add_point("left", pose_with(j1=30, j4=60))
+    assert s.region("left") is not None
+
+
+def test_reach_is_the_filled_polygon_through_the_recorded_hand_positions():
+    s = th.TeachSession()
+    for q in corner_poses():
+        s.add_point("left", q)
+    cells = s.reach_cells("left")
+    corners = np.array([hand_xy(q) for q in corner_poses()])
+    centre = corners.mean(axis=0)
+    assert (round(centre[0] / 0.02), round(centre[1] / 0.02)) in cells            # the middle of the quadrilateral is inside
+    far = centre + np.array([0.5, 0.5])
+    assert (round(far[0] / 0.02), round(far[1] / 0.02)) not in cells               # nothing far outside it
+    for c in corners:
+        assert (round(c[0] / 0.02), round(c[1] / 0.02)) in cells                   # and the corners themselves
+
+
+def test_with_fewer_than_three_points_the_reach_is_just_the_points():
+    s = th.TeachSession()
+    s.add_point("left", pose_with(j1=10, j4=30)); s.add_point("left", pose_with(j1=30, j4=60))
+    assert len(s.reach_cells("left")) == 2
+
+
+def test_undo_removes_the_last_point_and_clear_removes_all():
+    s = th.TeachSession()
+    for q in corner_poses():
+        s.add_point("left", q)
+    s.undo_point("left")
+    assert s.point_count("left") == 3
+    s.clear_points("left")
+    assert s.point_count("left") == 0 and s.region("left") is None
+    s.undo_point("left")  # nothing to undo: no error
+
+
+def test_the_trail_of_points_lists_the_hand_positions_for_the_markers():
+    s = th.TeachSession()
+    for q in corner_poses():
+        s.add_point("left", q)
+    assert np.array(s.point_list("left")) == pytest.approx(np.array([zones.ArmKinematics("left").points(q)["tcp"] for q in corner_poses()]), abs=1e-6)
+
+
+def test_points_and_a_sweep_combine_into_one_region():
+    s = th.TeachSession()
+    kin = zones.ArmKinematics("left")
+    s.set_sweep("left", True)
+    for a in range(0, 12):
+        s.observe("left", pose_with(j1=a, j4=20))
+    s.set_sweep("left", False)
+    s.add_point("left", pose_with(j1=60, j4=90)); s.add_point("left", pose_with(j1=50, j4=85))
+    hi = s.region("left")["hi"]
+    assert hi[0] >= max(kin.points(pose_with(j1=60, j4=90)).values(), key=lambda p: p[0])[0] - 1e-4

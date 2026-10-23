@@ -74,6 +74,8 @@ class EditorPanel:
         self.last_saved: tuple[pathlib.Path, pathlib.Path] | None = None
         self._nodes: list = []
         self._busy = False
+        self._playing = False
+        self._path_nodes: list = []
         self._build_gui()
         self.redraw()
 
@@ -100,6 +102,12 @@ class EditorPanel:
                 self.home_cards[side] = g.add_html(cards.home_card(side, False, False))
                 self.b_home[side] = g.add_button(f"Set {side.upper()} home here", color="green")
                 self.b_home[side].on_click(lambda _e, s=side: self.set_home_clicked(s))
+            g.add_markdown("**See the move first:** plays the recorded way from rest to home on the 3D robot (nothing moves for real).")
+            self.b_preview = {}
+            for label, sides in (("LEFT", ("left",)), ("RIGHT", ("right",)), ("both arms", ed.SIDES)):
+                b = g.add_button(f"Preview {label}: rest to home", color="gray")
+                b.on_click(lambda _e, ss=sides: self.play_path(list(ss)))
+                self.b_preview[label] = b
             if self.cameras is not None:
                 import viewer
 
@@ -107,13 +115,15 @@ class EditorPanel:
         # -- 3 Danger area ----------------------------------------------------------------------------------------------
         with tabs.add_tab(self.tab_labels[2]):
             with g.add_folder("Allowed area: show the farthest safe points"):
-                g.add_markdown("Press **Start**, move the leader to the farthest points the arm may safely reach (down to just above the table), press **Stop**. The green box is built as you go.")
+                g.add_markdown("Move the leader to a farthest point the arm may safely reach (down to just above the table), press **Record this point**. Do this for every corner and edge. The safe place is made from your points (green).")
                 self.record_side = g.add_button_group("Arm", ("left", "right", "both"))
                 self.record_side.value = "both"
-                self.b_record = g.add_button("Start recording extremes", color="green")
-                self.b_clear = g.add_button("Clear what was recorded", color="gray")
+                self.b_point = g.add_button("Record this point", color="green")
+                self.b_undo = g.add_button("Undo last point", color="gray")
+                self.b_clear = g.add_button("Clear all points", color="gray")
                 self.record_info = g.add_markdown("")
-                self.b_record.on_click(lambda _e: self.record_toggle_clicked())
+                self.b_point.on_click(lambda _e: self.record_point_clicked())
+                self.b_undo.on_click(lambda _e: self.undo_point_clicked())
                 self.b_clear.on_click(lambda _e: self.clear_clicked())
             with g.add_folder("Table (cm)"):
                 self.f_height_cm = g.add_number("top is this far above the hanging hand", (t.top_z - self.hanging_z) * 100, step=1.0)
@@ -144,6 +154,8 @@ class EditorPanel:
         # -- Advanced (rarely needed) -----------------------------------------------------------------------------------
         with g.add_folder("Advanced", expand_by_default=False):
             self.f_operator = g.add_text("operator", self.operator)
+            self.b_record = g.add_button("Start recording continuously (sweep)", color="gray")
+            self.b_record.on_click(lambda _e: self.record_toggle_clicked())
             self.f_margin = g.add_number("margin around the sweep (cm)", self.teach.margin * 100, min=0.0, step=0.5)
             self.f_margin.on_update(lambda _e: setattr(self.teach, "margin", float(self.f_margin.value) / 100.0))
             self.f_pose = g.add_dropdown("show robot at", ("live", "home", "rest", "ready"), initial_value=self.pose_view)
@@ -176,6 +188,79 @@ class EditorPanel:
         self.gizmo_table.on_update(lambda _e: self._table_gizmo_moved())
         self.gizmo_box = self.server.scene.add_transform_controls("/gizmo_box", scale=0.12, disable_rotations=True, visible=False)
         self.gizmo_box.on_update(lambda _e: self._box_gizmo_moved())
+
+    def _path_for(self, side: str) -> list[list[float]] | None:
+        """The path from rest to the arm's home to preview: the recorded one, or the built-in rest-to-ready path when home is the ready pose."""
+        arm = self.state.arms[side]
+        if arm.home_path:
+            return arm.home_path
+        if arm.home_source == "ready":
+            return poses.path_to_ready(side)
+        return None
+
+    def play_path(self, sides: list[str], blocking: bool = False, realtime: bool = True, speed_dps: float = 25.0, fps: float = 25.0) -> None:
+        """Plays the way from rest to home on the 3D robot at the speed the real arm would use (nothing real moves).
+
+        @param sides The arms to play, together (their frames are interleaved).
+        @param blocking Wait until it has finished (tests); otherwise it runs on its own thread.
+        @param realtime Sleep between frames (False in tests).
+        """
+        if self.robot is None:
+            return
+        paths = {s: self._path_for(s) for s in sides}
+        missing = [s for s, p in paths.items() if p is None]
+        if missing:
+            self.out_msg.content = f"No path recorded for the {' and '.join(missing)} arm: move the leader from the rest or ready pose and press Set home again."
+            return
+        if self._playing:
+            self.out_msg.content = "A preview is already playing."
+            return
+        frames = {}
+        for s, path in paths.items():
+            samples = [list(path[0])] + poses.densify(path, speed_dps, 1.0 / fps)
+            frames[s] = [np.radians(p) for p in samples]
+        count = max(len(f) for f in frames.values())
+        self._show_hand_paths({s: frames[s] for s in frames})
+
+        def run() -> None:
+            import time
+
+            self._playing, previous = True, self.pose_view
+            self.pose_view = "preview"
+            try:
+                for i in range(count):
+                    for s in sides:
+                        self.robot.pose(s, frames[s][min(i, len(frames[s]) - 1)])
+                    if realtime:
+                        time.sleep(1.0 / fps)
+            finally:
+                self.pose_view, self._playing = previous, False
+                self.out_msg.content = f"Played the way from rest to home for the {' and '.join(sides)} arm ({count / fps:.0f} s at {speed_dps:g} deg/s)."
+
+        if blocking:
+            run()
+        else:
+            import threading
+
+            threading.Thread(target=run, daemon=True).start()
+
+    def _show_hand_paths(self, frames: dict[str, list[np.ndarray]]) -> None:
+        """Draws the hand's way (the orange line) for the previewed arm(s) in the 3D view."""
+        for node in self._path_nodes:
+            try:
+                node.remove()
+            except Exception:
+                pass
+        self._path_nodes = []
+        for side, qs in frames.items():
+            pts = np.array([self.kin[side].points(q)["tcp"] + ed.BASE_OFFSET[side] for q in qs[:: max(1, len(qs) // 80)]])
+            if len(pts) >= 2:
+                self._path_nodes.append(self.server.scene.add_line_segments(f"/zones/hand_path_{side}", np.stack([pts[:-1], pts[1:]], axis=1), (255, 120, 0), thickness=0.008))
+
+    def _apply_teach(self) -> list[str]:
+        """Writes what the teach session learned into the state, then widens each allowed box to hold its arm's home pose; returns the arms widened."""
+        self.teach.apply_to(self.state)
+        return self.state.fit_home_into_region()
 
     def _guard(self, fn: Callable[[], None]) -> None:
         if self._busy:
@@ -316,7 +401,7 @@ class EditorPanel:
 
     def show_pose(self, live_q: dict[str, np.ndarray] | None = None) -> None:
         """Poses the drawn robot per the chosen view (home, rest, ready, or the live arms)."""
-        if self.robot is None:
+        if self.robot is None or self.pose_view == "preview":   # a preview owns the robot while it plays
             return
         for side in ed.SIDES:
             if self.pose_view == "rest":
@@ -339,8 +424,8 @@ class EditorPanel:
             self.teach.observe(side, q)
         sweeping = [s for s in ed.SIDES if self.teach.sweeping(s)]
         if sweeping:
-            self.teach.apply_to(self.state)
-        self.record_info.content = "  \n".join(f"{s}: recorded {self.teach.sweep_count(s)} poses" + (" (recording)" if self.teach.sweeping(s) else "") for s in ed.SIDES)
+            self._apply_teach()
+        self.refresh_record_info()
 
     def sweep_changed(self, side: str, on: bool) -> None:
         self.teach.set_sweep(side, on)
@@ -372,7 +457,7 @@ class EditorPanel:
         if q is None:
             return
         path = self.teach.set_home(side, q)
-        self.teach.apply_to(self.state)
+        self._apply_teach()
         arm = self.state.arms[side]
         arm.home_source = "teach"
         if path is None:
@@ -397,41 +482,75 @@ class EditorPanel:
         self.b_record.color = "red" if starting else "green"
         self.out_msg.content = ("Recording: move the leader to the farthest safe points, then press Stop." if starting else "Stopped. The green box is the allowed area.")
         if not starting:
-            self.teach.apply_to(self.state)
+            self._apply_teach()
             self.redraw()
 
+    def refresh_record_info(self) -> None:
+        """The Allowed area card's text: how many points each arm has and what is still missing."""
+        lines = []
+        for side in ed.SIDES:
+            n, swept = self.teach.point_count(side), self.teach.sweep_count(side)
+            text = f"**{side}**: {n} point{'s' if n != 1 else ''}" + (f", {swept} swept poses" if swept else "")
+            if n and n < 3:
+                text += " (record at least 3 for the work area; 2 are enough for the box)"
+            elif n == 0 and not swept:
+                text += " (none yet)"
+            lines.append(text)
+        self.record_info.content = "  \n".join(lines)
+
+    def _record_sides(self) -> tuple[str, ...]:
+        return ed.SIDES if self.record_side.value == "both" else (self.record_side.value,)
+
+    def record_point_clicked(self) -> None:
+        """Card 3 button: records the follower's pose now as one extreme point for the chosen arm(s); the safe place follows from the points."""
+        if self.read_q is None:
+            self.out_msg.content = self._NO_LIVE
+            return
+        for side in self._record_sides():
+            self.teach.add_point(side, np.asarray(self.read_q(side), dtype=float))
+        self._apply_teach()
+        self.redraw()
+
+    def undo_point_clicked(self) -> None:
+        """Card 3 button: removes the last recorded point of the chosen arm(s)."""
+        for side in self._record_sides():
+            self.teach.undo_point(side)
+        self._apply_teach()
+        self.redraw()
+
     def clear_clicked(self) -> None:
-        """Card 3 button: forgets what was recorded for the chosen arm(s) and removes their allowed region."""
-        sides = ed.SIDES if self.record_side.value == "both" else (self.record_side.value,)
-        for side in sides:
+        """Card 3 button: forgets every recorded point and sweep of the chosen arm(s) and removes their safe place."""
+        for side in self._record_sides():
+            self.teach.clear_points(side)
             self.teach.clear_sweep(side)
-            self.state.arms[side].region = None
-            self.state.arms[side].reach = set()
+        self._apply_teach()
         self.redraw()
 
     def mark_clicked(self, side: str) -> None:
+        """Advanced: remembers the hand's position now under the typed label."""
         q = self._live(side)
         if q is not None:
             self.teach.mark(side, self.f_mark.value or "mark", q)
             self.redraw()
 
     def apply_sweep_clicked(self) -> None:
-        """Turns the swept extremes into the allowed region and work area of each arm."""
-        self.teach.apply_to(self.state)
+        """Advanced: turns the recorded points and sweeps into the safe place of each arm now."""
+        self._apply_teach()
         done = [s for s in ed.SIDES if self.state.arms[s].region]
-        self.out_msg.content = ("Applied the sweep to the region and work area of: " + ", ".join(done) + ".") if done else \
-            f"Nothing to apply yet: sweep at least {th.MIN_SAMPLES} poses with Record extremes on."
+        self.out_msg.content = ("Applied to the safe place of: " + ", ".join(done) + ".") if done else \
+            f"Nothing to apply yet: record at least 2 points (or sweep {th.MIN_SAMPLES} poses)."
         self.redraw()
 
     # -- outputs --------------------------------------------------------------------------------------------------------
     def save_clicked(self) -> None:
         """Writes the bundle and the layout picture; the message names both files and any clash."""
-        self.teach.apply_to(self.state)
+        widened = self._apply_teach()
         self.operator = self.f_operator.value or self.operator
         problems = self.state.clashes()
         self.last_saved = outputs.save_bundle(self.state, self.operator, self.out_dir)
         warning = f"\n\n**Saved with {len(problems)} clash(es): fix them before apply.**" if problems else ""
-        self.out_msg.content = f"Saved `{self.last_saved[0].name}` and `{self.last_saved[1].name}` in `{self.out_dir}`.{warning}"
+        note = f"\n\nThe allowed box of the {' and '.join(widened)} arm was widened to hold its home pose." if widened else ""
+        self.out_msg.content = f"Saved `{self.last_saved[0].name}` and `{self.last_saved[1].name}` in `{self.out_dir}`.{note}{warning}"
 
     def export_clicked(self) -> pathlib.Path:
         """Writes the station keys file (home, reach, keep_out per arm)."""
@@ -478,6 +597,9 @@ class EditorPanel:
             trail = self.teach.trail(side)
             if len(trail):
                 self._nodes.append(scene.add_point_cloud(f"/zones/trail_{side}", trail[-3000:] + base, (30, 140, 255), point_size=0.006))
+            for i, xyz in enumerate(self.teach.point_list(side)):
+                self._nodes.append(scene.add_icosphere(f"/zones/point_{side}_{i}", 0.014, (255, 120, 0), position=tuple(np.asarray(xyz) + base)))
+                self._nodes.append(scene.add_label(f"/zones/point_{side}_{i}_label", str(i + 1), position=tuple(np.asarray(xyz) + base + [0, 0, 0.025])))
             for i, (label, xyz) in enumerate(self.teach.marks(side)):
                 self._nodes.append(scene.add_icosphere(f"/zones/mark_{side}_{i}", 0.012, (255, 0, 160), position=tuple(np.asarray(xyz) + base)))
                 self._nodes.append(scene.add_label(f"/zones/mark_{side}_{i}_label", f"{side}: {label}", position=tuple(np.asarray(xyz) + base + [0, 0, 0.03])))
@@ -505,6 +627,7 @@ class EditorPanel:
             self.f_width_cm.value = (t.y_range[1] - t.y_range[0]) * 100.0
         finally:
             self._busy = False
+        self.refresh_record_info()
         self.refresh_strip(clashes)
         self.refresh_home_cards()
         self.refresh_checklist()

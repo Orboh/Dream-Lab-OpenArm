@@ -16,3 +16,4 @@
 | [log-012.md](log-012.md) | Daily safety area part 1: zones schema and FK, hard driver guard, one-arm lock (`arms.py`), tests only. |
 | [log-012.md](log-012.md) | Daily safety area: zones, guard, one-arm lock, capture/verify/build/apply tool and 3D viewer (tests only; viewer demo running read-only). |
 | [log-013.md](log-013.md) | Round 2: real OpenArm model in the browser, visual zone editor, fixed output format (home pose + allowed/forbidden coordinates, station keys, layout picture). |
+| [log-014.md](log-014.md) | The editor page as four cards (Position, Home, Danger area, Save) with automatic path recording and live allowed region. |

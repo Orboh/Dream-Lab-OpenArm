@@ -48,11 +48,44 @@ def simplify_path(points: list[list[float]], tol_deg: float = PATH_TOLERANCE_DEG
     return left[:-1] + right
 
 
+def _fill_hull(xy: np.ndarray) -> set[tuple[int, int]]:
+    """The 2 cm grid cells whose centre lies inside the convex hull of `xy` (empty for a degenerate hull)."""
+    pts = sorted({(round(float(x), 6), round(float(y), 6)) for x, y in xy})
+    if len(pts) < 3:
+        return set()
+
+    def cross(o, a, b):
+        return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+
+    lower: list = []
+    for p in pts:
+        while len(lower) >= 2 and cross(lower[-2], lower[-1], p) <= 0:
+            lower.pop()
+        lower.append(p)
+    upper: list = []
+    for p in reversed(pts):
+        while len(upper) >= 2 and cross(upper[-2], upper[-1], p) <= 0:
+            upper.pop()
+        upper.append(p)
+    hull = lower[:-1] + upper[:-1]
+    if len(hull) < 3:
+        return set()
+    grid = zb.REACH_GRID_M
+    xs, ys = [p[0] for p in hull], [p[1] for p in hull]
+    cells = set()
+    for i in range(int(np.floor(min(xs) / grid)), int(np.ceil(max(xs) / grid)) + 1):
+        for j in range(int(np.floor(min(ys) / grid)), int(np.ceil(max(ys) / grid)) + 1):
+            c = (i * grid, j * grid)
+            if all(cross(hull[k], hull[(k + 1) % len(hull)], c) >= -1e-9 for k in range(len(hull))):
+                cells.add((i, j))
+    return cells
+
+
 class TeachSession:
     """The learned home, swept region, work area and path of both arms."""
 
-    def __init__(self, margin_m: float = 0.01) -> None:
-        """@param margin_m Metres added around the swept points when the region is made."""
+    def __init__(self, margin_m: float = 0.0) -> None:
+        """@param margin_m Metres added around the recorded points when the region is made (0: exactly the points you showed)."""
         self.margin = margin_m
         self._kin = {side: zones.ArmKinematics(side) for side in ed.SIDES}
         self._sweeping = {side: False for side in ed.SIDES}
@@ -65,6 +98,8 @@ class TeachSession:
         self._prefix: dict[str, list[list[float]]] = {side: [] for side in ed.SIDES}   # the known rest -> ready path kept in front of a taught segment
         # automatic tracking: since the arm last stood at rest or ready: the kept prefix and the poses recorded after it (None: it never did)
         self._auto: dict[str, dict | None] = {side: None for side in ed.SIDES}
+        self._recorded: dict[str, list[dict]] = {side: [] for side in ed.SIDES}      # single points recorded on purpose: {"pts": {name: xyz}}
+        self._touched = {side: False for side in ed.SIDES}                            # something was recorded or cleared: apply_to may overwrite the state
 
     # -- feeding -----------------------------------------------------------------------------------------------------
     def observe(self, side: str, q_rad: np.ndarray) -> None:
@@ -103,6 +138,7 @@ class TeachSession:
 
     def clear_sweep(self, side: str) -> None:
         self._points[side], self._tcp[side] = [], []
+        self._touched[side] = True
 
     def sweep_count(self, side: str) -> int:
         """How many poses have been swept."""
@@ -112,16 +148,50 @@ class TeachSession:
         """The swept hand positions, `[n, 3]`, arm base frame."""
         return np.array(self._tcp[side]).reshape(-1, 3)
 
+    # -- recorded points (the safe place is made from them) ---------------------------------------------------------------
+    def add_point(self, side: str, q_rad: np.ndarray) -> None:
+        """Records the follower's pose now as one extreme point."""
+        self._recorded[side].append({"pts": self._kin[side].points(np.asarray(q_rad, dtype=float))})
+        self._touched[side] = True
+
+    def undo_point(self, side: str) -> None:
+        """Removes the last recorded point (nothing happens if there is none)."""
+        if self._recorded[side]:
+            self._recorded[side].pop()
+            self._touched[side] = True
+
+    def clear_points(self, side: str) -> None:
+        self._recorded[side] = []
+        self._touched[side] = True
+
+    def point_count(self, side: str) -> int:
+        return len(self._recorded[side])
+
+    def point_list(self, side: str) -> list[list[float]]:
+        """The recorded hand positions, arm base frame, in the order they were recorded."""
+        return [[float(v) for v in p["pts"]["tcp"]] for p in self._recorded[side]]
+
     def region(self, side: str) -> dict[str, list[float]] | None:
-        """The bounding box of every swept arm point plus the margin, or None before #MIN_SAMPLES poses."""
-        if self.sweep_count(side) < MIN_SAMPLES:
+        """The bounding box of every arm point of the recorded poses (two or more) and of a sweep (#MIN_SAMPLES or more), plus the margin; None before that."""
+        sources: list[np.ndarray] = []
+        if self.sweep_count(side) >= MIN_SAMPLES:
+            sources += self._points[side]
+        if self.point_count(side) >= 2:
+            sources += [p for rec in self._recorded[side] for p in rec["pts"].values()]
+        if not sources:
             return None
-        pts = np.array(self._points[side])
-        return {"lo": [round(float(v), 4) for v in pts.min(axis=0) - self.margin], "hi": [round(float(v), 4) for v in pts.max(axis=0) + self.margin]}
+        pts = np.array(sources)
+        return {"lo": [float(np.floor((v) * 1e4) / 1e4) for v in pts.min(axis=0) - self.margin],
+                "hi": [float(np.ceil((v) * 1e4) / 1e4) for v in pts.max(axis=0) + self.margin]}
 
     def reach_cells(self, side: str) -> set[tuple[int, int]]:
-        """The 2 cm cells the hand has been over."""
-        return {zb.cell(p) for p in self._tcp[side]}
+        """The 2 cm cells the hand has been over, plus the area inside the polygon through three or more recorded hand positions."""
+        cells = {zb.cell(p) for p in self._tcp[side]}
+        xy = np.array([p["pts"]["tcp"][:2] for p in self._recorded[side]])
+        if len(xy) >= 3:
+            cells |= _fill_hull(xy)
+        cells |= {zb.cell(p) for p in xy}
+        return cells
 
     # -- marks -------------------------------------------------------------------------------------------------------
     def mark(self, side: str, label: str, q_rad: np.ndarray) -> None:
@@ -198,16 +268,13 @@ class TeachSession:
 
     # -- result ------------------------------------------------------------------------------------------------------
     def apply_to(self, state: ed.EditorState) -> None:
-        """Writes what was learned into the editor state: home, region, work area and home path (only what exists)."""
+        """Writes what was learned into the editor state: home, home path, and (for an arm with sweeps or points) its region and work area."""
         for side in ed.SIDES:
             arm = state.arms[side]
             if self._home[side] is not None:
                 arm.home = [float(v) for v in self._home[side]]
-            region = self.region(side)
-            if region is not None:
-                arm.region = region
-            cells = self.reach_cells(side)
-            if cells:
-                arm.reach = set(cells)
+            if self._touched[side] or self.sweep_count(side) or self.point_count(side):
+                arm.region = self.region(side)
+                arm.reach = set(self.reach_cells(side))
             if self._finished_path[side] is not None:
                 arm.home_path = self._finished_path[side]

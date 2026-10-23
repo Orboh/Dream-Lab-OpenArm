@@ -8,15 +8,19 @@ Run from this folder with the project's Python (the station must be stopped: `dr
     cd "october 23/workspace"
     PY="env -u PYTHONPATH -u AMENT_PREFIX_PATH ../../.venv/bin/python"
 
-## Teach mode (the leader moves the follower; this tool only listens)  <- the main workflow
+## Teach mode on four cards (the leader moves the follower; this tool only listens)  <- the main workflow
 Terminal 1 (your proven teleop, unchanged): `cd ~/projects/openarm-orboh && bash scripts/run_teleop_bimanual.sh`  (arms hanging at the start; Ctrl-C is the emergency stop)
-Terminal 2: `$PY workspace.py design --observe --cameras` and open http://localhost:8080. `--observe` only LISTENS to the follower's CAN frames (like your dmlog logger): it sends nothing.
-On the page, per arm:
-1. With the arm at rest (hanging) press **Start path**, move the leader until the cameras (Cameras panel: tick the box) see the work space, press **Set HOME = follower now**.
-   The way you moved the arm from rest to there is kept as the home path: the driver raises the arm along it at station start and parks it back along it on stop, so it never cuts across the table.
-2. Tick **Record extremes** and move the leader to the farthest points the follower may safely reach (down to just above the table, left, right, far). Untick, press **Apply sweep**.
-   The swept points become the allowed REGION (a box with the margin you set, default 1 cm) and the work area; the website shows the trail (blue), the region (green box) and your marks (pink).
-3. Set the table and any danger boxes in the same page if you want them, then **Save bundle + layout picture** and **Export station keys**.
+Terminal 2: `$PY workspace.py design --observe --cameras` and open http://localhost:8080. `--observe` only LISTENS to the follower's CAN frames: it sends nothing.
+The top strip shows a light per arm ("receiving" / "waiting") and the first clash. The side panel has four tabs, one card each:
+1. **1 Position** — live joint angles (J1..J7, degrees) and hand position (x, y, z in cm) of the left and right arm while you move the leader.
+2. **2 Home** — move the leader until the camera sees the work space (tick a camera below), press **Set LEFT home here** / **Set RIGHT home here**. The way from rest (or from the old ready pose) is recorded automatically.
+   **Preview** buttons (left, right, both) play the recorded way from rest to home on the 3D robot first, with an orange line for the hand's path; nothing real moves.
+   Each card says "home set, path from rest recorded" or warns "NO path": then move the leader from the rest or ready pose and press the button again.
+3. **3 Danger area** — *Allowed area*: pick left / right / both, move the leader to a farthest safe point (down to just above the table), press **Record this point**; repeat for every corner and edge. **Undo last point** and **Clear all points** fix mistakes.
+   The safe place is made from your points: the allowed box (green) is the box around every arm point at those poses (2 points are enough), and the work area is the polygon through the hand positions (3 or more points). Points show as numbered orange balls in the 3D view.
+   *Table*: four numbers in cm (height above the hanging hand, front edge, depth, width). *Danger boxes*: **Add a danger box**, set its size in cm, drag it in the 3D view, **Delete this box**.
+4. **4 Save** — a checklist (home set, path, allowed area for each arm, table placed, no clash) with what to do for a missing item, then **Save bundle + layout picture** and **Export station keys**.
+The **Advanced** folder keeps the rarely used controls (margin, work-area rectangle, marks, manual path, "show robot at", operator).
 Then `verify`, `build`, `apply` as below.
 
 ## The output (fixed format)

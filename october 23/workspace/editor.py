@@ -189,6 +189,26 @@ class EditorState:
         state.table_set = True
         return state
 
+    def fit_home_into_region(self) -> list[str]:
+        """Widens an arm's allowed region just enough to hold its home pose (the home is somewhere the arm is meant to be).
+
+        @return The sides whose region was widened (arms without a region are left alone).
+        """
+        widened = []
+        for side in SIDES:
+            region = self.arms[side].region
+            if not region:
+                continue
+            pts = np.array(list(zones.ArmKinematics(side).points(np.asarray(self.arms[side].home, dtype=float)).values()))
+            old_lo, old_hi = np.asarray(region["lo"], dtype=float), np.asarray(region["hi"], dtype=float)
+            pmin, pmax = pts.min(axis=0), pts.max(axis=0)
+            lo = np.where(pmin < old_lo, np.floor(pmin * 1e4) / 1e4, old_lo)      # only a side that has to move moves (rounded outward to 0.1 mm)
+            hi = np.where(pmax > old_hi, np.ceil(pmax * 1e4) / 1e4, old_hi)
+            if not (np.allclose(lo, old_lo) and np.allclose(hi, old_hi)):
+                self.arms[side].region = {"lo": [float(v) for v in lo], "hi": [float(v) for v in hi]}
+                widened.append(side)
+        return widened
+
     # -- clashes --------------------------------------------------------------------------------------------------------
     def clashes(self, live: dict[str, np.ndarray] | None = None) -> list[str]:
         """Every way the zones block the rest, ready and home poses, the path between them, or a live pose (radians per side)."""

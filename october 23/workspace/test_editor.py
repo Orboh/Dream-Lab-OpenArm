@@ -157,3 +157,25 @@ def test_export_station_keys_has_home_reach_and_keep_out_per_arm_and_nothing_els
         assert all(set(z) == {"kind", "center", "size"} for z in key["keep_out"])
     assert keys["follower_l"]["keep_out"][1]["size"] == [0.2, 0.5, 0.7]
     assert path.read_text().startswith("#")  # a header says what it is and where it goes
+
+
+# -- the home pose must lie inside the allowed region ---------------------------------------------------------------------------
+
+def test_fit_home_widens_the_region_to_hold_the_home_pose_and_nothing_more():
+    state = ed.EditorState.default()
+    kin = zones.ArmKinematics("left")
+    home_pts = np.array(list(kin.points(np.array(state.arms["left"].home)).values()))
+    inside = {"lo": (home_pts.min(axis=0) - 0.1).tolist(), "hi": (home_pts.max(axis=0) + 0.1).tolist()}
+    state.arms["left"].region = dict(inside)
+    assert state.fit_home_into_region() == []                       # already inside: untouched
+    assert state.arms["left"].region == inside
+    state.arms["left"].region = {"lo": [v + 0.15 for v in inside["lo"]], "hi": list(inside["hi"])}
+    assert state.fit_home_into_region() == ["left"]
+    assert state.arms["left"].region["lo"] == pytest.approx(np.minimum(np.array(inside["lo"]) + 0.15, home_pts.min(axis=0)).tolist(), abs=1e-4)
+    assert state.arms["left"].region["hi"] == pytest.approx(inside["hi"])
+    assert state.clashes() == []
+
+
+def test_an_arm_without_a_region_is_left_alone_by_fit_home():
+    state = ed.EditorState.default()
+    assert state.fit_home_into_region() == [] and state.arms["right"].region is None

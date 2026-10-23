@@ -661,3 +661,151 @@ def test_save_tab_checklist_lists_what_is_missing_and_ticks_off_what_is_done(pan
     panel.state.table_set = True
     panel.refresh_checklist()
     assert panel.check_html.content.count("&#10004;") >= 2   # table placed and no clash
+
+
+# -- round 5: the Danger card records points; the safe place is made from them -----------------------------------------------
+
+def put_live(panel, side, j1, j4=None):
+    panel.live_q = {side: moving_q(side, j1, j4)}
+    panel.teach_tick(panel.live_q)
+
+
+def test_record_point_uses_the_live_pose_of_the_chosen_arms(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.record_side.value = "left"
+    put_live(panel, "left", 20)
+    panel.record_point_clicked()
+    assert panel.teach.point_count("left") == 1 and panel.teach.point_count("right") == 0
+    panel.record_side.value = "both"
+    panel.live_q = {"left": moving_q("left", 30), "right": moving_q("right", 30)}
+    panel.record_point_clicked()
+    assert panel.teach.point_count("left") == 2 and panel.teach.point_count("right") == 1
+
+
+def test_the_safe_place_appears_from_the_second_point_and_the_card_says_what_is_missing(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.record_side.value = "left"
+    put_live(panel, "left", 10); panel.record_point_clicked()
+    assert panel.state.arms["left"].region is None and "at least" in panel.record_info.content
+    put_live(panel, "left", 40, 70); panel.record_point_clicked()
+    region = panel.state.arms["left"].region
+    assert region and region["lo"][2] < region["hi"][2]
+    assert "2 point" in panel.record_info.content
+
+
+def test_undo_point_and_clear_update_the_safe_place(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.record_side.value = "left"
+    for a in (10, 30, 50):
+        put_live(panel, "left", a, a + 10); panel.record_point_clicked()
+    panel.undo_point_clicked()
+    assert panel.teach.point_count("left") == 2 and panel.state.arms["left"].region
+    panel.clear_clicked()
+    assert panel.teach.point_count("left") == 0 and panel.state.arms["left"].region is None
+
+
+def test_record_point_without_a_live_arm_says_how_to_start_the_listener(panel):
+    panel.record_point_clicked()
+    assert "--observe" in panel.out_msg.content
+
+
+def test_saved_bundle_carries_the_region_made_from_the_points(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.record_side.value = "right"
+    for a, b in ((10, 20), (50, 20), (50, 80), (10, 80)):
+        put_live(panel, "right", a, b); panel.record_point_clicked()
+    panel.save_clicked()
+    raw = yaml.safe_load(panel.last_saved[0].read_text())
+    assert raw["arms"]["right"]["region"] and raw["arms"]["right"]["reach"] and "region" not in raw["arms"]["left"]
+
+
+def test_the_allowed_box_always_holds_the_home_pose_so_a_save_has_no_clash(panel):
+    import workspace as ws
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.live_q = {"left": moving_q("left", 20)}
+    for a in range(0, 30, 3):
+        panel.live_q = {"left": moving_q("left", a)}; panel.teach_tick(panel.live_q)
+    panel.set_home_clicked("left")
+    panel.record_side.value = "left"
+    far = moving_q("left", 5, 5)
+    for q in (far, far + 0.02):
+        panel.live_q = {"left": q}; panel.record_point_clicked()    # two points nowhere near the home pose
+    panel.save_clicked()
+    raw = yaml.safe_load(panel.last_saved[0].read_text())
+    assert not [p for p in ws.check_free_poses(raw) if "left home" in p]
+    assert "widened" in panel.out_msg.content
+
+
+# -- round 6: preview the move from rest to home on the 3D robot ---------------------------------------------------------------------
+
+class FakeRobot:
+    def __init__(self):
+        self.calls = []
+
+    def pose(self, side, q):
+        self.calls.append((side, np.array(q, dtype=float)))
+
+
+@pytest.fixture
+def panel_robot(tmp_path):
+    import viser
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = viser.ViserServer(port=port)
+    robot = FakeRobot()
+    p = designer.EditorPanel(server, ed.EditorState.default(), tmp_path / "out", "tester", robot=robot)
+    robot.calls.clear()
+    yield p, robot
+    server.stop()
+
+
+def taught(side="left"):
+    rest = poses.REST_DEG[side]
+    sign = 1.0 if side == "left" else -1.0
+    mid = [rest[0] + sign * 20, rest[1], rest[2], rest[3] + 25, rest[4], rest[5], rest[6]]
+    home = [rest[0] + sign * 45, rest[1], rest[2], rest[3] + 60, rest[4], rest[5], rest[6]]
+    return [list(rest), mid, home]
+
+
+def test_preview_plays_the_recorded_path_from_rest_to_home_on_the_robot(panel_robot):
+    panel, robot = panel_robot
+    path = taught("left")
+    panel.state.arms["left"].home_path = path
+    panel.state.arms["left"].home = list(np.radians(path[-1]))
+    panel.state.arms["left"].home_source = "teach"
+    panel.pose_view = "live"
+    panel.play_path(["left"], blocking=True, realtime=False)
+    left = [q for s, q in robot.calls if s == "left"]
+    assert len(left) > 20
+    assert np.degrees(left[0]) == pytest.approx(path[0], abs=0.5) and np.degrees(left[-1]) == pytest.approx(path[-1], abs=0.5)
+    assert not [1 for s, _ in robot.calls if s == "right"]            # only the chosen arm moved
+    assert panel.pose_view == "live" and "home" in panel.out_msg.content.lower()
+
+
+def test_preview_of_both_arms_moves_them_together(panel_robot):
+    panel, robot = panel_robot
+    for side in ed.SIDES:
+        panel.state.arms[side].home_path = taught(side)
+        panel.state.arms[side].home = list(np.radians(taught(side)[-1]))
+    panel.play_path(list(ed.SIDES), blocking=True, realtime=False)
+    sides = [s for s, _ in robot.calls]
+    assert sides.count("left") > 10 and sides.count("right") > 10
+    assert sides[:2] == ["left", "right"]                              # frames are interleaved
+
+
+def test_preview_without_a_path_says_so(panel_robot):
+    panel, robot = panel_robot
+    panel.state.arms["right"].home_path = None
+    panel.state.arms["right"].home_source = "teach"
+    panel.play_path(["right"], blocking=True, realtime=False)
+    assert "no path" in panel.out_msg.content.lower() and not robot.calls
+
+
+def test_preview_with_the_ready_home_uses_the_built_in_path(panel_robot):
+    panel, robot = panel_robot
+    panel.state.arms["left"].home_source = "ready"
+    panel.play_path(["left"], blocking=True, realtime=False)
+    left = [q for s, q in robot.calls if s == "left"]
+    assert np.degrees(left[0]) == pytest.approx(poses.REST_DEG["left"], abs=0.5) and np.degrees(left[-1]) == pytest.approx(poses.READY_DEG["left"], abs=0.5)
