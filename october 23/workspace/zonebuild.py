@@ -25,6 +25,8 @@ HAZARD_MARGIN_M = 0.03
 ## Two reference points touched again must agree within this, metres.
 VERIFY_TOLERANCE_M = 0.015
 SIDES = ("left", "right")
+## The gentle station settings `apply` writes: a slower start-up ramp and the slow hand speed cap (Dream's own ramp and cap, not the driver's).
+GENTLE_STATION = {"ramp_s": 3.0, "ramp_max_rad_s": 0.3, "max_ee_speed_m_s": 0.15}
 ## Written into every bundle so the numbers can be read without this code.
 FRAME_NOTE = ("each arm's base frame = the robot body frame shifted by (0, +0.031, 0.698) m for the left arm and (0, -0.031, 0.698) m for the right, "
               "no rotation; x forward, y left, z up; metres")
@@ -181,11 +183,12 @@ def compare_references(stored: list[tuple[float, float, float]], measured: list[
     return {"ok": max(distances) <= tol, "worst_m": max(distances), "distances_m": distances}
 
 
-def apply_to_station(station: pathlib.Path, fragment: dict[str, dict[str, Any]]) -> pathlib.Path:
+def apply_to_station(station: pathlib.Path, fragment: dict[str, dict[str, Any]], tuning: dict[str, float] | None = None) -> pathlib.Path:
     """Writes the fragment into station.yaml's `follower_l` / `follower_r`, after saving a timestamped backup beside it.
 
     @param station The station file.
     @param fragment From #station_fragment().
+    @param tuning Extra top-level settings to write (for example #GENTLE_STATION); with it `custom.driver` is also pointed at the `Arm` class of the same driver file.
     @return The backup's path.
     """
     text = station.read_text()
@@ -202,6 +205,11 @@ def apply_to_station(station: pathlib.Path, fragment: dict[str, dict[str, Any]])
             data[key]["region"] = fragment[side]["region"]
         else:
             data[key].pop("region", None)
+    if tuning:
+        data.update(tuning)
+        driver = (data.get("custom") or {}).get("driver")
+        if isinstance(driver, str) and driver.rsplit(":", 1)[-1] != "Arm":
+            data["custom"]["driver"] = driver.rsplit(":", 1)[0] + ":Arm"
     station.write_text(header + yaml.safe_dump(data, sort_keys=False, default_flow_style=None))
     return backup
 
@@ -236,3 +244,15 @@ def merge_leader(base: dict[str, Any], extra: dict[str, ArmCapture], operator: s
     merged["operator"] = operator
     merged["captured_at"] = now.isoformat(timespec="seconds")
     return merged
+
+
+def free_pose_problems(raw: dict[str, Any]) -> list[str]:
+    """Violations of the rest pose, the ready pose, the bundle's home pose and the path between them against the bundle's zones (empty when all are free)."""
+    parsed = zones.parse_zones(raw)
+    out: list[str] = []
+    for side in SIDES:
+        named = home_poses(side)
+        if parsed.home:
+            named["home"] = list(np.degrees(parsed.home[side]))
+        out += [f"{side} {text}" for text in pose_violations(parsed, side, named, zones.ArmKinematics(side))]
+    return out

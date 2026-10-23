@@ -809,3 +809,43 @@ def test_preview_with_the_ready_home_uses_the_built_in_path(panel_robot):
     panel.play_path(["left"], blocking=True, realtime=False)
     left = [q for s, q in robot.calls if s == "left"]
     assert np.degrees(left[0]) == pytest.approx(poses.REST_DEG["left"], abs=0.5) and np.degrees(left[-1]) == pytest.approx(poses.READY_DEG["left"], abs=0.5)
+
+
+# -- round 7: gentle station settings written by apply ------------------------------------------------------------------------------
+
+def test_apply_writes_the_gentle_station_settings_and_the_arm_driver(tmp_path):
+    station = tmp_path / "station.yaml"
+    station.write_text("body: custom\ncustom:\n  driver: \"/x/openarm_v2.py:ReadOnlyArm\"\n  ik: openarm2_faas\nmax_ee_speed_m_s: 0.6\nramp_s: 1.0\n"
+                       "follower_l: {can_channel: can_fol_l, home: [0.0]}\nfollower_r: {can_channel: can_fol_r, home: [0.0]}\n")
+    raw = zb.build_zones(capture_fixture(), source="editor", operator="k", now=NOW)
+    zb.apply_to_station(station, zb.station_fragment(raw, homes={"left": (0.0, 0.1), "right": (0.0, -0.1)}), tuning=zb.GENTLE_STATION)
+    new = yaml.safe_load(station.read_text())
+    assert new["ramp_s"] == 3.0 and new["ramp_max_rad_s"] == 0.3 and new["max_ee_speed_m_s"] == 0.15
+    assert new["custom"]["driver"].endswith("openarm_v2.py:Arm") and new["custom"]["ik"] == "openarm2_faas"
+
+
+def test_apply_without_tuning_leaves_the_other_settings_alone(tmp_path):
+    station = tmp_path / "station.yaml"
+    station.write_text("body: custom\nmax_ee_speed_m_s: 0.6\nfollower_l: {can_channel: can_fol_l, home: [0.0]}\nfollower_r: {can_channel: can_fol_r, home: [0.0]}\n")
+    raw = zb.build_zones(capture_fixture(), source="editor", operator="k", now=NOW)
+    zb.apply_to_station(station, zb.station_fragment(raw, homes={"left": (0.0, 0.1), "right": (0.0, -0.1)}))
+    assert yaml.safe_load(station.read_text())["max_ee_speed_m_s"] == 0.6
+
+
+def test_reference_buttons_record_the_hand_position_of_the_live_arm(panel):
+    panel.read_q = lambda side: panel.live_q[side]
+    panel.live_q = {"left": moving_q("left", 30)}
+    panel.record_reference_clicked("left")
+    panel.live_q = {"left": moving_q("left", 40)}
+    panel.record_reference_clicked("left")
+    refs = panel.state.references["left"]
+    assert len(refs) == 2 and refs[0] == pytest.approx(tuple(zones.ArmKinematics("left").points(moving_q("left", 30))["tcp"]), abs=1e-3)
+    assert "Left reference points (2)" in panel.check_html.content and "2" in panel.out_msg.content
+    panel.save_clicked()
+    raw = yaml.safe_load(panel.last_saved[0].read_text())
+    assert len(raw["references"]["left"]) == 2 and raw["references"]["right"] == []
+
+
+def test_reference_button_without_a_live_arm_says_how_to_start_the_listener(panel):
+    panel.record_reference_clicked("right")
+    assert "--observe" in panel.out_msg.content

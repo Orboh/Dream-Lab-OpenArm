@@ -15,8 +15,10 @@ import math
 import os
 import pathlib
 import shutil
+import subprocess
 import sys
 import threading
+import time
 import types
 
 import numpy as np
@@ -26,10 +28,12 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "driver"))
 sys.path.insert(0, str(HERE))
 
+import camerapose as camp  # noqa: E402
 import capture as cap  # noqa: E402
 import openarm_guard  # noqa: E402
 import openarm_lock  # noqa: E402
 import openarm_poses as poses  # noqa: E402
+import preflight as pf  # noqa: E402
 import openarm_zones as zones  # noqa: E402
 import zonebuild as zb  # noqa: E402
 
@@ -223,14 +227,7 @@ def station_homes(station: pathlib.Path) -> dict[str, tuple[float, float]]:
 
 def check_free_poses(raw: dict) -> list[str]:
     """Violations of the rest pose, the ready pose, the bundle's home pose and the path between them against the zones."""
-    parsed = zones.parse_zones(raw)
-    out: list[str] = []
-    for side in zb.SIDES:
-        named = zb.home_poses(side)
-        if parsed.home:
-            named["home"] = list(np.degrees(parsed.home[side]))
-        out += [f"{side} {text}" for text in zb.pose_violations(parsed, side, named, zones.ArmKinematics(side))]
-    return out
+    return zb.free_pose_problems(raw)
 
 
 def home_hands(raw: dict, station: pathlib.Path) -> dict[str, tuple[float, float]]:
@@ -269,7 +266,7 @@ def cmd_apply(args: argparse.Namespace) -> int:
     if cmd_build(args) != 0:
         sys.exit("not applied")
     fragment = zb.station_fragment(raw, home_hands(raw, station))
-    backup = zb.apply_to_station(station, fragment)
+    backup = zb.apply_to_station(station, fragment, tuning=None if args.no_tuning else zb.GENTLE_STATION)
     try:
         from robots import config
 
@@ -361,7 +358,45 @@ def cmd_design(args: argparse.Namespace) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def cmd_preflight(args: argparse.Namespace, probes=None, **_: object) -> int:
+    """The checks to pass before every session: CAN links, nobody else on the arms, cameras, zones fresh and consistent with the station file, the Arm driver, the guard."""
+    checks = pf.run_preflight(pathlib.Path(args.station).expanduser(), pathlib.Path(args.in_force).expanduser(), pathlib.Path(args.zones_dir), probes=probes)
+    print(pf.format_report(checks))
+    return 0 if all(c.ok for c in checks) else 1
+
+
+def cmd_start(args: argparse.Namespace, probes=None, runner=None, **_: object) -> int:
+    """Runs the checks and, only if all pass, starts the station (`dreamcli robot up`); --dry only prints what it would run."""
+    if cmd_preflight(args, probes=probes) != 0:
+        return 1
+    command = [str(pathlib.Path("~/dream-env/bin/dreamcli").expanduser()), "robot", "up"]
+    if args.dry:
+        print("would run:", " ".join(command))
+        return 0
+    print("starting:", " ".join(command))
+    return (runner or (lambda cmd: subprocess.run(cmd, check=False).returncode))(command)
+
+
+def cmd_camera_pose(args: argparse.Namespace, probes=None, opener=None, **_: object) -> int:
+    """Raises the chosen arm(s) to the camera-view pose (the taught home), holds it for you to look at the camera views, parks and switches off. The arms MOVE.
+
+    Runs the same checks as `start` first (station stopped, zones fresh, ...), so it refuses while the station, the teleop or an editor holds the arms or cameras.
+    """
+    if cmd_preflight(args, probes=probes) != 0:
+        return 1
+    sides = ["left", "right"] if args.arm == "both" else [args.arm]
+    if args.hold > 0:
+        hold = lambda: time.sleep(args.hold)  # noqa: E731
+    else:
+        hold = lambda: input("Look at the camera views now. Press Enter to park the arm and switch it off... ")  # noqa: E731
+    if opener is None:
+        import openarm_v2 as drv
+
+        opener = drv.Arm
+    return camp.run(pathlib.Path(args.station).expanduser(), sides, hold, opener)
+
+
+def main(argv: list[str] | None = None, probes=None, runner=None, opener=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("capture", help="paint the work area, touch the table, mark dangers (arms limp)")
@@ -381,6 +416,7 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--station", default=str(STATION))
         if name == "apply":
             p.add_argument("--no-verify", action="store_true")
+            p.add_argument("--no-tuning", action="store_true", help="do not write the gentle ramp and speed settings (ramp_s 3, ramp_max_rad_s 0.3, max_ee_speed_m_s 0.15) and the Arm driver")
         if name == "view":
             p.add_argument("--port", type=int, default=8080)
             p.add_argument("--live", choices=["none", "follower", "leader"], default="none")
@@ -396,9 +432,28 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--port", type=int, default=8080)
     p.add_argument("--operator", default=getpass.getuser())
     p.set_defaults(func=cmd_design)
+    for name, func, doc in (("preflight", cmd_preflight, "the checks to pass before every session"), ("start", cmd_start, "preflight, then start the station (dreamcli robot up)")):
+        p = sub.add_parser(name, help=doc)
+        p.add_argument("--station", default=str(STATION))
+        p.add_argument("--in-force", default=str(openarm_guard.zones_path()), help="the zones file the driver's guard reads")
+        p.add_argument("--zones-dir", default=str(ZONES_DIR))
+        if name == "start":
+            p.add_argument("--dry", action="store_true", help="run the checks and print the command, do not start")
+        p.set_defaults(func=func)
+    p = sub.add_parser("camera-pose", help="raise the arm(s) to the camera-view pose (the taught home), hold, park and switch off; the arms MOVE")
+    p.add_argument("--arm", choices=["left", "right", "both"], default="both")
+    p.add_argument("--hold", type=float, default=0.0, help="seconds to hold for the camera views (0: until you press Enter)")
+    p.add_argument("--station", default=str(STATION))
+    p.add_argument("--in-force", default=str(openarm_guard.zones_path()), help="the zones file the driver's guard reads")
+    p.add_argument("--zones-dir", default=str(ZONES_DIR))
+    p.set_defaults(func=cmd_camera_pose)
     p = sub.add_parser("status", help="zones in force, age, active arms")
     p.set_defaults(func=cmd_status)
     args = parser.parse_args(argv)
+    if args.func in (cmd_preflight, cmd_start):
+        return args.func(args, probes=probes, runner=runner)
+    if args.func is cmd_camera_pose:
+        return args.func(args, probes=probes, opener=opener)
     return args.func(args)
 
 

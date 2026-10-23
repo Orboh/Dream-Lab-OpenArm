@@ -75,6 +75,12 @@ def build_checklist(state: ed.EditorState, session) -> list[tuple[str, bool, str
         items.append((f"{cap} path recorded", bool(arm.home_path) or built_in or arm.home_source == "rest",
                       f"move the {side} leader from the rest or ready pose to the home, then press Set {side.upper()} home here"))
         items.append((f"{cap} allowed area", bool(arm.region), "Danger area tab: Record extremes and move the leader to the farthest safe points"))
+    for side in ed.SIDES:
+        items.append((f"{side.capitalize()} reference points (2)", len(state.references[side]) >= 2,
+                      f"Save tab: touch two table points with the {side} hand and press its reference button (the daily check needs them)"))
+    overlap = state.region_overlap_cm()
+    items.append(("The two allowed areas do not overlap", overlap == 0.0,
+                  f"the areas run {overlap:g} cm into each other, so the two hands can meet in the middle: record the extremes farther out, or keep each hand on its own side"))
     items.append(("Table placed", bool(state.table_set), "Danger area tab: enter the table numbers or drag the table"))
     items.append(("No clash", not state.clashes(), "a zone blocks the rest, ready or home pose: move or resize it"))
     return items

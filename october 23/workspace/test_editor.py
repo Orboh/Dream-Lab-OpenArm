@@ -161,21 +161,60 @@ def test_export_station_keys_has_home_reach_and_keep_out_per_arm_and_nothing_els
 
 # -- the home pose must lie inside the allowed region ---------------------------------------------------------------------------
 
-def test_fit_home_widens_the_region_to_hold_the_home_pose_and_nothing_more():
+def test_fit_home_gives_the_home_pose_room_on_every_side_and_nothing_more():
+    """The raised home is only there for the cameras to see the table: it must not sit against a wall of the allowed area."""
     state = ed.EditorState.default()
     kin = zones.ArmKinematics("left")
     home_pts = np.array(list(kin.points(np.array(state.arms["left"].home)).values()))
-    inside = {"lo": (home_pts.min(axis=0) - 0.1).tolist(), "hi": (home_pts.max(axis=0) + 0.1).tolist()}
+    room = ed.HOME_ROOM_M
+    inside = {"lo": (home_pts.min(axis=0) - room - 0.05).tolist(), "hi": (home_pts.max(axis=0) + room + 0.05).tolist()}
     state.arms["left"].region = dict(inside)
-    assert state.fit_home_into_region() == []                       # already inside: untouched
+    assert state.fit_home_into_region() == []                       # more than the room already: untouched
     assert state.arms["left"].region == inside
-    state.arms["left"].region = {"lo": [v + 0.15 for v in inside["lo"]], "hi": list(inside["hi"])}
+    state.arms["left"].region = {"lo": (home_pts.min(axis=0)).tolist(), "hi": (home_pts.max(axis=0)).tolist()}   # home touching every wall
     assert state.fit_home_into_region() == ["left"]
-    assert state.arms["left"].region["lo"] == pytest.approx(np.minimum(np.array(inside["lo"]) + 0.15, home_pts.min(axis=0)).tolist(), abs=1e-4)
-    assert state.arms["left"].region["hi"] == pytest.approx(inside["hi"])
+    region = state.arms["left"].region
+    assert np.array(region["lo"]) == pytest.approx(home_pts.min(axis=0) - room, abs=2e-4)
+    assert np.array(region["hi"]) == pytest.approx(home_pts.max(axis=0) + room, abs=2e-4)
+    assert state.fit_home_into_region() == []                       # idempotent
     assert state.clashes() == []
+
+
+def test_fit_home_never_shrinks_a_region_it_widens_on_one_side_only():
+    state = ed.EditorState.default()
+    home_pts = np.array(list(zones.ArmKinematics("left").points(np.array(state.arms["left"].home)).values()))
+    big = {"lo": (home_pts.min(axis=0) - 1.0).tolist(), "hi": (home_pts.max(axis=0) - 0.02).tolist()}   # far on the low side, 2 cm short on the high side
+    state.arms["left"].region = dict(big)
+    state.fit_home_into_region()
+    assert state.arms["left"].region["lo"] == big["lo"]
+    assert state.arms["left"].region["hi"] == pytest.approx((home_pts.max(axis=0) + ed.HOME_ROOM_M).tolist(), abs=2e-4)
 
 
 def test_an_arm_without_a_region_is_left_alone_by_fit_home():
     state = ed.EditorState.default()
     assert state.fit_home_into_region() == [] and state.arms["right"].region is None
+
+
+# -- reference points (for the daily verify) ---------------------------------------------------------------------------------------
+
+def test_reference_points_are_kept_in_the_state_and_the_bundle_and_round_trip():
+    state = ed.EditorState.default()
+    state.add_reference("left", (0.40, 0.05, -0.30)); state.add_reference("left", (0.50, 0.10, -0.30))
+    raw = state.to_bundle("k", NOW)
+    assert raw["references"]["left"] == [[0.4, 0.05, -0.3], [0.5, 0.1, -0.3]] and raw["references"]["right"] == []
+    zones.parse_zones(raw)
+    again = ed.EditorState.from_bundle(raw)
+    assert again.references["left"] == [(0.4, 0.05, -0.3), (0.5, 0.1, -0.3)]
+
+
+# -- the two allowed areas must not run into each other ---------------------------------------------------------------------------
+
+def test_region_overlap_is_zero_for_separate_areas_and_the_depth_when_they_run_into_each_other():
+    state = ed.EditorState.default()
+    state.arms["left"].region = {"lo": [-0.1, 0.0, -0.5], "hi": [0.1, 0.2, -0.2]}      # arm base frame: world y 0.031 .. 0.231
+    state.arms["right"].region = {"lo": [-0.1, -0.2, -0.5], "hi": [0.1, 0.0, -0.2]}    # world y -0.231 .. -0.031
+    assert state.region_overlap_cm() == 0.0
+    state.arms["right"].region = {"lo": [-0.1, -0.2, -0.5], "hi": [0.1, 0.1, -0.2]}    # reaches world y +0.069: 3.8 cm into the left one
+    assert state.region_overlap_cm() == pytest.approx(3.8, abs=0.05)
+    state.arms["right"].region = None
+    assert state.region_overlap_cm() == 0.0

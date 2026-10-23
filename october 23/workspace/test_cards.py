@@ -65,3 +65,24 @@ def test_ready_pose_home_counts_as_having_a_path():
     state.arms["right"].home_source = "ready"
     items = {label: ok for label, ok, _ in cards.build_checklist(state, th.TeachSession())}
     assert items["Right path recorded"]  # the built-in rest -> ready path covers it
+
+
+def test_checklist_asks_for_two_reference_points_per_arm():
+    state = ed.EditorState.default()
+    items = {label: ok for label, ok, _ in cards.build_checklist(state, th.TeachSession())}
+    assert not items["Left reference points (2)"] and not items["Right reference points (2)"]
+    state.add_reference("left", (0.4, 0, -0.3)); state.add_reference("left", (0.5, 0, -0.3))
+    items = {label: ok for label, ok, _ in cards.build_checklist(state, th.TeachSession())}
+    assert items["Left reference points (2)"] and not items["Right reference points (2)"]
+
+
+def test_checklist_warns_when_the_two_allowed_areas_overlap():
+    state = ed.EditorState.default()
+    state.arms["left"].region = {"lo": [-0.1, 0.0, -0.5], "hi": [0.1, 0.2, -0.2]}
+    state.arms["right"].region = {"lo": [-0.1, -0.2, -0.5], "hi": [0.1, 0.0, -0.2]}
+    items = {label: ok for label, ok, _ in cards.build_checklist(state, th.TeachSession())}
+    assert items["The two allowed areas do not overlap"]
+    state.arms["right"].region = {"lo": [-0.1, -0.2, -0.5], "hi": [0.1, 0.1, -0.2]}
+    items = {label: (ok, hint) for label, ok, hint in cards.build_checklist(state, th.TeachSession())}
+    ok, hint = items["The two allowed areas do not overlap"]
+    assert not ok and "3.8" in hint

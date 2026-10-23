@@ -16,6 +16,7 @@ import zonebuild as zb
 
 SIDES = ("left", "right")
 ## Each arm's base frame in the body frame, metres (checked against Dream's FK with a Kabsch fit: residual 0.0 m).
+HOME_ROOM_M = 0.05  # free space around the home pose inside the allowed area: home is only the pose from which the cameras see the table, not a limit
 BASE_OFFSET = {"left": np.array([0.0, 0.031, 0.698]), "right": np.array([0.0, -0.031, 0.698])}
 ## The table top is this far above the hand hanging at rest (user, 2026-10-23).
 TABLE_ABOVE_HANGING_HAND_M = 0.30
@@ -75,6 +76,7 @@ class EditorState:
     def __init__(self, table: Table, boxes: list[DangerBox], arms: dict[str, ArmState]) -> None:
         self.table, self.boxes, self.arms = table, boxes, arms
         self.table_set = False   # True once the user placed the table (or it came from a saved bundle)
+        self.references: dict[str, list[tuple[float, float, float]]] = {side: [] for side in SIDES}   # table points touched with the follower, for the daily verify
 
     @classmethod
     def default(cls) -> "EditorState":
@@ -121,6 +123,10 @@ class EditorState:
         ys = np.arange(round(y_range[0] / zb.REACH_GRID_M), round(y_range[1] / zb.REACH_GRID_M) + 1)
         self.arms[side].reach = {(int(i), int(j)) for i in xs for j in ys}
 
+    def add_reference(self, side: str, xyz) -> None:
+        """Records a reference point (arm base frame, metres): a place on the table touched with the follower, to be touched again by `verify`."""
+        self.references[side].append(tuple(round(float(v), 4) for v in xyz))
+
     def use_rest(self, side: str) -> None:
         self.arms[side].home = [float(v) for v in np.radians(poses.REST_DEG[side])]
         self.arms[side].home_source = "rest"
@@ -156,7 +162,7 @@ class EditorState:
         paths = {side: self.arms[side].home_path for side in SIDES if self.arms[side].home_path}
         bundle = {"version": 1, "captured_at": now.isoformat(timespec="seconds"), "source": "editor", "operator": operator, "frame": zb.FRAME_NOTE,
                 "home": {side: [round(v, 4) for v in self.arms[side].home] for side in SIDES}, "arms": arms,
-                "references": {side: [] for side in SIDES}, "verify": {"status": "unverified", "worst_m": None, "checked_at": None}}
+                "references": {side: [list(p) for p in self.references[side]] for side in SIDES}, "verify": {"status": "unverified", "worst_m": None, "checked_at": None}}
         if paths:
             bundle["home_path"] = {side: [list(map(float, p)) for p in path] for side, path in paths.items()}
         return bundle
@@ -187,10 +193,14 @@ class EditorState:
             arm.home_source = "bundle"
         state = cls(table, list(boxes.values()), arms)
         state.table_set = True
+        state.references = {side: [tuple(p) for p in (raw.get("references") or {}).get(side, [])] for side in SIDES}
         return state
 
     def fit_home_into_region(self) -> list[str]:
-        """Widens an arm's allowed region just enough to hold its home pose (the home is somewhere the arm is meant to be).
+        """Widens an arm's allowed region so its home pose has #HOME_ROOM_M of free space on every side.
+
+        The home is only the pose the cameras see the table from: it must not sit against a wall of the allowed area, or the arm
+        could hardly move away from it. A side that already has the room is left alone.
 
         @return The sides whose region was widened (arms without a region are left alone).
         """
@@ -201,13 +211,24 @@ class EditorState:
                 continue
             pts = np.array(list(zones.ArmKinematics(side).points(np.asarray(self.arms[side].home, dtype=float)).values()))
             old_lo, old_hi = np.asarray(region["lo"], dtype=float), np.asarray(region["hi"], dtype=float)
-            pmin, pmax = pts.min(axis=0), pts.max(axis=0)
-            lo = np.where(pmin < old_lo, np.floor(pmin * 1e4) / 1e4, old_lo)      # only a side that has to move moves (rounded outward to 0.1 mm)
-            hi = np.where(pmax > old_hi, np.ceil(pmax * 1e4) / 1e4, old_hi)
+            need_lo, need_hi = pts.min(axis=0) - HOME_ROOM_M, pts.max(axis=0) + HOME_ROOM_M
+            lo = np.where(need_lo < old_lo - 1e-4, np.floor(need_lo * 1e4) / 1e4, old_lo)   # only a side that has to move moves (rounded outward to 0.1 mm)
+            hi = np.where(need_hi > old_hi + 1e-4, np.ceil(need_hi * 1e4) / 1e4, old_hi)
             if not (np.allclose(lo, old_lo) and np.allclose(hi, old_hi)):
                 self.arms[side].region = {"lo": [float(v) for v in lo], "hi": [float(v) for v in hi]}
                 widened.append(side)
         return widened
+
+    def region_overlap_cm(self) -> float:
+        """How far the two arms' allowed areas run into each other (cm along the body's y axis), 0 when they do not or one is missing."""
+        boxes = []
+        for side in SIDES:
+            region = self.arms[side].region
+            if not region:
+                return 0.0
+            boxes.append((np.asarray(region["lo"], dtype=float) + BASE_OFFSET[side], np.asarray(region["hi"], dtype=float) + BASE_OFFSET[side]))
+        depth = np.minimum(boxes[0][1], boxes[1][1]) - np.maximum(boxes[0][0], boxes[1][0])
+        return round(float(depth[1]) * 100, 1) if bool(np.all(depth > 0)) else 0.0
 
     # -- clashes --------------------------------------------------------------------------------------------------------
     def clashes(self, live: dict[str, np.ndarray] | None = None) -> list[str]:

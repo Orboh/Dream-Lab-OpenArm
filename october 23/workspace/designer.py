@@ -151,6 +151,10 @@ class EditorPanel:
             self.b_export = g.add_button("Export station keys", color="gray")
             self.b_save.on_click(lambda _e: self.save_clicked())
             self.b_export.on_click(lambda _e: self.export_clicked())
+            g.add_markdown("Reference points: touch a spot on the table with the follower, press the button. Do it twice per arm; `verify` checks them every day.")
+            for side in ed.SIDES:
+                b_ref = g.add_button(f"Record reference point: {side.upper()} hand here", color="gray")
+                b_ref.on_click(lambda _e, s=side: self.record_reference_clicked(s))
         # -- Advanced (rarely needed) -----------------------------------------------------------------------------------
         with g.add_folder("Advanced", expand_by_default=False):
             self.f_operator = g.add_text("operator", self.operator)
@@ -525,6 +529,15 @@ class EditorPanel:
             self.teach.clear_sweep(side)
         self._apply_teach()
         self.redraw()
+
+    def record_reference_clicked(self, side: str) -> None:
+        """Save card button: records the live hand position as a reference point (a place touched on the table)."""
+        q = self._live(side)
+        if q is None:
+            return
+        self.state.add_reference(side, self.kin[side].points(q)["tcp"])
+        self.out_msg.content = f"{side} reference point {len(self.state.references[side])} recorded."
+        self.refresh_checklist()
 
     def mark_clicked(self, side: str) -> None:
         """Advanced: remembers the hand's position now under the typed label."""
