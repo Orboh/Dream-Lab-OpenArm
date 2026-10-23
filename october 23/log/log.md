@@ -12,3 +12,6 @@
 | [log-008.md](log-008.md) | Driver now accepts `left` / `right` as arm addresses to get around the wizard merging the two follower links. |
 | [log-009.md](log-009.md) | Wrote and validated the hand-made station.yaml for the OpenArm bimanual (dry-run driver, built-in OpenArm v2 model). |
 | [log-010.md](log-010.md) | Checked whether the driver's joint mapping matches Dream's OpenArm v2 model before moving the arms: wrist (joint 5) is off by 90 deg; not safe to move yet. |
+| [log-011.md](log-011.md) | Implemented "swing back then rise to the ready pose" at station start and parking at rest on stop (tested on the fake bus only). |
+| [log-012.md](log-012.md) | Daily safety area part 1: zones schema and FK, hard driver guard, one-arm lock (`arms.py`), tests only. |
+| [log-012.md](log-012.md) | Daily safety area: zones, guard, one-arm lock, capture/verify/build/apply tool and 3D viewer (tests only; viewer demo running read-only). |

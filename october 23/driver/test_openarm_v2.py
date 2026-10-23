@@ -89,10 +89,11 @@ def make_arm(tmp_path, monkeypatch):
             json.dumps({n: {"homing_offset": o} for n, o in OFFSETS.items()}))
     monkeypatch.setattr(drv, "CALIBRATION_DIR", tmp_path)
 
-    def build(cls, side="left", ends=(0.0, -65.0), channel="can_fol_l", logical=None, follow=False, home=None):
+    def build(cls, side="left", ends=(0.0, -65.0), channel="can_fol_l", logical=None, follow=False, home=None, frozen=()):
         start = {**LOGICAL, **(logical or {})}
         bus = FakeBus({n: start[n] + OFFSETS[n] for n in drv.MOTORS})
         bus.follow = follow
+        bus.frozen = set(frozen)
         def opener(opened_channel):
             bus.opened_channel = opened_channel
             return bus
@@ -332,20 +333,9 @@ def test_arm_stays_put_when_it_does_not_start_at_rest(make_arm, monkeypatch):
 
 def test_ready_move_stops_when_a_joint_lags(make_arm, monkeypatch):
     monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
-    with pytest.raises(errors.ArmError, match="behind"):
-        build_frozen = make_arm
-        # joint_4 never moves although it is told to
-        import types as _t
-        bus_holder = {}
-        original = drv.Arm.open_can_bus
-
-        def opener(channel):
-            bus = original(channel)
-            bus.frozen.add("joint_4")
-            return bus
-
-        monkeypatch.setattr(drv.Arm, "open_can_bus", staticmethod(lambda c: _wrap(opener, c, make_arm)))
-        make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True, home=poses.ready_rad("left"))
+    with pytest.raises(errors.ArmError, match="behind"):  # joint_4 never moves although it is told to
+        make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True, home=poses.ready_rad("left"),
+                 frozen=("joint_4",))
 
 
 def test_torque_off_parks_at_rest_along_the_path_then_switches_off(make_arm, monkeypatch):
@@ -372,3 +362,33 @@ def test_torque_off_at_rest_does_not_move(make_arm, monkeypatch):
     arm.torque_off()
     assert joints_of(bus) == pytest.approx(poses.REST_DEG["left"], abs=0.05)
     assert not any(bus.enabled.values())
+
+
+# -- leader arms (read-only, for defining the work area) ------------------------------------------------------------------
+
+def test_leader_reader_uses_the_leader_calibration_and_link(tmp_path, monkeypatch):
+    leader_offsets = {n: o + 10.0 for n, o in OFFSETS.items()}
+    for side in ("left", "right"):
+        (tmp_path / f"leader_{side}.json").write_text(json.dumps({n: {"homing_offset": o} for n, o in leader_offsets.items()}))
+    monkeypatch.setenv("OPENARM_LEADER_CALIBRATION_DIR", str(tmp_path))
+    bus = FakeBus({n: LOGICAL[n] + leader_offsets[n] for n in drv.MOTORS})  # a leader sitting at LOGICAL by its own calibration
+
+    def opener(channel):
+        bus.opened_channel = channel
+        return bus
+
+    monkeypatch.setattr(drv.ReadOnlyLeader, "open_can_bus", staticmethod(opener))
+    cfg = types.SimpleNamespace(can_channel="left", gripper_closed_deg=0.0, gripper_open_deg=-65.0)
+    leader = drv.ReadOnlyLeader(cfg, "left")
+    assert bus.opened_channel == "can_lead_l"
+    assert np.degrees(leader.read().positions_rad) == pytest.approx([LOGICAL[n] for n in drv.JOINTS], abs=0.05)
+    with pytest.raises(errors.ArmError):
+        leader.write(np.zeros(7), 0.5)
+    assert all(arb == damiao.PARAM_ID for arb, _ in bus.sent)  # only state queries
+
+
+def test_leader_reader_refuses_when_its_calibration_is_missing(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENARM_LEADER_CALIBRATION_DIR", str(tmp_path / "nowhere"))
+    cfg = types.SimpleNamespace(can_channel="left", gripper_closed_deg=0.0, gripper_open_deg=-65.0)
+    with pytest.raises(errors.ArmError, match="calibration"):
+        drv.ReadOnlyLeader(cfg, "left")

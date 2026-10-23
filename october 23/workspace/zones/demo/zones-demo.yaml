@@ -1,0 +1,36 @@
+version: 1
+captured_at: '2026-10-23T15:34:47+09:00'
+source: demo
+operator: demo
+frame: dream-model-base
+arms:
+  left:
+    table_z: -0.3
+    reach:
+    - [0.5, 0.0]
+    keep_out:
+    - name: table
+      kind: box
+      allow_tcp_touch: true
+      center: [0.55, 0.0, -0.45]
+      size: [0.4, 0.5, 0.3]
+  right:
+    table_z: -0.3
+    reach:
+    - [0.5, 0.0]
+    keep_out:
+    - name: table
+      kind: box
+      allow_tcp_touch: true
+      center: [0.55, 0.0, -0.45]
+      size: [0.4, 0.5, 0.3]
+references:
+  left:
+  - [0.3, 0.0, -0.3]
+  - [0.4, 0.1, -0.3]
+  right:
+  - [0.3, 0.0, -0.3]
+  - [0.4, 0.1, -0.3]
+verify: {status: unverified, worst_m: null, checked_at: null}
+note: 'DEMO ONLY: invented table 30 cm above the hanging hand, 35-75 cm in front;
+  not measured. Never apply this.'

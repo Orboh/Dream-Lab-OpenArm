@@ -1,0 +1,230 @@
+"""Builds the zones file and the station.yaml fragment from captured points. Pure maths and file handling, no hardware.
+
+The zones file is the one source of truth of the daily safety area (schema read by `driver/openarm_zones.py`). Every number is in the
+arm's own base frame (Dream's `openarm2_faas` model: x forward, y left, z up), metres.
+"""
+
+import dataclasses
+import datetime as dt
+import pathlib
+import shutil
+from typing import Any
+
+import numpy as np
+import yaml
+
+import openarm_poses as poses
+import openarm_zones as zones
+
+## The painted work area's grid, metres: the same 2 cm Dream's setup wizard uses.
+REACH_GRID_M = 0.02
+## How thick the table slab is taken to be below its top, metres (covers the desk body next to the arm).
+TABLE_THICKNESS_M = 0.30
+## A hazard box is the marked points' bounding box grown by this, metres.
+HAZARD_MARGIN_M = 0.03
+## Two reference points touched again must agree within this, metres.
+VERIFY_TOLERANCE_M = 0.015
+SIDES = ("left", "right")
+## Written into every bundle so the numbers can be read without this code.
+FRAME_NOTE = ("each arm's base frame = the robot body frame shifted by (0, +0.031, 0.698) m for the left arm and (0, -0.031, 0.698) m for the right, "
+              "no rotation; x forward, y left, z up; metres")
+
+
+@dataclasses.dataclass
+class ArmCapture:
+    """What was captured for one arm."""
+
+    reach: set[tuple[int, int]] = dataclasses.field(default_factory=set)
+    table_points: list[tuple[float, float, float]] = dataclasses.field(default_factory=list)
+    hazards: dict[str, list[tuple[float, float, float]]] = dataclasses.field(default_factory=dict)
+    references: list[tuple[float, float, float]] = dataclasses.field(default_factory=list)
+
+
+def cell(xy: np.ndarray) -> tuple[int, int]:
+    """The grid cell a position seen from above is in."""
+    i, j = np.round(np.asarray(xy, dtype=float)[:2] / REACH_GRID_M)
+    return int(i), int(j)
+
+
+def cells_to_points(cells: set[tuple[int, int]]) -> list[list[float]]:
+    """Grid cells as sorted `[x, y]` points, metres to the millimetre."""
+    return [[round(i * REACH_GRID_M, 3), round(j * REACH_GRID_M, 3)] for i, j in sorted(cells)]
+
+
+def _bbox(points: list[tuple[float, float, float]]) -> tuple[np.ndarray, np.ndarray]:
+    array = np.asarray(points, dtype=float)
+    return array.min(axis=0), array.max(axis=0)
+
+
+def table_keep_out(points: list[tuple[float, float, float]], thickness: float = TABLE_THICKNESS_M) -> dict[str, Any]:
+    """The table as a keep-out slab: its top at the touched height, its footprint the touched points' bounding box.
+
+    @param points Three or more points touched on the table top, base frame.
+    @param thickness Slab thickness below the top, metres.
+    @return A keep-out box the grasp point may touch (`allow_tcp_touch`).
+    @throws ValueError Fewer than three points.
+    """
+    if len(points) < 3:
+        raise ValueError("touch the table top in at least three points")
+    low, high = _bbox(points)
+    top = float(np.median([p[2] for p in points]))
+    size_x, size_y = max(float(high[0] - low[0]), 0.05), max(float(high[1] - low[1]), 0.05)
+    return {
+        "name": "table", "kind": "box", "allow_tcp_touch": True,
+        "center": [round(float((low[0] + high[0]) / 2), 4), round(float((low[1] + high[1]) / 2), 4), round(top - thickness / 2, 4)],
+        "size": [round(size_x, 4), round(size_y, 4), round(thickness, 4)],
+    }
+
+
+def hazard_keep_out(name: str, points: list[tuple[float, float, float]], margin: float = HAZARD_MARGIN_M) -> dict[str, Any]:
+    """A danger zone: the marked points' bounding box grown by `margin`.
+
+    @param name The zone's name.
+    @param points One or more marked points, base frame.
+    @param margin Metres added on every side.
+    @return A keep-out box.
+    """
+    low, high = _bbox(points)
+    low, high = low - margin, high + margin
+    return {"name": name, "kind": "box", "center": [round(float(v), 4) for v in (low + high) / 2],
+            "size": [round(float(v), 4) for v in high - low]}
+
+
+def build_zones(captures: dict[str, ArmCapture], source: str, operator: str, now: dt.datetime,
+                homes: dict[str, list[float]] | None = None) -> dict[str, Any]:
+    """The zones file's contents.
+
+    @param captures Per side, what was captured.
+    @param source `"follower"` or `"leader"`.
+    @param operator Who captured it.
+    @param now When (timezone-aware).
+    @param homes Per side, the home pose in radians (seven angles): where the arm starts and ends a run; the ready pose when None.
+    @return The mapping to write as YAML; `verify.status` starts as `unverified`.
+    @throws ValueError An arm has too few table points.
+    """
+    arms: dict[str, Any] = {}
+    refs: dict[str, Any] = {}
+    for side in SIDES:
+        c = captures[side]
+        table = table_keep_out(c.table_points)
+        keep_out = [table] + [hazard_keep_out(name, pts) for name, pts in c.hazards.items()]
+        arms[side] = {"table_z": round(float(np.median([p[2] for p in c.table_points])), 4),
+                      "reach": cells_to_points(c.reach) or None, "keep_out": keep_out}
+        refs[side] = [[round(float(v), 4) for v in p] for p in c.references]
+    return {"version": 1, "captured_at": now.isoformat(timespec="seconds"), "source": source, "operator": operator,
+            "frame": FRAME_NOTE, "home": homes or {side: poses.ready_rad(side) for side in SIDES}, "arms": arms, "references": refs,
+            "verify": {"status": "unverified", "worst_m": None, "checked_at": None}}
+
+
+def station_fragment(raw: dict[str, Any], homes: dict[str, tuple[float, float]]) -> dict[str, dict[str, Any]]:
+    """The keys to write into each arm's section of station.yaml: `reach` (painted cells plus the home hand) and `keep_out`.
+
+    Dream's keep_out takes exactly `kind`, `center`, `size` for a box. `region` is not written: the rest and ready poses have the hand below the table top.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for side in SIDES:
+        cells = {cell(np.array(p)) for p in (raw["arms"][side].get("reach") or [])}
+        cells.add(cell(np.array(homes[side])))
+        keep_out = []
+        for zone in raw["arms"][side]["keep_out"]:
+            if zone["kind"] == "box":
+                keep_out.append({"kind": "box", "center": list(zone["center"]), "size": list(zone["size"])})
+            else:
+                keep_out.append({"kind": "capsule", "center": list(zone["center"]), "radius": zone["radius"], "height": zone["height"]})
+        out[side] = {"reach": cells_to_points(cells), "keep_out": keep_out}
+        if raw.get("home"):
+            out[side]["home"] = [float(v) for v in raw["home"][side]]
+    return out
+
+
+def pose_violations(parsed: zones.Zones, side: str, named_poses: dict[str, list[float]], kin: zones.ArmKinematics) -> list[str]:
+    """Which of the given poses (joint degrees, Dream's model) the zones would refuse.
+
+    @param parsed The zones.
+    @param side `"left"` or `"right"`.
+    @param named_poses Name to seven joint angles in degrees.
+    @param kin That arm's kinematics.
+    @return One text per problem, naming the pose; empty when all are allowed.
+    """
+    out: list[str] = []
+    for name, pose in named_poses.items():
+        for text in parsed.violations(side, kin.points(np.radians(pose)), check_reach=False):
+            out.append(f"{name}: {text}")
+    return out
+
+
+def home_poses(side: str, steps: int = 6) -> dict[str, list[float]]:
+    """The poses the zones must leave free for each arm: rest, ready and samples along the path between them."""
+    path = poses.path_to_ready(side)
+    named = {"rest": path[0], "ready": path[-1]}
+    for index, point in enumerate(path[1:-1], start=1):
+        named[f"path {index}"] = point
+    return named
+
+
+def compare_references(stored: list[tuple[float, float, float]], measured: list[tuple[float, float, float]], tol: float = VERIFY_TOLERANCE_M) -> dict[str, Any]:
+    """Compares reference points touched again with the stored ones.
+
+    @param stored The points stored with the zones.
+    @param measured The same points touched now, in the same order.
+    @param tol Largest accepted distance, metres.
+    @return `{"ok", "worst_m", "distances_m"}`.
+    @throws ValueError The lists differ in length or are empty.
+    """
+    if len(stored) != len(measured) or not stored:
+        raise ValueError(f"touch the same {len(stored)} reference points as when the zones were captured")
+    distances = [float(np.linalg.norm(np.asarray(a) - np.asarray(b))) for a, b in zip(stored, measured, strict=True)]
+    return {"ok": max(distances) <= tol, "worst_m": max(distances), "distances_m": distances}
+
+
+def apply_to_station(station: pathlib.Path, fragment: dict[str, dict[str, Any]]) -> pathlib.Path:
+    """Writes the fragment into station.yaml's `follower_l` / `follower_r`, after saving a timestamped backup beside it.
+
+    @param station The station file.
+    @param fragment From #station_fragment().
+    @return The backup's path.
+    """
+    text = station.read_text()
+    backup = station.with_name(f"{station.name}.{dt.datetime.now():%Y%m%d-%H%M%S}.bak")
+    shutil.copy2(station, backup)
+    header = "".join(line for line in text.splitlines(keepends=True) if line.startswith("#"))
+    data = yaml.safe_load(text)
+    for side, key in (("left", "follower_l"), ("right", "follower_r")):
+        data[key]["reach"] = fragment[side]["reach"]
+        data[key]["keep_out"] = fragment[side]["keep_out"]
+        if "home" in fragment[side]:
+            data[key]["home"] = fragment[side]["home"]
+    station.write_text(header + yaml.safe_dump(data, sort_keys=False, default_flow_style=None))
+    return backup
+
+
+def merge_leader(base: dict[str, Any], extra: dict[str, ArmCapture], operator: str, now: dt.datetime) -> dict[str, Any]:
+    """Adds what was painted and marked with the leader arms to a follower-captured zones file.
+
+    The table and the reference points stay the follower's (ground truth); the painted cells are added to the work area and each marked
+    hazard becomes a new keep-out box (a name already in use gets a numeric suffix).
+
+    @param base The follower's zones mapping.
+    @param extra Per side, the leader session's capture (only `reach` and `hazards` are used).
+    @param operator Who captured it.
+    @param now When.
+    @return A new zones mapping.
+    """
+    import copy
+
+    merged = copy.deepcopy(base)
+    for side in SIDES:
+        section = merged["arms"][side]
+        cells = {cell(np.array(p)) for p in (section.get("reach") or [])} | extra[side].reach
+        section["reach"] = cells_to_points(cells) or None
+        names = {z["name"] for z in section["keep_out"]}
+        for name, points in extra[side].hazards.items():
+            unique, n = name, 2
+            while unique in names:
+                unique, n = f"{name} {n}", n + 1
+            names.add(unique)
+            section["keep_out"].append(hazard_keep_out(unique, points))
+    merged["source"] = "follower+leader"
+    merged["operator"] = operator
+    merged["captured_at"] = now.isoformat(timespec="seconds")
+    return merged

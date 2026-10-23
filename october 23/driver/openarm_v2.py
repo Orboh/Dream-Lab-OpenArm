@@ -24,7 +24,7 @@ counts every joint the same way as the fork's logical angle has not been checked
 move the way the joint does, and that a known pose reads as the arm model says.
 
 No gravity feed-forward: held at the fork's gains the arm sags a little, and with the motors off it falls, so
-`drops_when_limp` is True: support the arm before disengage() or torque_off().
+`drops_when_limp` is True: support the arm before disengage(). torque_off() first parks a raised arm at rest along the path.
 
 @see ReadOnlyArm, Arm
 """
@@ -40,6 +40,9 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+import openarm_guard
+import openarm_lock
+import openarm_poses as poses
 from robots import config, damiao, errors, followers, robstride
 
 _log = logging.getLogger(__name__)
@@ -123,6 +126,20 @@ SEND_TIMEOUT_S = 0.1
 ## so each follower can be typed as `left` or `right`; the real SocketCAN link is what gets opened.
 LINK_ALIASES = {"left": "can_fol_l", "right": "can_fol_r"}
 
+## Seconds between the frames of a path move (50 Hz) and the spacing its samples are cut at.
+CONTROL_PERIOD_S = 0.02
+SAMPLE_DT_S = 0.02
+## Joint speed of the ready and park moves, degrees per second (the fork's own start alignment uses 40).
+FOLLOW_MAX_DPS = 25.0
+## A joint this far behind its path target, degrees, stops the move (stuck, blocked, or a wrong mapping).
+FOLLOW_LAG_DEG = 8.0
+## At start the arm goes to the ready pose only if it is within this of the rest pose, degrees.
+REST_TOLERANCE_DEG = 12.0
+## On torque_off the arm is parked only if it is within this of the rest-to-ready path, degrees.
+PARK_TOLERANCE_DEG = 20.0
+## The config's home counts as the ready pose within this, degrees.
+READY_HOME_TOLERANCE_DEG = 2.0
+
 ## Tries to confirm a motor switched off: leaving one energized is not acceptable.
 DISABLE_TRIES = 5
 
@@ -147,17 +164,18 @@ class FdBus(damiao.DamiaoBus):
         self._require().send(message, timeout=SEND_TIMEOUT_S)
 
 
-def resolve_channel(channel: object) -> str:
+def resolve_channel(channel: object, aliases: dict[str, str] | None = None) -> str:
     """The SocketCAN link behind an address: `left` / `right` (any case) become `can_fol_l` / `can_fol_r`.
 
     @param channel What the config's `can_channel` holds.
+    @param aliases The short names and their links; #LINK_ALIASES (the followers) by default.
     @return The link name; anything that is not an alias is returned as written, without surrounding spaces.
     """
     text = str(channel).strip()
-    return LINK_ALIASES.get(text.lower(), text)
+    return (aliases or LINK_ALIASES).get(text.lower(), text)
 
 
-def side_of(cfg: config.ArmConfig, side: str) -> str:
+def side_of(cfg: config.ArmConfig, side: str, aliases: dict[str, str] | None = None) -> str:
     """The arm's side, from `side` or, while setup is still finding the arms, from the adapter's name.
 
     @param cfg The arm's config; `can_channel` ending in `_l` or `_r`, or `left` / `right`, names the side.
@@ -167,7 +185,7 @@ def side_of(cfg: config.ArmConfig, side: str) -> str:
     """
     if side in LIMITS_DEG:
         return side
-    channel = resolve_channel(cfg.can_channel)
+    channel = resolve_channel(cfg.can_channel, aliases)
     for suffix, name in (("_l", "left"), ("_r", "right")):
         if channel.endswith(suffix):
             return name
@@ -176,14 +194,15 @@ def side_of(cfg: config.ArmConfig, side: str) -> str:
     )
 
 
-def homing_offsets(side: str) -> dict[str, float]:
+def homing_offsets(side: str, path: pathlib.Path | None = None) -> dict[str, float]:
     """The fork's homing offsets for an arm, degrees per motor.
 
     @param side `"left"` or `"right"`.
+    @param path The calibration file; the follower's by default.
     @return The offset of each of #MOTORS.
     @throws ArmError The calibration file is missing or lacks a motor.
     """
-    path = CALIBRATION_DIR / f"{CALIBRATION_IDS[side]}.json"
+    path = path or CALIBRATION_DIR / f"{CALIBRATION_IDS[side]}.json"
     try:
         data = json.loads(path.read_text())
         return {name: float(data[name]["homing_offset"]) for name in MOTORS}
@@ -202,6 +221,12 @@ class ReadOnlyArm(followers.Driver):
 
     ## How the CAN link is opened; tests put a fake one here.
     open_can_bus = staticmethod(open_fd_bus)
+    ## The short addresses (`left` / `right`) and the links they stand for.
+    link_aliases = LINK_ALIASES
+
+    def _load_offsets(self) -> dict[str, float]:
+        """This arm's homing offsets (the follower's calibration file)."""
+        return homing_offsets(self.side)
 
     def __init__(self, cfg: config.ArmConfig, side: str) -> None:
         """Opens the arm's CAN link and asks nothing of the motors yet.
@@ -211,13 +236,13 @@ class ReadOnlyArm(followers.Driver):
         @param side `"left"` or `"right"`.
         @throws ArmError The side is unknown, or its calibration is missing.
         """
-        self.side = side_of(cfg, side)
-        self._offsets = homing_offsets(self.side)
+        self.side = side_of(cfg, side, self.link_aliases)
+        self._offsets = self._load_offsets()
         self._ends = (float(cfg.gripper_closed_deg), float(cfg.gripper_open_deg))
         self._deg: dict[str, float] | None = None
         self._limp = False
         motors = [damiao.Motor(name=n, can_id=CAN_IDS[n], model=MODELS[n]) for n in MOTORS]
-        self.bus = FdBus(resolve_channel(cfg.can_channel), motors, opener=self.open_can_bus, clock=time.monotonic)
+        self.bus = FdBus(resolve_channel(cfg.can_channel, self.link_aliases), motors, opener=self.open_can_bus, clock=time.monotonic)
         self.bus.open()
 
     # -- reading ------------------------------------------------------------------------------------------------
@@ -292,6 +317,27 @@ class ReadOnlyArm(followers.Driver):
         self.bus.close()
 
 
+## The leader (teleoperation) arms: same motors and ids, their own links and calibration.
+LEADER_LINK_ALIASES = {"left": "can_lead_l", "right": "can_lead_r"}
+LEADER_CALIBRATION_IDS = {"left": "leader_left", "right": "leader_right"}
+
+
+class ReadOnlyLeader(ReadOnlyArm):
+    """A leader arm opened only to be read, by hand: used to define the work area. Never switches a motor on; write() refuses."""
+
+    link_aliases = LEADER_LINK_ALIASES
+
+    def _load_offsets(self) -> dict[str, float]:
+        """The leader's homing offsets (`leader_<side>.json` in the fork's teleoperator calibration folder)."""
+        directory = pathlib.Path(
+            os.environ.get(
+                "OPENARM_LEADER_CALIBRATION_DIR",
+                "~/.cache/huggingface/lerobot/calibration/teleoperators/openarm_leader",
+            )
+        ).expanduser()
+        return homing_offsets(self.side, directory / f"{LEADER_CALIBRATION_IDS[self.side]}.json")
+
+
 class Arm(ReadOnlyArm):
     """One OpenArm arm, switched on and holding where it is, then following Dream's targets."""
 
@@ -304,9 +350,16 @@ class Arm(ReadOnlyArm):
             motor does not confirm switching on, and those already on are switched off again.
         """
         super().__init__(cfg, side)
+        self._guard = openarm_guard.Guard(self.side)
+        self._lock = openarm_lock.ArmLock(self.side)
+        self._held: dict[str, float] | None = None  # the pose a locked arm holds
+        home = getattr(cfg, "home", None)
+        self._home_deg = None if home is None else np.degrees(MODEL_SIGN * (np.asarray(home, dtype=float) - MODEL_ZERO_RAD))
         try:
             self._logical()  # refuses a bad reading before any motor is on
             self._switch_on()
+            if self._should_go_ready():
+                self.go_ready()
         except BaseException:
             self.bus.close()
             raise
@@ -376,6 +429,11 @@ class Arm(ReadOnlyArm):
             self._logical()
             self._switch_on()
             return  # the arm now holds where the hand left it; this target is dropped
+        if not self._lock.is_active():
+            self._hold_locked()
+            return  # this arm is locked (arms.py): it keeps its pose whatever it is asked
+        self._held = None
+        self._guard.check(positions_rad)
         here = self._deg if self._deg is not None else self._logical()
         logical = np.degrees(MODEL_SIGN * (np.asarray(positions_rad, dtype=np.float64) - MODEL_ZERO_RAD))
         targets = dict(zip(JOINTS, logical.tolist(), strict=True))
@@ -396,6 +454,12 @@ class Arm(ReadOnlyArm):
             if state is not None:
                 here[name] = state.position_deg - self._offsets[name]
 
+    def _hold_locked(self) -> None:
+        """Keeps a locked arm where it was when the lock first showed, motors alive."""
+        if self._held is None:
+            self._held = dict(self._logical())
+        self.bus.mit_batch({n: (KP[n], KD[n], self._native_of(n, self._held[n]), 0.0, 0.0) for n in MOTORS})
+
     def disengage(self) -> bool:
         """Switches every motor off where it is, so a hand can move the arm; the arm falls unless supported.
 
@@ -410,12 +474,86 @@ class Arm(ReadOnlyArm):
         """Closes the CAN link without a move; motors keep their last target only while their own CAN timeout allows."""
         self.bus.close()
 
+    # -- ready and rest poses -----------------------------------------------------------------------------------
+
+    def _joint_pose(self) -> list[float]:
+        """The seven joints as last read, logical degrees."""
+        return [self._deg[n] for n in JOINTS]
+
+    def _should_go_ready(self) -> bool:
+        """True when the config's home is this arm's ready pose and the arm sits at rest: then the station start raises it."""
+        if self._home_deg is None or len(self._home_deg) != len(JOINTS):
+            return False
+        if float(np.max(np.abs(self._home_deg - np.asarray(poses.READY_DEG[self.side])))) > READY_HOME_TOLERANCE_DEG:
+            return False
+        index, distance = poses.nearest(poses.path_to_ready(self.side), self._joint_pose())
+        return index == 0 and distance <= REST_TOLERANCE_DEG
+
+    def _follow(self, points: list[list[float]]) -> None:
+        """Moves the joints along `points` (degrees, the first is where the arm is) at #FOLLOW_MAX_DPS, the gripper held.
+
+        @throws ArmError A motor leaves the enabled state, or a joint lags its target by more than #FOLLOW_LAG_DEG.
+        """
+        grip = self._deg[GRIPPER]
+        for sample in poses.densify(points, FOLLOW_MAX_DPS, SAMPLE_DT_S):
+            targets = {}
+            for name, angle in zip(JOINTS, sample, strict=True):
+                low, high = LIMITS_DEG[self.side][name]
+                targets[name] = min(max(angle, low), high)
+            targets[GRIPPER] = grip
+            self.bus.mit_batch({n: (KP[n], KD[n], self._native_of(n, a), 0.0, 0.0) for n, a in targets.items()})
+            for name in MOTORS:
+                state = self.bus.motors[name].state
+                if state.status != damiao.STATUS_ENABLED:
+                    raise errors.ArmError(f"arm {self.side} {name} left the enabled state (status {state.status:#x})")
+                behind = abs(state.position_deg - self._offsets[name] - targets[name])
+                if name != GRIPPER and behind > FOLLOW_LAG_DEG:
+                    raise errors.ArmError(
+                        f"arm {self.side} {name} is {behind:.1f} deg behind its target: stopped (blocked, or a wrong "
+                        "angle mapping)"
+                    )
+            time.sleep(CONTROL_PERIOD_S)
+        self._logical()
+
+    def go_ready(self) -> None:
+        """Raises the arm from rest to the ready pose along the recorded path: back first, then up.
+
+        @throws ArmError As #_follow.
+        """
+        _log.info("arm %s: rest -> ready along %d waypoints", self.side, len(poses.WAYPOINTS_DEG[self.side]))
+        self._follow([self._joint_pose(), *poses.path_to_ready(self.side)[1:]])
+
+    def _park(self) -> None:
+        """Brings a raised arm back to the rest pose along the same path, so it does not fall when switched off.
+
+        Does nothing when the arm is limp, already at rest, or too far from the path to follow it.
+        """
+        if self._limp or self._deg is None:
+            return
+        self._logical()
+        path = poses.path_to_ready(self.side)
+        here = self._joint_pose()
+        index, distance = poses.nearest(path, here)
+        if distance > PARK_TOLERANCE_DEG:
+            _log.warning("arm %s: %.0f deg from the rest-to-ready path, not parking", self.side, distance)
+            return
+        if index == 0:
+            return
+        _log.info("arm %s: parking at rest along the path before switching off", self.side)
+        self._follow([here, *reversed(path[:index])])
+
     def torque_off(self) -> None:
-        """Switches every motor off and closes the link. Nothing parks the arm: it falls unless supported.
+        """Parks a raised arm at rest along the recorded path, then switches every motor off and closes the link.
+
+        A failed park is logged and the motors are switched off where the arm is: it then falls unless supported.
 
         @throws ArmError A motor did not confirm switching off (the link is closed either way).
         """
         try:
+            try:
+                self._park()
+            except Exception as exc:
+                _log.warning("arm %s: parking failed (%s); switching off where it is", self.side, exc)
             self._disable(list(MOTORS))
         finally:
             self.bus.close()
