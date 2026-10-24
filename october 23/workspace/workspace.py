@@ -371,6 +371,8 @@ def cmd_design(args: argparse.Namespace) -> int:
     print(f"starting from {newest.name if newest else 'the defaults (table top 30 cm above the hanging hand)'}")
     apply_table_args(state, args)
     state.danger_only = bool(args.danger_only) or state.danger_only
+    tolerance = getattr(args, "park_tolerance_deg", None)
+    state.park_tolerance_deg = float(tolerance) if tolerance is not None else (8.0 if state.danger_only else 0.0)
     cameras = camerapanel.cameras_from_station(STATION) if args.cameras else None
     arms, read_q, observers, observer_status = {}, None, {}, None
     if args.live != "none" or cameras is not None or args.observe:
@@ -474,6 +476,7 @@ def main(argv: list[str] | None = None, probes=None, runner=None, opener=None) -
     p.add_argument("--cameras", action="store_true", help="offer the station file's RealSense cameras as switchable feeds")
     p.add_argument("--detail", choices=["visual", "collision"], default="visual")
     p.add_argument("--danger-only", action="store_true", help="the bundle names only the danger zones (the table and any box you add): no painted work area, no allowed region, so the model is told nothing about the task")
+    p.add_argument("--park-tolerance-deg", type=float, default=None, help="simplify the saved rest-to-home path to this tolerance (degrees) when that keeps it clear of the zones: a shorter raise and park (default 8 with --danger-only, else 0: as recorded)")
     p.add_argument("--table-front-cm", type=float, help="the table's near edge, cm in front of the robot's centre line (tape measure)")
     p.add_argument("--table-top-cm", type=float, help="the table top, cm above the floor-level base plate the arms stand on (the shoulders are 69.8 cm above it)")
     p.add_argument("--table-lower-cm", type=float, default=0.0, help="lower the table's danger box top by this many cm (0 keeps it at the real surface; up to 2 keeps the safety balls out of the table; max 4). A NEGATIVE value raises the top: an extra safety margin over the table (down to -15), e.g. --table-lower-cm=-5")

@@ -18,8 +18,8 @@ from test_preflight import Probes, failed, run, setup  # noqa: F401  (a consiste
 NOW = dt.datetime.now(dt.timezone.utc)
 
 
-def wandering(side: str, detours: int = 6, amplitude: float = 30.0) -> list[list[float]]:
-    """The built-in rest-to-ready path with back-and-forth detours of joint 1 added on every segment: what a path taught by hand looks like."""
+def wandering(side: str, detours: int = 6, amplitude: float = 6.0) -> list[list[float]]:
+    """The built-in rest-to-ready path with small back-and-forth wiggles of joint 1 added on every segment: what a path taught by hand looks like (the hand is never steady)."""
     base = poses.path_to_ready(side)
     out = [list(base[0])]
     for a, b in zip(base[:-1], base[1:]):
@@ -85,15 +85,20 @@ def test_a_shortcut_that_comes_closer_to_a_zone_than_the_recorded_path_is_not_ta
 
 
 def test_the_strict_rule_forbids_the_grasp_point_touching_a_zone_on_the_drivers_own_move():
-    # raise the table until the ready pose's grasp point lies just above the box top: the guard for Dream's targets lets a grasp point touch the table, the driver's move may not
-    for lower in np.arange(0.0, -14.0, -0.5):
-        state = state_with_path({}, lower_cm=float(lower))
-        if state.clashes():
-            break
-        if state.path_warnings():
-            assert not state.clashes()  # the guard for Dream's targets accepts this pose; the strict path rule does not
-            return
-    pytest.fail("never found a table height where only the strict rule objects")
+    import openarm_zones as zones
+
+    kin = zones.ArmKinematics("left", logical=True)
+    ready = poses.READY_DEG["left"]
+    tcp = kin.points(np.radians(ready))["tcp"]
+    box = {"name": "table", "kind": "box", "allow_tcp_touch": True, "center": [float(tcp[0]), float(tcp[1]), float(tcp[2]) - 0.005 - 0.10], "size": [0.04, 0.04, 0.20]}  # its top 5 mm under the grasp point
+    raw = {"version": 1, "captured_at": NOW.isoformat(), "source": "t", "arms": {"left": {"reach": None, "keep_out": [box]}, "right": {"reach": None, "keep_out": []}}}
+    parsed = zones.parse_zones(raw)
+    assert parsed.violations("left", kin.points(np.radians(ready)), check_reach=False, check_region=False) == []   # the guard for Dream's targets lets a grasp point touch the table
+    path = poses.path_to_ready("left")[-2:]
+    problems = zb.taught_path_problems(raw, "left", path)
+    assert problems and "tcp" in problems[0] and "keep-out zone 'table'" in problems[0]   # the driver's own move may not
+    assert zb.taught_path_slack_cm(raw, "left", path) < 0
+    assert raw["arms"]["left"]["keep_out"][0]["allow_tcp_touch"] is True   # the check works on a copy: the zones themselves are untouched
 
 
 def test_the_save_card_has_an_item_for_the_path_and_ticks_it_for_a_clear_one():
@@ -112,7 +117,7 @@ def test_preflight_refuses_a_raise_and_park_that_takes_too_long_for_an_active_ar
     monkeypatch.setenv("OPENARM_ACTIVE_ARMS", str(tmp_path / "active.json"))
     import openarm_lock as lock
 
-    lock.set_active(["left", "right"]) if hasattr(lock, "set_active") else (tmp_path / "active.json").write_text('{"active": ["left", "right"]}')
+    lock.set_active("both")
     zones_in_force_with_path(setup, tmp_path, {"left": wandering("left")})
     bad = [c for c in run(setup) if c.label == pf.LABEL_PARK][0]
     assert bad.ok is False and "left" in bad.detail and "limit 45 s" in bad.detail

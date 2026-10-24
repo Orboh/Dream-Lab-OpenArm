@@ -751,6 +751,22 @@ class Arm(ReadOnlyArm):
             else:
                 self._stall_since = None
 
+    def _dead_reason(self) -> str | None:
+        """Why the arm no longer answers (its control thread died, or the motors have been silent for over 0.5 s), or None while it does."""
+        if "thread" in self._alarms:
+            return self._alarms["thread"]
+        if self._thread is not None and self._time() - self._deg_time > 0.5:
+            return f"arm {self.side}: no reply from the motors for over 0.5 s (power or CAN cable?)"
+        return None
+
+    def is_alive(self) -> bool:
+        """Whether the arm still answers; False tells the station to report it and offer a Reset (it may still hold under power: support it)."""
+        return self._dead_reason() is None
+
+    def why_stopped(self) -> str:
+        """The reason #is_alive is False, or empty."""
+        return self._dead_reason() or ""
+
     def alarm(self) -> str | None:
         """Why the run must stop although the arm answers (a hot motor, a fault, a blocked gripper, a dead control thread), or None."""
         return next(iter(self._alarms.values()), None) if self._alarms else None
