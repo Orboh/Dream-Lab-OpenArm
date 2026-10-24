@@ -13,6 +13,7 @@ from typing import Any
 import numpy as np
 import yaml
 
+import openarm_mapping as mapping
 import openarm_poses as poses
 import openarm_zones as zones
 
@@ -118,24 +119,49 @@ def build_zones(captures: dict[str, ArmCapture], source: str, operator: str, now
             "verify": {"status": "unverified", "worst_m": None, "checked_at": None}}
 
 
-def station_fragment(raw: dict[str, Any], homes: dict[str, tuple[float, float]]) -> dict[str, dict[str, Any]]:
+def home_adjustments(raw: dict[str, Any]) -> dict[str, list[tuple[int, float]]]:
+    """Per side, the joints of the bundle's home that the station file moves (degrees) to keep them inside Dream's joint range: `{}` when none moves."""
+    out = {}
+    for side in SIDES:
+        if raw.get("home"):
+            moved = mapping.clip_to_model_limits(side, mapping.to_model(side, raw["home"][side]))[1]
+            if moved:
+                out[side] = moved
+    return out
+
+
+def _keep_out_of(raw: dict[str, Any], side: str) -> list[dict[str, Any]]:
+    """The arm's danger zones in the exact form Dream's station file takes (`kind`, `center`, `size` for a box; `radius`, `height` for a capsule)."""
+    keep_out = []
+    for zone in raw["arms"][side]["keep_out"]:
+        if zone["kind"] == "box":
+            keep_out.append({"kind": "box", "center": list(zone["center"]), "size": list(zone["size"])})
+        else:
+            keep_out.append({"kind": "capsule", "center": list(zone["center"]), "radius": zone["radius"], "height": zone["height"]})
+    return keep_out
+
+
+def station_fragment(raw: dict[str, Any], homes: dict[str, tuple[float, float]], danger_only: bool | None = None) -> dict[str, dict[str, Any]]:
     """The keys to write into each arm's section of station.yaml: `reach` (painted cells plus the home hand) and `keep_out`.
+
+    A **danger-only** bundle (`mode: danger_only`, or `danger_only=True`) writes `keep_out` and `home` and nothing else: no `reach` and no `region`, so Dream's hand can go anywhere except into the
+    danger zones (Dream: "None when the arm's section has no `reach`: the hand can go anywhere"). Nothing about the task or the table's usable area is handed to the model.
 
     Dream's keep_out takes exactly `kind`, `center`, `size` for a box. `region` is not written: the rest and ready poses have the hand below the table top.
     """
     out: dict[str, dict[str, Any]] = {}
+    danger = (raw.get("mode") == "danger_only") if danger_only is None else danger_only
     for side in SIDES:
+        if danger:
+            out[side] = {"keep_out": _keep_out_of(raw, side)}
+            if raw.get("home"):
+                out[side]["home"] = [float(v) for v in mapping.clip_to_model_limits(side, mapping.to_model(side, raw["home"][side]))[0]]
+            continue
         cells = {cell(np.array(p)) for p in (raw["arms"][side].get("reach") or [])}
         cells.add(cell(np.array(homes[side])))
-        keep_out = []
-        for zone in raw["arms"][side]["keep_out"]:
-            if zone["kind"] == "box":
-                keep_out.append({"kind": "box", "center": list(zone["center"]), "size": list(zone["size"])})
-            else:
-                keep_out.append({"kind": "capsule", "center": list(zone["center"]), "radius": zone["radius"], "height": zone["height"]})
-        out[side] = {"reach": cells_to_points(cells), "keep_out": keep_out}
-        if raw.get("home"):
-            out[side]["home"] = [float(v) for v in raw["home"][side]]
+        out[side] = {"reach": cells_to_points(cells), "keep_out": _keep_out_of(raw, side)}
+        if raw.get("home"):  # the bundle's home is the arm's logical angles; the station file holds Dream's model angles (the same under the identity mapping)
+            out[side]["home"] = [float(v) for v in mapping.clip_to_model_limits(side, mapping.to_model(side, raw["home"][side]))[0]]
         if raw["arms"][side].get("region"):
             out[side]["region"] = {"lo": list(raw["arms"][side]["region"]["lo"]), "hi": list(raw["arms"][side]["region"]["hi"])}
     return out
@@ -197,7 +223,10 @@ def apply_to_station(station: pathlib.Path, fragment: dict[str, dict[str, Any]],
     header = "".join(line for line in text.splitlines(keepends=True) if line.startswith("#"))
     data = yaml.safe_load(text)
     for side, key in (("left", "follower_l"), ("right", "follower_r")):
-        data[key]["reach"] = fragment[side]["reach"]
+        if "reach" in fragment[side]:
+            data[key]["reach"] = fragment[side]["reach"]
+        else:
+            data[key].pop("reach", None)  # danger-only: no painted area, the hand can go anywhere outside the danger zones
         data[key]["keep_out"] = fragment[side]["keep_out"]
         if "home" in fragment[side]:
             data[key]["home"] = fragment[side]["home"]
@@ -254,5 +283,5 @@ def free_pose_problems(raw: dict[str, Any]) -> list[str]:
         named = home_poses(side)
         if parsed.home:
             named["home"] = list(np.degrees(parsed.home[side]))
-        out += [f"{side} {text}" for text in pose_violations(parsed, side, named, zones.ArmKinematics(side))]
+        out += [f"{side} {text}" for text in pose_violations(parsed, side, named, zones.ArmKinematics(side, logical=True))]
     return out

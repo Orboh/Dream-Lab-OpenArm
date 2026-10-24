@@ -15,8 +15,8 @@ OpenArm runs CAN-FD (the fork's `use_can_fd` defaults to True, links at 1 Mbit /
 Angles. The motors report degrees in their own frame; the fork's calibration file for the arm
 (`follower_left.json` / `follower_right.json`, the `homing_offset` of each joint) turns them into the arm's logical
 angle, whose zero is the arm hanging down. The driver reads those offsets and refuses to open without them, since
-without them every angle would be wrong. Logical degrees then become radians in Dream's arm model through MODEL_SIGN
-and MODEL_ZERO_RAD below.
+without them every angle would be wrong. Logical degrees then become radians in Dream's arm model through the mapping of
+`openarm_mapping` (`OPENARM_MODEL_MAPPING`: `identity` by default, `official` after the 2026-10-24 check, log-018).
 
 NOT VERIFIED: MODEL_SIGN and MODEL_ZERO_RAD are the identity, a starting point. Whether Dream's `openarm2_faas` model
 counts every joint the same way as the fork's logical angle has not been checked on the arm. Check it with
@@ -42,6 +42,7 @@ import numpy as np
 import numpy.typing as npt
 
 import openarm_guard
+import openarm_mapping as mapping
 import openarm_motion as motion
 import openarm_lock
 import openarm_poses as poses
@@ -119,7 +120,7 @@ MAX_STEP_DEG = 20.0
 ## negative). Used for reading only: write() refuses until `gripper_closed_deg` and `gripper_open_deg` are set.
 FALLBACK_GRIPPER_DEG = (0.0, -65.0)
 
-## Joint i's model angle = MODEL_SIGN[i] * logical radians + MODEL_ZERO_RAD[i]. Identity until checked on the arm.
+## The identity mapping, kept for reference: joint i's model angle = MODEL_SIGN[i] * logical radians + MODEL_ZERO_RAD[i]. The arms use `openarm_mapping.get(side)` (identity unless OPENARM_MODEL_MAPPING says otherwise).
 MODEL_SIGN = np.ones(len(JOINTS))
 MODEL_ZERO_RAD = np.zeros(len(JOINTS))
 
@@ -255,6 +256,7 @@ class ReadOnlyArm(followers.Driver):
         """
         self.side = side_of(cfg, side, self.link_aliases)
         self._offsets = self._load_offsets()
+        self._sign, self._zero = mapping.get(self.side)  # logical -> Dream's model: sign * logical + zero
         self._ends = (float(cfg.gripper_closed_deg), float(cfg.gripper_open_deg))
         self._deg: dict[str, float] | None = None
         self._limp = False
@@ -293,8 +295,8 @@ class ReadOnlyArm(followers.Driver):
         """
         deg = self._logical()
         states = [self.bus.motors[n].state for n in MOTORS]
-        positions = MODEL_SIGN * np.radians([deg[n] for n in JOINTS]) + MODEL_ZERO_RAD
-        velocities = MODEL_SIGN * np.radians([states[i].velocity_deg_s for i in range(len(JOINTS))])
+        positions = self._sign * np.radians([deg[n] for n in JOINTS]) + self._zero
+        velocities = self._sign * np.radians([states[i].velocity_deg_s for i in range(len(JOINTS))])
         closed, opened = self._gripper_ends()
         grip = float(np.clip((deg[GRIPPER] - closed) / (opened - closed), 0.0, 1.0))
         temps = np.array([max(s.temp_mos_c, s.temp_rotor_c) for s in states], dtype=np.float64)
@@ -399,7 +401,7 @@ class Arm(ReadOnlyArm):
         self._sim_t = 0.0                                  # simulated seconds of an inline arm (tests): the monitors' clock when there is no thread
         self._warned: dict[str, float] = {}
         home = getattr(cfg, "home", None)
-        self._home_deg = None if home is None else np.degrees(MODEL_SIGN * (np.asarray(home, dtype=float) - MODEL_ZERO_RAD))
+        self._home_deg = None if home is None else np.degrees(self._sign * (np.asarray(home, dtype=float) - self._zero))
         try:
             self._logical()  # refuses a bad reading before any motor is on
             self._switch_on()
@@ -503,7 +505,7 @@ class Arm(ReadOnlyArm):
         self._held = None
         here = self._deg if self._deg is not None else self._logical()
         positions_rad = self._limited(positions_rad, here)
-        logical = np.degrees(MODEL_SIGN * (np.asarray(positions_rad, dtype=np.float64) - MODEL_ZERO_RAD))
+        logical = np.degrees(self._sign * (np.asarray(positions_rad, dtype=np.float64) - self._zero))
         targets = dict(zip(JOINTS, logical.tolist(), strict=True))
         targets[GRIPPER] = closed + float(np.clip(gripper, 0.0, 1.0)) * (opened - closed)
         commands: dict[str, tuple[float, float, float, float, float]] = {}
@@ -548,7 +550,7 @@ class Arm(ReadOnlyArm):
         if self._safe_q is not None and now - self._safe_time <= SAFE_Q_FRESH_S:
             prev = self._safe_q
         else:
-            prev = MODEL_ZERO_RAD + MODEL_SIGN * np.radians([here[n] for n in JOINTS])
+            prev = self._zero + self._sign * np.radians([here[n] for n in JOINTS])
         limited, found = self._guard.limit(prev, positions_rad)
         self._safe_q, self._safe_time = limited, now
         if found and not self._at_edge:

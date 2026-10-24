@@ -19,6 +19,8 @@ from typing import Any
 import numpy as np
 import yaml
 
+import openarm_mapping as mapping
+
 JOINTS = 7
 ## Dream's collision sphere around every link, and the margin it keeps from a keep-out zone, metres.
 LINK_RADIUS_M = 0.04
@@ -71,15 +73,18 @@ def model_urdf(side: str) -> pathlib.Path:
 class ArmKinematics:
     """Forward kinematics of one arm of Dream's OpenArm v2 model, in numpy (fast enough for the 250 Hz command loop)."""
 
-    def __init__(self, side: str, urdf: pathlib.Path | None = None) -> None:
+    def __init__(self, side: str, urdf: pathlib.Path | None = None, logical: bool = False) -> None:
         """Reads the arm's seven revolute joints from its URDF.
 
         @param side `"left"` or `"right"`.
         @param urdf The URDF file; the installed model's by default.
+        @param logical True when #points() will be given the fork's logical angles (the real arm: the editor, the teach tools, the saved poses): they are mapped to Dream's
+            model first (`openarm_mapping`, a no-op for the default identity mapping). False (the driver and its guard) when the angles already are Dream's.
         """
         import xml.etree.ElementTree as ET
 
         self.side = side
+        self._logical = logical
         root = ET.parse(urdf or model_urdf(side)).getroot()
         joints = {j.get("name"): j for j in root.findall("joint")}
         self._origins: list[np.ndarray] = []
@@ -97,9 +102,11 @@ class ArmKinematics:
     def points(self, q_rad: np.ndarray) -> dict[str, np.ndarray]:
         """The arm's named points in its base frame.
 
-        @param q_rad Seven joint angles, radians, in Dream's model.
+        @param q_rad Seven joint angles, radians, in Dream's model (or logical when built with `logical=True`).
         @return `elbow`, `wrist_pitch`, `wrist`, `forearm`, `hand` and `tcp`, each `[3]` metres.
         """
+        if self._logical:
+            q_rad = mapping.to_model(self.side, q_rad)
         frame = np.eye(4)
         origins: list[np.ndarray] = []
         for i in range(JOINTS):

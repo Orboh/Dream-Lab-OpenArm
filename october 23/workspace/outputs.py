@@ -48,7 +48,7 @@ def export_station_keys(raw: dict, path: pathlib.Path) -> pathlib.Path:
 
     import openarm_zones as zones
 
-    homes = {side: tuple(zones.ArmKinematics(side).points(np.asarray(raw["home"][side], dtype=float))["tcp"][:2]) for side in zb.SIDES}
+    homes = {side: tuple(zones.ArmKinematics(side, logical=True).points(np.asarray(raw["home"][side], dtype=float))["tcp"][:2]) for side in zb.SIDES}
     fragment = zb.station_fragment(raw, homes)
     keys = {"follower_l": fragment["left"], "follower_r": fragment["right"]}
     path = pathlib.Path(path)

@@ -54,7 +54,7 @@ def build_scene(server: viser.ViserServer, raw: dict) -> dict:
             z = raw["arms"][side].get("table_z", 0.0) + 0.004
             cells = np.array([[x + offset[0], y + offset[1], z] for x, y in parsed.arms[side].reach])
             server.scene.add_point_cloud(f"/{side}/work_area", cells, GREEN, point_size=0.012, point_shape="square")
-        kin = zones.ArmKinematics(side)
+        kin = zones.ArmKinematics(side, logical=True)
         for name, pose, color in (("rest", poses.REST_DEG[side], GREY), ("ready", poses.READY_DEG[side], BLUE)):
             pts = kin.points(np.radians(pose))
             server.scene.add_line_segments(f"/{side}/{name}", _skeleton(pts, offset), color, thickness=0.006)

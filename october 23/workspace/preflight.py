@@ -12,6 +12,7 @@ import numpy as np
 import yaml
 
 import openarm_guard
+import openarm_mapping as mapping
 import openarm_lock
 import openarm_zones as zones
 import zonebuild as zb
@@ -23,6 +24,7 @@ LABEL_CAMERAS_FREE = "No other program has the cameras open"
 LABEL_LOADS = "Dream accepts the station file"
 LABEL_FRESH = "Safety zones in force exist and are less than 24 hours old"
 LABEL_NEWEST = "The zones in force are the newest saved bundle"
+LABEL_MAPPING = "The station file was written under the joint mapping now in use"
 LABEL_HOME = "The station's home equals the bundle's home (both arms)"
 LABEL_PATH = "A home path from rest is stored and ends at the home"
 LABEL_CLEAR = "The home, rest, ready poses and the path are clear of every zone and the home is inside the allowed region"
@@ -139,7 +141,7 @@ def run_preflight(station: pathlib.Path, in_force: pathlib.Path, zones_dir: path
         off = []
         for side, key in (("left", "follower_l"), ("right", "follower_r")):
             station_home = (data.get(key) or {}).get("home")
-            if station_home is None or len(station_home) != 7 or float(np.max(np.abs(np.asarray(station_home) - np.asarray(parsed.home[side])))) > 2e-3:
+            if station_home is None or len(station_home) != 7 or float(np.max(np.abs(np.asarray(station_home) - mapping.clip_to_model_limits(side, mapping.to_model(side, parsed.home[side]))[0]))) > 2e-3:  # the station holds Dream's model angles (kept inside Dream's joint range), the bundle the logical ones
                 off.append(side)
         checks.append(Check(not off, LABEL_HOME, f"differs for: {off}; run `workspace.py apply`" if off else ""))
         # home path
@@ -157,6 +159,14 @@ def run_preflight(station: pathlib.Path, in_force: pathlib.Path, zones_dir: path
     path_part = driver.rsplit(":", 1)[0]
     ok_driver = driver.endswith(":Arm") and pathlib.Path(path_part).is_file()
     checks.append(Check(ok_driver, LABEL_DRIVER, "" if ok_driver else f"custom.driver is {driver!r}"))
+    try:
+        written_under, in_use = mapping.recorded() or "identity", mapping.active()
+    except ValueError as exc:
+        checks.append(Check(False, LABEL_MAPPING, str(exc)))
+    else:
+        checks.append(Check(written_under == in_use, LABEL_MAPPING,
+                            f"in use: {in_use}" if written_under == in_use else
+                            f"the station file's home was written under '{written_under}' but '{in_use}' is in use (OPENARM_MODEL_MAPPING): unset the variable or run `workspace.py apply` again"))
     checks.append(Check(openarm_guard.required(), LABEL_GUARD, "" if openarm_guard.required() else "OPENARM_ZONES_REQUIRED=0 is set in this shell"))
     active = sorted(openarm_lock.active_arms())
     checks.append(Check(True, "Active arms (one-arm lock)", ", ".join(active) if active else "none: the lock file is unreadable"))

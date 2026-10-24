@@ -101,7 +101,7 @@ def render_layout(raw: dict[str, Any], out: pathlib.Path) -> pathlib.Path:
                 px, py = project_top(x + base[0], y + base[1])
                 draw.rectangle([px - 2, py - 2, px + 2, py + 2], fill=GREEN)
     for side in ed.SIDES:
-        kin = zones.ArmKinematics(side)
+        kin = zones.ArmKinematics(side, logical=True)
         home = parsed.home[side] if parsed.home else None
         ready = np.radians(zones_pose(side, "ready"))
         home_is_ready = home is not None and np.allclose(home, ready, atol=0.01)

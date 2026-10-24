@@ -93,12 +93,19 @@ def build_checklist(state: ed.EditorState, session, lang: i18n.Lang = i18n.EN) -
         built_in = arm.home_source == "ready" and not arm.home_path
         items.append((_cap(lang, lang.t("check.home", side=name)), arm.home_source != "default", lang.t("check.home.hint", side=name)))
         items.append((_cap(lang, lang.t("check.path", side=name)), bool(arm.home_path) or built_in or arm.home_source == "rest", lang.t("check.path.hint", side=name)))
+        if state.danger_only:  # only the danger zones are named: no allowed area, work area or reference points are asked for
+            continue
         items.append((_cap(lang, lang.t("check.area", side=name)), bool(arm.region), lang.t("check.area.hint")))
-    for side in ed.SIDES:
+        over, total = state.reach_over_table(side)
+        items.append((_cap(lang, lang.t("check.reachtable", side=name)), over > 0, lang.t("check.reachtable.hint", side=name, over=over, total=total)))
+        holes = session.reach_holes(side)
+        items.append((_cap(lang, lang.t("check.holes", side=name)), holes == 0, lang.t("check.holes.hint", n=holes)))
+    for side in ([] if state.danger_only else ed.SIDES):
         name = lang.t(f"side.{side}")
         items.append((_cap(lang, lang.t("check.refs", side=name)), len(state.references[side]) >= 2, lang.t("check.refs.hint", side=name)))
-    overlap = state.region_overlap_cm()
-    items.append((lang.t("check.overlap"), overlap == 0.0, lang.t("check.overlap.hint", cm=f"{overlap:g}")))
+    if not state.danger_only:
+        overlap = state.region_overlap_cm()
+        items.append((lang.t("check.overlap"), overlap == 0.0, lang.t("check.overlap.hint", cm=f"{overlap:g}")))
     items.append((lang.t("check.table"), bool(state.table_set), lang.t("check.table.hint")))
     items.append((lang.t("check.clash"), not state.clashes(), lang.t("check.clash.hint")))
     return items

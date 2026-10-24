@@ -83,7 +83,7 @@ class EditorPanel:
         self.teach = th.TeachSession()
         self.live_q: dict[str, np.ndarray] = {}
         self.receiving = {side: False for side in ed.SIDES}
-        self.kin = {side: zones.ArmKinematics(side) for side in ed.SIDES}
+        self.kin = {side: zones.ArmKinematics(side, logical=True) for side in ed.SIDES}
         self.hanging_z = float(self.kin["left"].points(np.zeros(7))["tcp"][2] + ed.BASE_OFFSET["left"][2])
         self.last_saved: tuple[pathlib.Path, pathlib.Path] | None = None
         self._nodes: list = []
@@ -199,6 +199,10 @@ class EditorPanel:
                 self.f_front_cm = g.add_number("", t.x_range[0] * 100, step=1.0)
                 self.f_depth_cm = g.add_number("", (t.x_range[1] - t.x_range[0]) * 100, min=5.0, step=1.0)
                 self.f_width_cm = g.add_number("", (t.y_range[1] - t.y_range[0]) * 100, min=5.0, step=1.0)
+                self.f_lower_cm = g.add_number("", t.lower_cm, min=0.0, max=ed.LOWER_MAX_CM, step=0.5)
+                tx(self.f_lower_cm, "label", "table.lower")
+                tx(g.add_markdown(""), "content", "table.lower.help")
+                self.f_lower_cm.on_update(lambda _e: self.lower_changed())
                 for handle, key in ((self.f_height_cm, "table.height"), (self.f_front_cm, "table.front"), (self.f_depth_cm, "table.depth"), (self.f_width_cm, "table.width")):
                     tx(handle, "label", key)
                 for f in (self.f_height_cm, self.f_front_cm, self.f_depth_cm, self.f_width_cm):
@@ -578,6 +582,13 @@ class EditorPanel:
         t = self.state.table
         t.top_z, t.x_range, t.y_range, t.thickness = float(top_z), tuple(map(float, x_range)), tuple(map(float, y_range)), float(thickness)
         self.state.table_set = True
+        self.redraw()
+
+    def lower_changed(self) -> None:
+        """Danger area tab: how far the table's danger box top is lowered below the real surface (0 keeps it at the surface); warns past the safe limit."""
+        self.state.table.lower_cm = min(max(float(self.f_lower_cm.value), 0.0), ed.LOWER_MAX_CM)
+        warning = self.state.table.lower_warning()
+        self.out_msg.content = self.lang.t("msg.lowerwarn", cm=self.state.table.lower_cm, dip=self.state.table.lower_cm - ed.SAFE_LOWER_CM, safe=ed.SAFE_LOWER_CM) if warning else ""
         self.redraw()
 
     def table_cards_changed(self) -> None:

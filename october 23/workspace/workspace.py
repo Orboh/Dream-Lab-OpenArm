@@ -32,6 +32,7 @@ import camerapose as camp  # noqa: E402
 import capture as cap  # noqa: E402
 import openarm_guard  # noqa: E402
 import openarm_lock  # noqa: E402
+import openarm_mapping as mapping  # noqa: E402
 import openarm_poses as poses  # noqa: E402
 import preflight as pf  # noqa: E402
 import openarm_zones as zones  # noqa: E402
@@ -69,10 +70,11 @@ def open_sources(kind: str, sides: list[str]):
     for side in sides:
         cfg = types.SimpleNamespace(can_channel=side, gripper_closed_deg=math.nan, gripper_open_deg=math.nan)
         arms[side] = cls(cfg, side)
-    kins = {side: zones.ArmKinematics(side) for side in sides}
+    kins = {side: zones.ArmKinematics(side, logical=True) for side in sides}
 
     def read_q(side: str) -> np.ndarray:
-        return arms[side].read().positions_rad
+        """The arm's logical joints (radians): `read()` gives Dream's model angles, mapped back (a no-op for the identity mapping)."""
+        return mapping.to_logical(side, arms[side].read().positions_rad)
 
     def read_tcp(side: str) -> np.ndarray:
         return kins[side].points(read_q(side))["tcp"]
@@ -221,7 +223,7 @@ def station_homes(station: pathlib.Path) -> dict[str, tuple[float, float]]:
     out = {}
     for side, key in (("left", "follower_l"), ("right", "follower_r")):
         home = (data.get(key) or {}).get("home") or np.radians(poses.READY_DEG[side])
-        out[side] = tuple(zones.ArmKinematics(side).points(np.asarray(home, dtype=float))["tcp"][:2])
+        out[side] = tuple(zones.ArmKinematics(side, logical=True).points(np.asarray(home, dtype=float))["tcp"][:2])
     return out
 
 
@@ -233,7 +235,7 @@ def check_free_poses(raw: dict) -> list[str]:
 def home_hands(raw: dict, station: pathlib.Path) -> dict[str, tuple[float, float]]:
     """Each arm's home hand position seen from above: from the bundle's home pose, else from the station file's."""
     if raw.get("home"):
-        return {side: tuple(zones.ArmKinematics(side).points(np.asarray(raw["home"][side], dtype=float))["tcp"][:2]) for side in zb.SIDES}
+        return {side: tuple(zones.ArmKinematics(side, logical=True).points(np.asarray(raw["home"][side], dtype=float))["tcp"][:2]) for side in zb.SIDES}
     return station_homes(station)
 
 
@@ -245,9 +247,12 @@ def cmd_build(args: argparse.Namespace) -> int:
     problems = check_free_poses(raw)
     fragment = zb.station_fragment(raw, home_hands(raw, pathlib.Path(args.station).expanduser()))
     print(f"zones: {path.name}  (source {raw['source']}, verify {raw['verify']['status']})")
+    for side, moved in zb.home_adjustments(raw).items():
+        print(f"note: the {side} home would be outside Dream's joint range; the station file moves " + ", ".join(f"joint {j} by {d:+g} deg" for j, d in moved) + " to keep it 0.5 deg inside")
     for side in zb.SIDES:
         f = fragment[side]
-        print(f"{side}: reach {len(f['reach'])} cells, keep_out {[z.get('name', z['kind']) for z in raw['arms'][side]['keep_out']]}")
+        area = f"reach {len(f['reach'])} cells" if "reach" in f else "no reach and no region (danger-only: the hand can go anywhere outside the danger zones)"
+        print(f"{side}: {area}, keep_out {[z.get('name', z['kind']) for z in raw['arms'][side]['keep_out']]}")
     if problems:
         print("\nTHE ZONES BLOCK THE REST/READY POSES OR THE PATH BETWEEN THEM:")
         print("\n".join("  " + p for p in problems[:12]))
@@ -261,8 +266,11 @@ def cmd_apply(args: argparse.Namespace) -> int:
     path = pick_zones(args.zones)
     raw = load_raw(path)
     station = pathlib.Path(args.station).expanduser()
-    if raw["verify"]["status"] != "ok" and not args.no_verify:
+    danger_only = raw.get("mode") == "danger_only"
+    if raw["verify"]["status"] != "ok" and not args.no_verify and not danger_only:
         sys.exit("these zones are not verified today: run `verify` (or --no-verify for a bench test)")
+    if danger_only and raw["verify"]["status"] != "ok":  # a danger-only bundle has no reference points to touch: its table box comes from the tape measurements
+        print("note: danger-only zones are applied without a reference-point check; the table box is from tape measurements (front edge, top height)")
     if cmd_build(args) != 0:
         sys.exit("not applied")
     fragment = zb.station_fragment(raw, home_hands(raw, station))
@@ -276,8 +284,14 @@ def cmd_apply(args: argparse.Namespace) -> int:
         sys.exit(f"Dream refused the new station file ({exc}); the backup was restored")
     target = openarm_guard.zones_path()
     target.parent.mkdir(parents=True, exist_ok=True)
+    if target.exists():  # the zones that were in force stay available
+        shutil.copy2(target, target.with_name(f"{target.name}.{dt.datetime.now():%Y%m%d-%H%M%S}.bak"))
     shutil.copy2(path, target)
-    print(f"applied: {station} (backup {backup.name}); zones in force: {target}")
+    record = mapping.record_path()
+    if record.exists():
+        shutil.copy2(record, record.with_name(f"{record.name}.{dt.datetime.now():%Y%m%d-%H%M%S}.bak"))
+    mapping.write_record(mapping.active())  # the station file's home is in Dream's model angles of THIS mapping: remember it, whatever shell starts the station later
+    print(f"applied: {station} (backup {backup.name}); zones in force: {target}; joint mapping recorded: {mapping.active()} ({record})")
     return 0
 
 
@@ -323,6 +337,26 @@ def cmd_view(args: argparse.Namespace) -> int:
     return 0
 
 
+def apply_table_args(state, args: argparse.Namespace) -> bool:
+    """Puts the table measured with a tape (`--table-front-cm`, `--table-top-cm`, with depth and width) into the editor state. The table stays "not placed" on the Save card until you touch it on the page.
+
+    @return True when a table was set from the arguments.
+    """
+    import editor
+
+    if args.table_front_cm is None and args.table_top_cm is None:
+        return False
+    if args.table_front_cm is None or args.table_top_cm is None:
+        sys.exit("give both --table-front-cm and --table-top-cm")
+    state.table = editor.table_from_measurements(args.table_front_cm, args.table_top_cm, args.table_depth_cm, args.table_width_cm, args.table_centre_y_cm,
+                                           lower_cm=getattr(args, "table_lower_cm", 0.0))
+    print(f"table from the tape: front edge {args.table_front_cm:g} cm in front of the centre line, top {args.table_top_cm:g} cm above the base plate, "
+          f"{args.table_depth_cm:g} deep x {args.table_width_cm:g} wide (check depth and width on the page); danger box top lowered by {getattr(args, 'table_lower_cm', 0.0):g} cm")
+    if state.table.lower_warning():
+        print("WARNING:", state.table.lower_warning())
+    return True
+
+
 def cmd_design(args: argparse.Namespace) -> int:
     """The visual editor: the real OpenArm model, the table and danger boxes you drag, Save and Export. Starts from the newest bundle unless --new."""
     import camerapanel
@@ -332,6 +366,8 @@ def cmd_design(args: argparse.Namespace) -> int:
     newest = None if args.new else (pathlib.Path(args.zones) if args.zones else newest_zones())
     state = editor.EditorState.from_bundle(load_raw(newest)) if newest else editor.EditorState.default()
     print(f"starting from {newest.name if newest else 'the defaults (table top 30 cm above the hanging hand)'}")
+    apply_table_args(state, args)
+    state.danger_only = bool(args.danger_only) or state.danger_only
     cameras = camerapanel.cameras_from_station(STATION) if args.cameras else None
     arms, read_q, observers, observer_status = {}, None, {}, None
     if args.live != "none" or cameras is not None or args.observe:
@@ -434,6 +470,13 @@ def main(argv: list[str] | None = None, probes=None, runner=None, opener=None) -
     p.add_argument("--observe", action="store_true", help="TEACH: only LISTEN to the follower's CAN frames while your teleop runs (sends nothing)")
     p.add_argument("--cameras", action="store_true", help="offer the station file's RealSense cameras as switchable feeds")
     p.add_argument("--detail", choices=["visual", "collision"], default="visual")
+    p.add_argument("--danger-only", action="store_true", help="the bundle names only the danger zones (the table and any box you add): no painted work area, no allowed region, so the model is told nothing about the task")
+    p.add_argument("--table-front-cm", type=float, help="the table's near edge, cm in front of the robot's centre line (tape measure)")
+    p.add_argument("--table-top-cm", type=float, help="the table top, cm above the floor-level base plate the arms stand on (the shoulders are 69.8 cm above it)")
+    p.add_argument("--table-lower-cm", type=float, default=0.0, help="lower the table's danger box top by this many cm (0, the default, keeps it at the real surface: the safest; up to 2 keeps the safety balls out of the table; max 4)")
+    p.add_argument("--table-depth-cm", type=float, default=45.0, help="how far the table runs away from the robot (default 45: a placeholder until measured)")
+    p.add_argument("--table-width-cm", type=float, default=60.0, help="the table's width (default 60: a placeholder until measured)")
+    p.add_argument("--table-centre-y-cm", type=float, default=0.0, help="the table's centre, cm to the left of the centre line")
     p.add_argument("--collect-env", default=os.environ.get("ENV_FILE", ""), help="settings file of the Collect tab (default: $ENV_FILE, else the openarm-orboh Kitakyushu Takeei file)")
     p.add_argument("--port", type=int, default=8080)
     p.add_argument("--operator", default=getpass.getuser())

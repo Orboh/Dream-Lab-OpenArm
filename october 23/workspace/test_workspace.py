@@ -209,6 +209,7 @@ def station_env(tmp_path, monkeypatch):
     ws.save_raw(path, raw)
     monkeypatch.setattr(ws, "ZONES_DIR", zdir)
     monkeypatch.setenv("OPENARM_ZONES", str(tmp_path / "in_force.yaml"))
+    monkeypatch.setenv("OPENARM_MAPPING_FILE", str(tmp_path / "model_mapping"))  # apply records the mapping here, never in the real ~/.dreamlabs
     return station, path
 
 
@@ -333,7 +334,7 @@ def test_a_given_home_is_kept_and_a_bad_one_is_refused():
 
 
 def test_station_fragment_and_apply_carry_home_too(tmp_path):
-    mine = {"left": [0.1] * 7, "right": [-0.1] * 7}
+    mine = {"left": [0.1] * 7, "right": [-0.1, -0.1, -0.1, 0.1, -0.1, -0.1, -0.1]}   # a pose inside Dream's joint ranges (elbow joint 4 runs 0 to 140 deg)
     raw = zb.build_zones(capture_fixture(), source="editor", operator="k", now=NOW, homes=mine)
     frag = zb.station_fragment(raw, homes={"left": (0.05, 0.12), "right": (0.05, -0.12)})
     assert frag["left"]["home"] == mine["left"] and frag["right"]["home"] == mine["right"]

@@ -16,6 +16,7 @@ import numpy as np
 import yaml
 
 import openarm_lock
+import openarm_mapping as mapping
 
 SIDES = ("left", "right")
 KEYS = {"left": "follower_l", "right": "follower_r"}
@@ -48,7 +49,7 @@ def run(station: pathlib.Path, sides: list[str], hold: Callable[[], None], opene
         say(f"{side}: opening (it raises itself from rest to the home along the recorded path if it hangs at rest)")
         arm = opener(cfg, side)
         try:
-            home_deg = np.degrees(np.asarray(cfg.home, dtype=float))
+            home_deg = np.degrees(mapping.to_logical(side, cfg.home))  # the station's home is in Dream's model angles; _joint_pose() is logical
             gap = float(np.abs(np.asarray(arm._joint_pose(), dtype=float) - home_deg).max())
             if gap <= DONE_WITHIN_DEG:
                 say(f"{side}: at the camera-view pose (largest joint {gap:.1f} deg from the home): look at the camera views now")

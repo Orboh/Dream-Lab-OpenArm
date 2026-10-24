@@ -18,6 +18,10 @@ SIDES = ("left", "right")
 ## Each arm's base frame in the body frame, metres (checked against Dream's FK with a Kabsch fit: residual 0.0 m).
 HOME_ROOM_M = 0.05  # free space around the home pose inside the allowed area: home is only the pose from which the cameras see the table, not a limit
 BASE_OFFSET = {"left": np.array([0.0, 0.031, 0.698]), "right": np.array([0.0, -0.031, 0.698])}
+## How far the danger box's top may be lowered below the real table surface, cm. 0 (the default) puts the box top at the surface: the safest. Dream keeps the arm's 4 cm safety balls 2 cm off the box, so the arm
+## stays 6 cm (ball centre) from it; lowering the box by d cm lets the balls come d cm lower. Past #SAFE_LOWER_CM a ball can dip into the real table, so the editor warns.
+LOWER_MAX_CM = 4.0
+SAFE_LOWER_CM = 2.0
 ## The table top is this far above the hand hanging at rest (user, 2026-10-23).
 TABLE_ABOVE_HANGING_HAND_M = 0.30
 
@@ -40,13 +44,40 @@ class Table:
     x_range: tuple[float, float]
     y_range: tuple[float, float]
     thickness: float = zb.TABLE_THICKNESS_M
+    lower_cm: float = 0.0   # the danger box's top sits this far below the real surface (0: at the surface, the safest); see #LOWER_MAX_CM
+
+    def lower_warning(self) -> str | None:
+        """Text when the box top is lowered so far that a safety ball (4 cm radius) can dip into the real table, else None."""
+        if self.lower_cm > SAFE_LOWER_CM + 1e-9:
+            return (f"the danger box top is {self.lower_cm:g} cm below the table surface: the arm's 4 cm safety balls can dip {self.lower_cm - SAFE_LOWER_CM:g} cm into the real table "
+                    f"(up to {SAFE_LOWER_CM:g} cm is the limit that still keeps them out)")
+        return None
 
     def keep_out(self) -> dict[str, Any]:
-        """The slab as a keep-out box the grasp point may touch."""
+        """The slab as a keep-out box the grasp point may touch (its top is #lower_cm below the surface)."""
         (x0, x1), (y0, y1) = self.x_range, self.y_range
+        top = self.top_z - self.lower_cm / 100.0
         return {"name": "table", "kind": "box", "allow_tcp_touch": True,
-                "center": [round((x0 + x1) / 2, 4), round((y0 + y1) / 2, 4), round(self.top_z - self.thickness / 2, 4)],
+                "center": [round((x0 + x1) / 2, 4), round((y0 + y1) / 2, 4), round(top - self.thickness / 2, 4)],
                 "size": [round(x1 - x0, 4), round(y1 - y0, 4), round(self.thickness, 4)]}
+
+
+def table_from_measurements(front_cm: float, top_above_base_plate_cm: float, depth_cm: float, width_cm: float, centre_y_cm: float = 0.0, thickness_m: float = zb.TABLE_THICKNESS_M,
+                            lower_cm: float = 0.0) -> Table:
+    """The table from tape measurements (body frame: x forward from the robot's centre line, y left, z up from the floor-level base plate).
+
+    @param front_cm How far in front of the robot's centre line the near edge is.
+    @param top_above_base_plate_cm The table top's height above the base plate the arms stand on (the arm's own base joint is #BASE_OFFSET z = 69.8 cm above it).
+    @param depth_cm How far the table runs away from the robot. @param width_cm Its width. @param centre_y_cm Where its centre is sideways (0: on the centre line).
+    @param lower_cm How far the danger box's top is lowered below the real surface (0 keeps it at the surface; at most #LOWER_MAX_CM).
+    """
+    if depth_cm <= 0 or width_cm <= 0:
+        raise ValueError("depth and width must be above 0")
+    if not 0.0 <= lower_cm <= LOWER_MAX_CM:
+        raise ValueError(f"lower_cm must be between 0 and {LOWER_MAX_CM:g}")
+    front, half = front_cm / 100.0, width_cm / 200.0
+    centre = centre_y_cm / 100.0
+    return Table(top_z=top_above_base_plate_cm / 100.0, x_range=(front, front + depth_cm / 100.0), y_range=(centre - half, centre + half), thickness=thickness_m, lower_cm=lower_cm)
 
 
 @dataclasses.dataclass
@@ -75,13 +106,14 @@ class EditorState:
 
     def __init__(self, table: Table, boxes: list[DangerBox], arms: dict[str, ArmState]) -> None:
         self.table, self.boxes, self.arms = table, boxes, arms
+        self.danger_only = False  # True: the bundle names only the danger zones (no painted work area, no allowed region): nothing about the task is handed to the model
         self.table_set = False   # True once the user placed the table (or it came from a saved bundle)
         self.references: dict[str, list[tuple[float, float, float]]] = {side: [] for side in SIDES}   # table points touched with the follower, for the daily verify
 
     @classmethod
     def default(cls) -> "EditorState":
         """A table 30 cm above the hanging hand, 35-80 cm in front of the body, 60 cm wide; both arms at the ready pose, no work area."""
-        hanging = zones.ArmKinematics("left").points(np.zeros(7))["tcp"][2]
+        hanging = zones.ArmKinematics("left", logical=True).points(np.zeros(7))["tcp"][2]
         table = Table(top_z=float(hanging + BASE_OFFSET["left"][2] + TABLE_ABOVE_HANGING_HAND_M), x_range=(0.35, 0.80), y_range=(-0.30, 0.30))
         return cls(table, [], {side: ArmState(home=list(poses.ready_rad(side))) for side in SIDES})
 
@@ -156,13 +188,22 @@ class EditorState:
         """The zones bundle in the documented output format (arm base frames); `source` is `editor`."""
         arms = {side: {"table_z": round(float(self.table.top_z - BASE_OFFSET[side][2]), 4),
                        "reach": zb.cells_to_points(self.arms[side].reach) or None, "keep_out": self._arm_keep_out(side)} for side in SIDES}
+        if self.danger_only:
+            for side in SIDES:
+                arms[side].pop("reach")
         for side in SIDES:
-            if self.arms[side].region:
+            if self.arms[side].region and not self.danger_only:
                 arms[side]["region"] = {"lo": list(self.arms[side].region["lo"]), "hi": list(self.arms[side].region["hi"])}
         paths = {side: self.arms[side].home_path for side in SIDES if self.arms[side].home_path}
+        if self.danger_only:  # the known rest-to-ready path is the home path of an arm whose home is the ready pose
+            paths.update({side: poses.path_to_ready(side) for side in SIDES if not paths.get(side) and self.arms[side].home_source == "ready"})
         bundle = {"version": 1, "captured_at": now.isoformat(timespec="seconds"), "source": "editor", "operator": operator, "frame": zb.FRAME_NOTE,
                 "home": {side: [round(v, 4) for v in self.arms[side].home] for side in SIDES}, "arms": arms,
                 "references": {side: [list(p) for p in self.references[side]] for side in SIDES}, "verify": {"status": "unverified", "worst_m": None, "checked_at": None}}
+        if self.table.lower_cm:
+            bundle["table_danger_lowered_cm"] = float(self.table.lower_cm)  # the box top is this far below the real surface
+        if self.danger_only:
+            bundle["mode"] = "danger_only"
         if paths:
             bundle["home_path"] = {side: [list(map(float, p)) for p in path] for side, path in paths.items()}
         return bundle
@@ -173,7 +214,8 @@ class EditorState:
         left = raw["arms"]["left"]
         table_zone = next(z for z in left["keep_out"] if z.get("name") == "table")
         c, s = to_world("left", table_zone["center"]), table_zone["size"]
-        table = Table(top_z=c[2] + s[2] / 2, x_range=(c[0] - s[0] / 2, c[0] + s[0] / 2), y_range=(c[1] - s[1] / 2, c[1] + s[1] / 2), thickness=s[2])
+        lower = float(raw.get("table_danger_lowered_cm", 0.0))
+        table = Table(top_z=c[2] + s[2] / 2 + lower / 100.0, x_range=(c[0] - s[0] / 2, c[0] + s[0] / 2), y_range=(c[1] - s[1] / 2, c[1] + s[1] / 2), thickness=s[2], lower_cm=lower)
         boxes: dict[str, DangerBox] = {}
         for side in SIDES:
             for zone in raw["arms"][side]["keep_out"]:
@@ -192,6 +234,7 @@ class EditorState:
         for arm in arms.values():
             arm.home_source = "bundle"
         state = cls(table, list(boxes.values()), arms)
+        state.danger_only = raw.get("mode") == "danger_only"
         state.table_set = True
         state.references = {side: [tuple(p) for p in (raw.get("references") or {}).get(side, [])] for side in SIDES}
         return state
@@ -209,7 +252,7 @@ class EditorState:
             region = self.arms[side].region
             if not region:
                 continue
-            pts = np.array(list(zones.ArmKinematics(side).points(np.asarray(self.arms[side].home, dtype=float)).values()))
+            pts = np.array(list(zones.ArmKinematics(side, logical=True).points(np.asarray(self.arms[side].home, dtype=float)).values()))
             old_lo, old_hi = np.asarray(region["lo"], dtype=float), np.asarray(region["hi"], dtype=float)
             need_lo, need_hi = pts.min(axis=0) - HOME_ROOM_M, pts.max(axis=0) + HOME_ROOM_M
             lo = np.where(need_lo < old_lo - 1e-4, np.floor(need_lo * 1e4) / 1e4, old_lo)   # only a side that has to move moves (rounded outward to 0.1 mm)
@@ -218,6 +261,16 @@ class EditorState:
                 self.arms[side].region = {"lo": [float(v) for v in lo], "hi": [float(v) for v in hi]}
                 widened.append(side)
         return widened
+
+    def reach_over_table(self, side: str) -> tuple[int, int]:
+        """How much of an arm's painted work area lies over the table seen from above: `(cells over the table, all cells)`; `(0, 0)` when nothing is painted."""
+        cells = self.arms[side].reach
+        if not cells:
+            return 0, 0
+        (x0, x1), (y0, y1) = self.table.x_range, self.table.y_range
+        base = BASE_OFFSET[side]
+        over = sum(1 for i, j in cells if x0 <= i * zb.REACH_GRID_M + base[0] <= x1 and y0 <= j * zb.REACH_GRID_M + base[1] <= y1)
+        return over, len(cells)
 
     def region_overlap_cm(self) -> float:
         """How far the two arms' allowed areas run into each other (cm along the body's y axis), 0 when they do not or one is missing."""
@@ -237,7 +290,7 @@ class EditorState:
         parsed = zones.parse_zones(self.to_bundle("editor", now))
         out: list[str] = []
         for side in SIDES:
-            kin = zones.ArmKinematics(side)
+            kin = zones.ArmKinematics(side, logical=True)
             named = zb.home_poses(side)
             named["home"] = list(np.degrees(self.arms[side].home))
             out += [f"{side} {t}" for t in zb.pose_violations(parsed, side, named, kin)]

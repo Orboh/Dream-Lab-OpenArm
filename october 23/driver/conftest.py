@@ -17,3 +17,7 @@ def _guard_defaults(monkeypatch, tmp_path):
     monkeypatch.setenv("OPENARM_ZONES_REQUIRED", "0")
     monkeypatch.setenv("OPENARM_ZONES", str(tmp_path / "zones.yaml"))
     monkeypatch.setenv("OPENARM_ACTIVE_ARMS", str(tmp_path / "active_arms.json"))
+
+import os  # noqa: E402
+
+os.environ.setdefault("OPENARM_MAPPING_FILE", "/nonexistent/openarm_model_mapping")   # the tests never read the real ~/.dreamlabs record

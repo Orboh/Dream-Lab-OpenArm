@@ -87,7 +87,7 @@ class TeachSession:
     def __init__(self, margin_m: float = 0.0) -> None:
         """@param margin_m Metres added around the recorded points when the region is made (0: exactly the points you showed)."""
         self.margin = margin_m
-        self._kin = {side: zones.ArmKinematics(side) for side in ed.SIDES}
+        self._kin = {side: zones.ArmKinematics(side, logical=True) for side in ed.SIDES}
         self._sweeping = {side: False for side in ed.SIDES}
         self._points: dict[str, list[np.ndarray]] = {side: [] for side in ed.SIDES}
         self._tcp: dict[str, list[np.ndarray]] = {side: [] for side in ed.SIDES}
@@ -192,6 +192,21 @@ class TeachSession:
             cells |= _fill_hull(xy)
         cells |= {zb.cell(p) for p in xy}
         return cells
+
+    def reach_holes(self, side: str, max_gap_m: float = 0.15) -> int:
+        """How many work-area cells are farther than `max_gap_m` (metres, seen from above) from every hand position that was actually visited (recorded points, swept trail).
+
+        A polygon through a few far-apart points marks everything inside as reachable; a cell this far from anything the hand visited is space nobody showed to be safe.
+        """
+        visited = [np.asarray(p[:2], dtype=float) for p in self.point_list(side)] + [np.asarray(p[:2], dtype=float) for p in self._tcp[side]]
+        if not visited:
+            return 0
+        visited_xy = np.array(visited)
+        cells = np.array([[i * zb.REACH_GRID_M, j * zb.REACH_GRID_M] for i, j in self.reach_cells(side)])
+        if not len(cells):
+            return 0
+        gaps = np.min(np.linalg.norm(cells[:, None, :] - visited_xy[None, :, :], axis=2), axis=1)
+        return int(np.sum(gaps > max_gap_m))
 
     # -- marks -------------------------------------------------------------------------------------------------------
     def mark(self, side: str, label: str, q_rad: np.ndarray) -> None:

@@ -75,3 +75,12 @@ Tests: `$PY -m pytest -q` here and in `../driver`.
 - One arm only: Dream sends both arms on every tick, so say which one may move BEFORE the station starts: `python driver/arms.py right` (or `left`; `both` to undo; `status` shows it; it also works while running). The other arm then holds still, is not raised at start, and the log shows what Dream asked of it ("Dream asks ... this arm is LOCKED, so it holds still"). A Reset still goes through Dream's Home for both arms, but a locked arm just holds.
 - Home is the camera-view pose, not a limit: the editor gives it 5 cm of room on every side inside the allowed area, and warns on the Save card when the left and right allowed areas overlap (then the hands can meet in the middle).
 - `workspace.py camera-pose [--arm left|right|both] [--hold SECONDS]` raises the arm(s) to that pose for a look at the camera views, then parks and switches them off. The arms MOVE: station stopped, space clear, hand on the emergency stop. Same checks as `start`.
+
+## Joint mapping (Dream's model vs the real arm) — prepared, off by default
+Dream's `openarm2_faas` model and the official OpenArm v10 URDF disagree about the wrist (log-018). `driver/openarm_mapping.py` holds the fix as the `official` table (joint 5 quarter turn, joints 6 and 7 reversed).
+`OPENARM_MODEL_MAPPING` unset or `identity`: as always. `official`: the driver, the editor, the teach tools, the station home and the preflight all use it. Switching it on needs a recapture of the table and zones first and a supervised first move: read log-019.
+
+## Danger-only mode (Dream-1 zero-shot): only the places to stay out of
+`python workspace.py design --danger-only --table-front-cm 13 --table-top-cm 25 --table-depth-cm 100 --table-width-cm 140` (add `OPENARM_MODEL_MAPPING=official` for the official joint mapping, log-019). The bundle then holds only `keep_out` zones and the home: no `reach`, no `region` (log-021).
+The table's danger box top is at the real surface (`--table-lower-cm 0`, the safest). If Dream's hand cannot get low enough to grasp, lower it by up to 2 cm (the field on the Danger area tab, or `--table-lower-cm 2`); more than 2 cm lets the safety balls dip into the real table.
+
