@@ -116,6 +116,11 @@ LIMIT_SLACK_DEG = 30.0
 ## write() refuses a joint target this far from where the arm is, degrees: the loop rate-caps its targets, so a
 ## jump this big means a wrong angle mapping, not a command.
 MAX_STEP_DEG = 20.0
+## The gripper is the exception: Dream opens and closes it in big steps (a 30 deg jump between two targets ended the first live run on 10-24), and its angle is measured, so a jump is no sign of a wrong
+## mapping. A target further than this from the last one is approached in steps of this size; the tracker (80 deg/s) sets the real speed.
+GRIPPER_MAX_STEP_DEG = 20.0
+## A raise or park move that plans longer than this is logged as a warning: `dreamcli robot down` gives up after 60 s and kills the station (10-24: the motors were left on).
+LONG_MOVE_WARN_S = 45.0
 ## The gripper's logical degrees closed and open when setup has not measured them yet (the fork's range; open is
 ## negative). Used for reading only: write() refuses until `gripper_closed_deg` and `gripper_open_deg` are set.
 FALLBACK_GRIPPER_DEG = (0.0, -65.0)
@@ -515,7 +520,10 @@ class Arm(ReadOnlyArm):
         for name in MOTORS:
             low, high = LIMITS_DEG[self.side][name]
             target = min(max(targets[name], low), high)
-            if abs(target - before[name]) > MAX_STEP_DEG:
+            if name == GRIPPER and abs(target - before[name]) > GRIPPER_MAX_STEP_DEG:
+                self._note_gripper_step(target, before[name])
+                target = before[name] + math.copysign(GRIPPER_MAX_STEP_DEG, target - before[name])
+            elif abs(target - before[name]) > MAX_STEP_DEG:
                 raise errors.ArmError(
                     f"arm {self.side} {name}: target {target:.1f} deg is {abs(target - before[name]):.1f} deg from the "
                     f"{'last target' if before is not here else 'arm'} ({before[name]:.1f} deg); nothing was sent. A wrong angle mapping looks like this"
@@ -534,6 +542,14 @@ class Arm(ReadOnlyArm):
             state = self.bus.motors[name].state
             if state is not None:
                 here[name] = state.position_deg - self._offsets[name]
+
+    def _note_gripper_step(self, target: float, last: float) -> None:
+        """Says (at most every 5 s) that a gripper target was approached in steps instead of at once."""
+        now = time.monotonic()
+        if now - getattr(self, "_grip_noted", 0.0) >= 5.0:
+            self._grip_noted = now
+            _log.info("arm %s: the gripper was asked %.0f deg in one step (%.1f to %.1f deg): approached in steps of %.0f deg, the tracker sets the speed", self.side,
+                      abs(target - last), last, target, GRIPPER_MAX_STEP_DEG)
 
     def _note_request(self, positions_rad: np.ndarray) -> None:
         """Logs what Dream asks of this arm (net move of the run, joint, travel), and says when the arm is locked and so holds still."""
@@ -774,6 +790,8 @@ class Arm(ReadOnlyArm):
         path = motion.smooth_path(np.array(points, dtype=float), LIMITS, SAMPLE_DT_S)
         peak_v = float(np.max(np.abs(np.diff(path.samples, axis=0)) / SAMPLE_DT_S)) if len(path.samples) > 1 else 0.0
         _log.info("arm %s: smooth move of %.1f s, peak joint speed %.0f deg/s", self.side, path.duration, peak_v)
+        if path.duration > LONG_MOVE_WARN_S:
+            _log.warning("arm %s: this move takes %.0f s; `dreamcli robot down` waits only 60 s for it, then kills the station and leaves the motors on: shorten the home path", self.side, path.duration)
         for sample in path.samples[1:]:
             sent, _ = self._send_setpoint(np.append(sample, grip), 1.0)
             for name in MOTORS:

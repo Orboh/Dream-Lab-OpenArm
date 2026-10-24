@@ -27,6 +27,8 @@ LABEL_NEWEST = "The zones in force are the newest saved bundle"
 LABEL_MAPPING = "The station file was written under the joint mapping now in use"
 LABEL_HOME = "The station's home equals the bundle's home (both arms)"
 LABEL_PATH = "A home path from rest is stored and ends at the home"
+LABEL_PARK = "The raise and park along the home path take less than 45 s for each active arm"
+LABEL_PATH_CLEAR = "The raise and park path of each active arm keeps clear of the danger zones"
 LABEL_CLEAR = "The home, rest, ready poses and the path are clear of every zone and the home is inside the allowed region"
 LABEL_DRIVER = "The station uses the Arm driver (not the read-only one)"
 LABEL_GUARD = "The hard guard is on"
@@ -148,6 +150,19 @@ def run_preflight(station: pathlib.Path, in_force: pathlib.Path, zones_dir: path
         nopath = [s for s in zb.SIDES if not (parsed.home_path or {}).get(s)
                   or float(np.max(np.abs(np.radians(parsed.home_path[s][-1]) - np.asarray(parsed.home[s])))) > 0.02]
         checks.append(Check(not nopath, LABEL_PATH, f"missing or not ending at home for: {nopath}; record it on the Home card" if nopath else ""))
+        # the driver's own raise and park move: short enough for `dreamcli robot down` (it kills the station after 60 s), and clear of the zones
+        active = set(openarm_lock.active_arms())
+        long_ones, close_calls = [], []
+        for side in zb.SIDES:
+            path = (parsed.home_path or {}).get(side)
+            if side not in active or not path:
+                continue
+            seconds = zb.path_seconds(path)
+            if seconds >= zb.PARK_MAX_S:
+                long_ones.append(f"{side} {seconds:.0f} s")
+            close_calls += zb.taught_path_problems(parsed.raw, side, limit=1)
+        checks.append(Check(not long_ones, LABEL_PARK, f"too long: {', '.join(long_ones)} (limit {zb.PARK_MAX_S:.0f} s); save the bundle again with a shorter path" if long_ones else ""))
+        checks.append(Check(not close_calls, LABEL_PATH_CLEAR, close_calls[0] if close_calls else ""))
         # clear of zones
         problems = zb.free_pose_problems(parsed.raw)
         checks.append(Check(not problems, LABEL_CLEAR, problems[0] if problems else ""))

@@ -202,9 +202,11 @@ def test_the_danger_box_top_is_at_the_surface_unless_lowered():
     assert top_of(two.keep_out()) == pytest.approx(0.23) and two.top_z == pytest.approx(0.25) and two.lower_warning() is None  # 2 cm: the 4 cm safety balls just touch the real table
     three = ed.table_from_measurements(13, 25, 100, 140, lower_cm=3.0)
     assert "dip 1 cm" in three.lower_warning()
-    for bad in (-1.0, 4.5):
+    for bad in (-16.0, 4.5):
         with pytest.raises(ValueError):
             ed.table_from_measurements(13, 25, 100, 140, lower_cm=bad)
+    raised = ed.table_from_measurements(13, 25, 100, 140, lower_cm=-5.0)
+    assert top_of(raised.keep_out()) == pytest.approx(0.30) and raised.top_z == pytest.approx(0.25) and raised.lower_warning() is None  # raised 5 cm: a margin, no warning
 
 
 def test_the_lowering_is_saved_with_the_bundle_and_restored_on_load():

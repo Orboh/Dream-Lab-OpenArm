@@ -253,6 +253,9 @@ def cmd_build(args: argparse.Namespace) -> int:
         f = fragment[side]
         area = f"reach {len(f['reach'])} cells" if "reach" in f else "no reach and no region (danger-only: the hand can go anywhere outside the danger zones)"
         print(f"{side}: {area}, keep_out {[z.get('name', z['kind']) for z in raw['arms'][side]['keep_out']]}")
+    for side in zb.SIDES:  # a warning, not a block: it matters for an arm that is active (preflight checks exactly that)
+        for text in zb.taught_path_problems(raw, side, limit=1):
+            print(f"WARNING: {text}")
     if problems:
         print("\nTHE ZONES BLOCK THE REST/READY POSES OR THE PATH BETWEEN THEM:")
         print("\n".join("  " + p for p in problems[:12]))
@@ -473,7 +476,7 @@ def main(argv: list[str] | None = None, probes=None, runner=None, opener=None) -
     p.add_argument("--danger-only", action="store_true", help="the bundle names only the danger zones (the table and any box you add): no painted work area, no allowed region, so the model is told nothing about the task")
     p.add_argument("--table-front-cm", type=float, help="the table's near edge, cm in front of the robot's centre line (tape measure)")
     p.add_argument("--table-top-cm", type=float, help="the table top, cm above the floor-level base plate the arms stand on (the shoulders are 69.8 cm above it)")
-    p.add_argument("--table-lower-cm", type=float, default=0.0, help="lower the table's danger box top by this many cm (0, the default, keeps it at the real surface: the safest; up to 2 keeps the safety balls out of the table; max 4)")
+    p.add_argument("--table-lower-cm", type=float, default=0.0, help="lower the table's danger box top by this many cm (0 keeps it at the real surface; up to 2 keeps the safety balls out of the table; max 4). A NEGATIVE value raises the top: an extra safety margin over the table (down to -15), e.g. --table-lower-cm=-5")
     p.add_argument("--table-depth-cm", type=float, default=45.0, help="how far the table runs away from the robot (default 45: a placeholder until measured)")
     p.add_argument("--table-width-cm", type=float, default=60.0, help="the table's width (default 60: a placeholder until measured)")
     p.add_argument("--table-centre-y-cm", type=float, default=0.0, help="the table's centre, cm to the left of the centre line")

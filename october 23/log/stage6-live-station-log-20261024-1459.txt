@@ -1,0 +1,346 @@
+=== dreamcli robot up: 2026-10-24 14:59:01 /home/kota-ueda/dream-env/bin/python -m robots.station --config /home/kota-ueda/.dreamlabs/station.yaml --arms-lock /home/kota-ueda/.dreamlabs/arms.lock
+2026-10-24 14:59:20,849 INFO _robots_driver_openarm_v2: arm left: locked (arms.py), so it stays where it is: not raised to ready
+2026-10-24 14:59:21,444 INFO _robots_driver_openarm_v2: arm right: rest -> ready along 9 waypoints
+2026-10-24 14:59:21,473 INFO _robots_driver_openarm_v2: arm right: smooth move of 61.8 s, peak joint speed 26 deg/s
+2026-10-24 15:00:31,363 INFO __main__: station: cameras ['head', 'wrist_l', 'wrist_r'] open and publishing
+2026-10-24 15:00:58,764 INFO dream.live: live: start prm_d99c28d310123473 refused: start refused: no checkpoint; this body has no default model: send it with the start (the live view's Start does), or set 'checkpoint' in the station file
+2026-10-24 15:01:08,943 INFO __main__: station: idle -> starting (run 1, prompt 'pick up the block')
+2026-10-24 15:01:11,223 INFO __main__: station: starting -> running (run 1, prompt 'pick up the block')
+2026-10-24 15:01:14,243 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 60 due by wall time, after 2985 ms, sync (first chunk; motion starts)
+2026-10-24 15:01:15,312 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 5), 15 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:15,572 INFO _robots_driver_openarm_v2: arm right: Dream asks: 5 deg from where this run began (joint 3), 19 deg of joint travel in all
+2026-10-24 15:01:17,316 INFO _robots_driver_openarm_v2: arm left: Dream asks: 27 deg from where this run began (joint 5), 73 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:17,575 INFO _robots_driver_openarm_v2: arm right: Dream asks: 15 deg from where this run began (joint 3), 58 deg of joint travel in all
+2026-10-24 15:01:17,921 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 24 due by wall time, after 1196 ms, sync
+2026-10-24 15:01:19,319 INFO _robots_driver_openarm_v2: arm left: Dream asks: 22 deg from where this run began (joint 5), 204 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:19,581 INFO _robots_driver_openarm_v2: arm right: Dream asks: 23 deg from where this run began (joint 3), 102 deg of joint travel in all
+2026-10-24 15:01:21,322 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 238 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:21,585 INFO _robots_driver_openarm_v2: arm right: Dream asks: 24 deg from where this run began (joint 3), 108 deg of joint travel in all
+2026-10-24 15:01:21,756 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 29 due by wall time, after 1433 ms, sync
+2026-10-24 15:01:23,324 INFO _robots_driver_openarm_v2: arm left: Dream asks: 24 deg from where this run began (joint 5), 390 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:23,585 INFO _robots_driver_openarm_v2: arm right: Dream asks: 27 deg from where this run began (joint 3), 126 deg of joint travel in all
+2026-10-24 15:01:25,402 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 24 due by wall time, after 1209 ms, sync
+2026-10-24 15:01:25,405 WARNING robots.control: command clamped: right gripper asked 0.160 in one tick, limit 0.050; later clamps this run are counted (clamp_count) and the largest request kept (max_ee_speed_requested_m_s), not logged
+2026-10-24 15:01:25,406 ERROR robots.control: loop stopped by ArmError after 4 chunks: arm right gripper: target -4.1 deg is 29.7 deg from the last target (-33.9 deg); nothing was sent. A wrong angle mapping looks like this
+2026-10-24 15:01:25,407 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 416 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:25,408 ERROR robots.control: teardown step failed: hold right arm: arm right gripper: target -4.1 deg is 29.7 deg from the last target (-33.9 deg); nothing was sent. A wrong angle mapping looks like this
+2026-10-24 15:01:25,838 ERROR __main__: station: run 1 failed with ArmError: arm right gripper: target -4.1 deg is 29.7 deg from the last target (-33.9 deg); nothing was sent. A wrong angle mapping looks like this
+2026-10-24 15:01:25,839 INFO __main__: station: running -> error (run 1, prompt 'pick up the block')
+2026-10-24 15:01:25,839 ERROR __main__: station: arm 'right': arm right gripper is blocked or squeezing (it led its angle by 30 deg for 2 s): relaxed to where it is
+2026-10-24 15:01:25,839 INFO __main__: station: error -> stopping (run 1, prompt 'pick up the block')
+2026-10-24 15:01:25,839 WARNING __main__: station: parking the right arm and switching it off; reset the arms to use it again
+2026-10-24 15:01:25,860 WARNING _robots_driver_openarm_v2: arm right: 27 deg from the rest-to-ready path, not parking
+2026-10-24 15:01:25,868 INFO __main__: station: stopping -> error (run 1, prompt 'pick up the block')
+2026-10-24 15:01:31,189 INFO __main__: station: error -> resetting (run 1, prompt 'pick up the block')
+2026-10-24 15:01:31,797 INFO _robots_driver_openarm_v2: arm left: locked (arms.py), so it stays where it is: not raised to ready
+2026-10-24 15:01:32,394 INFO __main__: station: arms ['left', 'right'] reopened
+2026-10-24 15:01:32,398 INFO __main__: station: resetting -> homing (run 1, prompt 'pick up the block')
+2026-10-24 15:01:32,399 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.384 rad
+2026-10-24 15:01:32,600 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 4), 9 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:32,650 INFO _robots_driver_openarm_v2: arm right: Dream asks: 5 deg from where this run began (joint 7), 13 deg of joint travel in all
+2026-10-24 15:01:34,625 INFO _robots_driver_openarm_v2: arm left: Dream asks: 59 deg from where this run began (joint 4), 98 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:34,650 INFO _robots_driver_openarm_v2: arm right: Dream asks: 49 deg from where this run began (joint 7), 117 deg of joint travel in all
+2026-10-24 15:01:35,400 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 15:01:35,400 INFO __main__: station: homing -> idle (run 1, prompt 'pick up the block')
+2026-10-24 15:01:47,676 INFO __main__: station: idle -> starting (run 2, prompt 'move right 5 cm')
+2026-10-24 15:01:48,870 INFO __main__: station: starting -> running (run 2, prompt 'move right 5 cm')
+2026-10-24 15:01:51,631 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 54 due by wall time, after 2697 ms, sync (first chunk; motion starts)
+2026-10-24 15:01:52,644 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 5), 14 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:52,916 INFO _robots_driver_openarm_v2: arm right: Dream asks: 5 deg from where this run began (joint 3), 19 deg of joint travel in all
+2026-10-24 15:01:54,646 INFO _robots_driver_openarm_v2: arm left: Dream asks: 27 deg from where this run began (joint 5), 73 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:54,920 INFO _robots_driver_openarm_v2: arm right: Dream asks: 15 deg from where this run began (joint 3), 58 deg of joint travel in all
+2026-10-24 15:01:55,502 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 29 due by wall time, after 1461 ms, sync
+2026-10-24 15:01:56,650 INFO _robots_driver_openarm_v2: arm left: Dream asks: 17 deg from where this run began (joint 5), 189 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:56,921 INFO _robots_driver_openarm_v2: arm right: Dream asks: 22 deg from where this run began (joint 3), 106 deg of joint travel in all
+2026-10-24 15:01:58,654 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 229 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:01:58,923 INFO _robots_driver_openarm_v2: arm right: Dream asks: 23 deg from where this run began (joint 3), 115 deg of joint travel in all
+2026-10-24 15:01:59,396 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 29 due by wall time, after 1475 ms, sync
+2026-10-24 15:02:00,663 INFO _robots_driver_openarm_v2: arm left: Dream asks: 17 deg from where this run began (joint 5), 356 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:00,927 INFO _robots_driver_openarm_v2: arm right: Dream asks: 24 deg from where this run began (joint 3), 131 deg of joint travel in all
+2026-10-24 15:02:02,666 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 401 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:02,929 INFO _robots_driver_openarm_v2: arm right: Dream asks: 24 deg from where this run began (joint 3), 136 deg of joint travel in all
+2026-10-24 15:02:03,299 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 28 due by wall time, after 1385 ms, sync
+2026-10-24 15:02:04,669 INFO _robots_driver_openarm_v2: arm left: Dream asks: 21 deg from where this run began (joint 5), 546 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:04,931 INFO _robots_driver_openarm_v2: arm right: Dream asks: 25 deg from where this run began (joint 3), 153 deg of joint travel in all
+2026-10-24 15:02:06,672 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 578 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:06,874 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 23 due by wall time, after 1167 ms, sync
+2026-10-24 15:02:06,879 WARNING robots.control: command clamped: left gripper asked 0.074 in one tick, limit 0.050; later clamps this run are counted (clamp_count) and the largest request kept (max_ee_speed_requested_m_s), not logged
+2026-10-24 15:02:06,937 INFO _robots_driver_openarm_v2: arm right: Dream asks: 25 deg from where this run began (joint 3), 158 deg of joint travel in all
+2026-10-24 15:02:08,675 INFO _robots_driver_openarm_v2: arm left: Dream asks: 28 deg from where this run began (joint 5), 742 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:08,939 INFO _robots_driver_openarm_v2: arm right: Dream asks: 26 deg from where this run began (joint 3), 174 deg of joint travel in all
+2026-10-24 15:02:10,471 INFO robots.control: chunk 6: 48 actions, 0 executed since its observation, 24 due by wall time, after 1176 ms, sync
+2026-10-24 15:02:10,942 INFO _robots_driver_openarm_v2: arm right: Dream asks: 27 deg from where this run began (joint 3), 183 deg of joint travel in all
+2026-10-24 15:02:11,066 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 5), 865 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:12,945 INFO _robots_driver_openarm_v2: arm right: Dream asks: 28 deg from where this run began (joint 3), 196 deg of joint travel in all
+2026-10-24 15:02:13,067 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 937 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:14,058 INFO robots.control: chunk 7: 48 actions, 0 executed since its observation, 23 due by wall time, after 1174 ms, sync
+2026-10-24 15:02:14,947 INFO _robots_driver_openarm_v2: arm right: Dream asks: 29 deg from where this run began (joint 3), 206 deg of joint travel in all
+2026-10-24 15:02:15,071 INFO _robots_driver_openarm_v2: arm left: Dream asks: 14 deg from where this run began (joint 5), 1061 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:16,950 INFO _robots_driver_openarm_v2: arm right: Dream asks: 30 deg from where this run began (joint 3), 213 deg of joint travel in all
+2026-10-24 15:02:17,072 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 1112 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:17,083 INFO __main__: station: running -> stopping (run 2, prompt 'move right 5 cm')
+2026-10-24 15:02:18,855 INFO __main__: station: stopping -> idle (run 2, prompt 'move right 5 cm')
+2026-10-24 15:02:18,855 INFO __main__: station: idle -> homing (run 2, prompt 'move right 5 cm')
+2026-10-24 15:02:18,856 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.384 rad
+2026-10-24 15:02:18,957 INFO _robots_driver_openarm_v2: arm right: Dream asks: 29 deg from where this run began (joint 3), 219 deg of joint travel in all
+2026-10-24 15:02:19,081 INFO _robots_driver_openarm_v2: arm left: Dream asks: 7 deg from where this run began (joint 4), 1208 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:20,981 INFO _robots_driver_openarm_v2: arm right: Dream asks: 8 deg from where this run began (joint 3), 282 deg of joint travel in all
+2026-10-24 15:02:21,082 INFO _robots_driver_openarm_v2: arm left: Dream asks: 59 deg from where this run began (joint 4), 1296 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:21,856 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 15:02:21,857 INFO __main__: station: homing -> idle (run 2, prompt 'move right 5 cm')
+2026-10-24 15:02:47,052 INFO __main__: station: idle -> starting (run 3, prompt 'move up 5 cm')
+2026-10-24 15:02:48,383 INFO __main__: station: starting -> running (run 3, prompt 'move up 5 cm')
+2026-10-24 15:02:51,049 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 53 due by wall time, after 2629 ms, sync (first chunk; motion starts)
+2026-10-24 15:02:52,113 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 5), 13 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:52,372 INFO _robots_driver_openarm_v2: arm right: Dream asks: 5 deg from where this run began (joint 3), 19 deg of joint travel in all
+2026-10-24 15:02:54,115 INFO _robots_driver_openarm_v2: arm left: Dream asks: 27 deg from where this run began (joint 5), 69 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:54,372 INFO _robots_driver_openarm_v2: arm right: Dream asks: 15 deg from where this run began (joint 3), 58 deg of joint travel in all
+2026-10-24 15:02:54,753 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 25 due by wall time, after 1234 ms, sync
+2026-10-24 15:02:56,118 INFO _robots_driver_openarm_v2: arm left: Dream asks: 21 deg from where this run began (joint 5), 195 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:56,373 INFO _robots_driver_openarm_v2: arm right: Dream asks: 23 deg from where this run began (joint 3), 103 deg of joint travel in all
+2026-10-24 15:02:58,117 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 225 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:02:58,377 INFO _robots_driver_openarm_v2: arm right: Dream asks: 23 deg from where this run began (joint 3), 111 deg of joint travel in all
+2026-10-24 15:02:58,643 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 30 due by wall time, after 1482 ms, sync
+2026-10-24 15:03:00,050 WARNING robots.control: command clamped: right gripper asked 0.076 in one tick, limit 0.050; later clamps this run are counted (clamp_count) and the largest request kept (max_ee_speed_requested_m_s), not logged
+2026-10-24 15:03:00,120 INFO _robots_driver_openarm_v2: arm left: Dream asks: 20 deg from where this run began (joint 5), 363 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:03:00,379 INFO _robots_driver_openarm_v2: arm right: Dream asks: 28 deg from where this run began (joint 3), 132 deg of joint travel in all
+2026-10-24 15:03:02,122 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 3), 392 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:03:02,381 INFO _robots_driver_openarm_v2: arm right: Dream asks: 30 deg from where this run began (joint 3), 144 deg of joint travel in all
+2026-10-24 15:03:02,504 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 26 due by wall time, after 1291 ms, sync
+2026-10-24 15:03:04,123 INFO _robots_driver_openarm_v2: arm left: Dream asks: 26 deg from where this run began (joint 5), 528 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:03:04,384 INFO _robots_driver_openarm_v2: arm right: Dream asks: 33 deg from where this run began (joint 3), 167 deg of joint travel in all
+2026-10-24 15:03:06,124 INFO _robots_driver_openarm_v2: arm left: Dream asks: 34 deg from where this run began (joint 5), 547 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:03:06,309 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 28 due by wall time, after 1382 ms, sync
+2026-10-24 15:03:06,421 INFO _robots_driver_openarm_v2: arm right: Dream asks: 34 deg from where this run began (joint 3), 169 deg of joint travel in all
+2026-10-24 15:03:07,234 INFO __main__: station: running -> stopping (run 3, prompt 'move up 5 cm')
+2026-10-24 15:03:07,550 INFO __main__: station: stopping -> idle (run 3, prompt 'move up 5 cm')
+2026-10-24 15:03:07,550 INFO __main__: station: idle -> homing (run 3, prompt 'move up 5 cm')
+2026-10-24 15:03:07,550 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.384 rad
+2026-10-24 15:03:08,126 INFO _robots_driver_openarm_v2: arm left: Dream asks: 16 deg from where this run began (joint 4), 706 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:03:08,426 INFO _robots_driver_openarm_v2: arm right: Dream asks: 24 deg from where this run began (joint 3), 203 deg of joint travel in all
+2026-10-24 15:03:10,151 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 795 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:03:10,552 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 15:03:10,552 INFO __main__: station: homing -> idle (run 3, prompt 'move up 5 cm')
+2026-10-24 15:03:10,898 ERROR __main__: station: arm 'right': arm right gripper is blocked or squeezing (it led its angle by 6 deg for 2 s): relaxed to where it is
+2026-10-24 15:03:10,899 INFO __main__: station: idle -> stopping (run 3, prompt 'move up 5 cm')
+2026-10-24 15:03:10,901 WARNING __main__: station: parking the right arm and switching it off; reset the arms to use it again
+2026-10-24 15:03:10,919 INFO _robots_driver_openarm_v2: arm right: parking at rest along the path before switching off
+2026-10-24 15:03:10,937 INFO _robots_driver_openarm_v2: arm right: smooth move of 61.7 s, peak joint speed 26 deg/s
+2026-10-24 15:04:15,150 INFO __main__: station: stopping -> error (run 3, prompt 'move up 5 cm')
+2026-10-24 15:04:18,163 INFO __main__: station: error -> resetting (run 3, prompt 'move up 5 cm')
+2026-10-24 15:04:18,762 INFO _robots_driver_openarm_v2: arm left: locked (arms.py), so it stays where it is: not raised to ready
+2026-10-24 15:04:19,360 INFO _robots_driver_openarm_v2: arm right: rest -> ready along 9 waypoints
+2026-10-24 15:04:19,407 INFO _robots_driver_openarm_v2: arm right: smooth move of 61.6 s, peak joint speed 26 deg/s
+2026-10-24 15:05:27,272 INFO __main__: station: arms ['left', 'right'] reopened
+2026-10-24 15:05:27,272 INFO __main__: station: resetting -> homing (run 3, prompt 'move up 5 cm')
+2026-10-24 15:05:27,272 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.384 rad
+2026-10-24 15:05:27,475 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 4), 9 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:05:29,498 INFO _robots_driver_openarm_v2: arm left: Dream asks: 59 deg from where this run began (joint 4), 98 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:05:30,275 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 15:05:30,276 INFO __main__: station: homing -> idle (run 3, prompt 'move up 5 cm')
+2026-10-24 15:05:54,985 INFO __main__: station: idle -> starting (run 4, prompt 'grab the wooden block')
+2026-10-24 15:05:56,198 INFO __main__: station: starting -> running (run 4, prompt 'grab the wooden block')
+2026-10-24 15:06:00,446 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 23 due by wall time, after 1151 ms, sync (first chunk; motion starts)
+2026-10-24 15:06:00,448 INFO _robots_driver_openarm_v2: arm left: Dream asks: 79 deg from where this run began (joint 4), 132 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:01,684 INFO _robots_driver_openarm_v2: arm right: Dream asks: 5 deg from where this run began (joint 3), 24 deg of joint travel in all
+2026-10-24 15:06:02,448 INFO _robots_driver_openarm_v2: arm left: Dream asks: 73 deg from where this run began (joint 4), 190 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:03,686 INFO _robots_driver_openarm_v2: arm right: Dream asks: 16 deg from where this run began (joint 3), 68 deg of joint travel in all
+2026-10-24 15:06:04,275 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 28 due by wall time, after 1421 ms, sync
+2026-10-24 15:06:04,449 INFO _robots_driver_openarm_v2: arm left: Dream asks: 79 deg from where this run began (joint 4), 285 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:05,689 INFO _robots_driver_openarm_v2: arm right: Dream asks: 35 deg from where this run began (joint 3), 171 deg of joint travel in all
+2026-10-24 15:06:06,452 INFO _robots_driver_openarm_v2: arm left: Dream asks: 68 deg from where this run began (joint 4), 377 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:07,692 INFO _robots_driver_openarm_v2: arm right: Dream asks: 40 deg from where this run began (joint 3), 199 deg of joint travel in all
+2026-10-24 15:06:07,894 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 24 due by wall time, after 1194 ms, sync
+2026-10-24 15:06:08,456 INFO _robots_driver_openarm_v2: arm left: Dream asks: 77 deg from where this run began (joint 4), 494 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:09,692 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 225 deg of joint travel in all
+2026-10-24 15:06:10,459 INFO _robots_driver_openarm_v2: arm left: Dream asks: 68 deg from where this run began (joint 4), 579 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:11,417 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 23 due by wall time, after 1126 ms, sync
+2026-10-24 15:06:11,694 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 233 deg of joint travel in all
+2026-10-24 15:06:12,463 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 731 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:13,697 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 250 deg of joint travel in all
+2026-10-24 15:06:14,462 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 779 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:15,117 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 25 due by wall time, after 1261 ms, sync
+2026-10-24 15:06:15,703 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 257 deg of joint travel in all
+2026-10-24 15:06:16,466 INFO _robots_driver_openarm_v2: arm left: Dream asks: 70 deg from where this run began (joint 4), 938 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:17,703 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 267 deg of joint travel in all
+2026-10-24 15:06:18,468 INFO _robots_driver_openarm_v2: arm left: Dream asks: 68 deg from where this run began (joint 4), 969 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:18,733 INFO robots.control: chunk 6: 48 actions, 0 executed since its observation, 24 due by wall time, after 1203 ms, sync
+2026-10-24 15:06:19,705 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 277 deg of joint travel in all
+2026-10-24 15:06:20,471 INFO _robots_driver_openarm_v2: arm left: Dream asks: 71 deg from where this run began (joint 4), 1135 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:21,709 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 283 deg of joint travel in all
+2026-10-24 15:06:22,476 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 1151 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:22,667 INFO robots.control: chunk 7: 48 actions, 0 executed since its observation, 31 due by wall time, after 1526 ms, sync
+2026-10-24 15:06:23,710 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 290 deg of joint travel in all
+2026-10-24 15:06:24,476 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 1322 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:25,711 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 296 deg of joint travel in all
+2026-10-24 15:06:26,260 INFO robots.control: chunk 8: 48 actions, 0 executed since its observation, 23 due by wall time, after 1174 ms, sync
+2026-10-24 15:06:26,476 INFO _robots_driver_openarm_v2: arm left: Dream asks: 79 deg from where this run began (joint 4), 1434 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:27,714 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 305 deg of joint travel in all
+2026-10-24 15:06:28,476 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 1521 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:29,717 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 311 deg of joint travel in all
+2026-10-24 15:06:30,011 INFO robots.control: chunk 9: 48 actions, 0 executed since its observation, 27 due by wall time, after 1338 ms, sync
+2026-10-24 15:06:30,480 INFO _robots_driver_openarm_v2: arm left: Dream asks: 77 deg from where this run began (joint 4), 1628 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:31,720 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 321 deg of joint travel in all
+2026-10-24 15:06:32,488 INFO _robots_driver_openarm_v2: arm left: Dream asks: 67 deg from where this run began (joint 4), 1714 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:33,564 INFO robots.control: chunk 10: 48 actions, 0 executed since its observation, 23 due by wall time, after 1152 ms, sync
+2026-10-24 15:06:33,724 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 324 deg of joint travel in all
+2026-10-24 15:06:34,486 INFO _robots_driver_openarm_v2: arm left: Dream asks: 71 deg from where this run began (joint 4), 1850 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:35,726 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 337 deg of joint travel in all
+2026-10-24 15:06:36,492 INFO _robots_driver_openarm_v2: arm left: Dream asks: 64 deg from where this run began (joint 4), 1911 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:37,353 INFO robots.control: chunk 11: 48 actions, 0 executed since its observation, 27 due by wall time, after 1372 ms, sync
+2026-10-24 15:06:37,727 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 342 deg of joint travel in all
+2026-10-24 15:06:38,493 INFO _robots_driver_openarm_v2: arm left: Dream asks: 70 deg from where this run began (joint 4), 2067 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:39,729 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 354 deg of joint travel in all
+2026-10-24 15:06:40,497 INFO _robots_driver_openarm_v2: arm left: Dream asks: 67 deg from where this run began (joint 4), 2109 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:41,047 INFO robots.control: chunk 12: 48 actions, 0 executed since its observation, 26 due by wall time, after 1279 ms, sync
+2026-10-24 15:06:41,732 INFO _robots_driver_openarm_v2: arm right: Dream asks: 46 deg from where this run began (joint 3), 362 deg of joint travel in all
+2026-10-24 15:06:42,497 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 2272 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:43,734 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 371 deg of joint travel in all
+2026-10-24 15:06:44,502 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 2302 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:44,801 INFO robots.control: chunk 13: 48 actions, 0 executed since its observation, 27 due by wall time, after 1331 ms, sync
+2026-10-24 15:06:45,736 INFO _robots_driver_openarm_v2: arm right: Dream asks: 46 deg from where this run began (joint 3), 378 deg of joint travel in all
+2026-10-24 15:06:46,500 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 2483 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:47,739 INFO _robots_driver_openarm_v2: arm right: Dream asks: 48 deg from where this run began (joint 3), 414 deg of joint travel in all
+2026-10-24 15:06:48,502 INFO _robots_driver_openarm_v2: arm left: Dream asks: 63 deg from where this run began (joint 4), 2506 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:48,898 INFO robots.control: chunk 14: 48 actions, 0 executed since its observation, 34 due by wall time, after 1682 ms, sync
+2026-10-24 15:06:49,743 INFO _robots_driver_openarm_v2: arm right: Dream asks: 46 deg from where this run began (joint 3), 427 deg of joint travel in all
+2026-10-24 15:06:50,505 INFO _robots_driver_openarm_v2: arm left: Dream asks: 70 deg from where this run began (joint 4), 2679 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:51,744 INFO _robots_driver_openarm_v2: arm right: Dream asks: 46 deg from where this run began (joint 3), 439 deg of joint travel in all
+2026-10-24 15:06:52,509 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 2702 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:52,538 INFO robots.control: chunk 15: 48 actions, 0 executed since its observation, 24 due by wall time, after 1187 ms, sync
+2026-10-24 15:06:53,745 INFO _robots_driver_openarm_v2: arm right: Dream asks: 46 deg from where this run began (joint 3), 448 deg of joint travel in all
+2026-10-24 15:06:54,510 INFO _robots_driver_openarm_v2: arm left: Dream asks: 68 deg from where this run began (joint 4), 2877 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:55,746 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 456 deg of joint travel in all
+2026-10-24 15:06:56,514 INFO _robots_driver_openarm_v2: arm left: Dream asks: 67 deg from where this run began (joint 4), 2888 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:56,613 INFO robots.control: chunk 16: 48 actions, 0 executed since its observation, 33 due by wall time, after 1668 ms, sync
+2026-10-24 15:06:57,747 INFO _robots_driver_openarm_v2: arm right: Dream asks: 45 deg from where this run began (joint 3), 483 deg of joint travel in all
+2026-10-24 15:06:58,516 INFO _robots_driver_openarm_v2: arm left: Dream asks: 65 deg from where this run began (joint 4), 3073 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:06:59,750 INFO _robots_driver_openarm_v2: arm right: Dream asks: 46 deg from where this run began (joint 3), 524 deg of joint travel in all
+2026-10-24 15:07:00,520 INFO _robots_driver_openarm_v2: arm left: Dream asks: 63 deg from where this run began (joint 4), 3086 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:00,810 INFO robots.control: chunk 17: 48 actions, 0 executed since its observation, 36 due by wall time, after 1797 ms, sync
+2026-10-24 15:07:01,754 INFO _robots_driver_openarm_v2: arm right: Dream asks: 49 deg from where this run began (joint 4), 561 deg of joint travel in all
+2026-10-24 15:07:02,521 INFO _robots_driver_openarm_v2: arm left: Dream asks: 67 deg from where this run began (joint 4), 3273 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:03,757 INFO _robots_driver_openarm_v2: arm right: Dream asks: 66 deg from where this run began (joint 3), 621 deg of joint travel in all
+2026-10-24 15:07:04,417 INFO robots.control: chunk 18: 48 actions, 0 executed since its observation, 23 due by wall time, after 1170 ms, sync
+2026-10-24 15:07:04,526 INFO _robots_driver_openarm_v2: arm left: Dream asks: 79 deg from where this run began (joint 4), 3392 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:05,758 INFO _robots_driver_openarm_v2: arm right: Dream asks: 65 deg from where this run began (joint 3), 646 deg of joint travel in all
+2026-10-24 15:07:06,526 INFO _robots_driver_openarm_v2: arm left: Dream asks: 67 deg from where this run began (joint 4), 3498 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:07,761 INFO _robots_driver_openarm_v2: arm right: Dream asks: 64 deg from where this run began (joint 3), 656 deg of joint travel in all
+2026-10-24 15:07:08,531 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 3505 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:08,617 INFO robots.control: chunk 19: 48 actions, 0 executed since its observation, 36 due by wall time, after 1799 ms, sync
+2026-10-24 15:07:09,764 INFO _robots_driver_openarm_v2: arm right: Dream asks: 59 deg from where this run began (joint 3), 690 deg of joint travel in all
+2026-10-24 15:07:10,531 INFO _robots_driver_openarm_v2: arm left: Dream asks: 67 deg from where this run began (joint 4), 3704 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:11,766 INFO _robots_driver_openarm_v2: arm right: Dream asks: 63 deg from where this run began (joint 3), 724 deg of joint travel in all
+2026-10-24 15:07:12,537 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 3715 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:12,615 INFO robots.control: chunk 20: 48 actions, 0 executed since its observation, 31 due by wall time, after 1562 ms, sync
+2026-10-24 15:07:13,772 INFO _robots_driver_openarm_v2: arm right: Dream asks: 54 deg from where this run began (joint 3), 780 deg of joint travel in all
+2026-10-24 15:07:14,538 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 3922 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:15,772 INFO _robots_driver_openarm_v2: arm right: Dream asks: 47 deg from where this run began (joint 3), 825 deg of joint travel in all
+2026-10-24 15:07:16,279 INFO robots.control: chunk 21: 48 actions, 0 executed since its observation, 25 due by wall time, after 1269 ms, sync
+2026-10-24 15:07:16,540 INFO _robots_driver_openarm_v2: arm left: Dream asks: 79 deg from where this run began (joint 4), 4049 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:17,772 INFO _robots_driver_openarm_v2: arm right: Dream asks: 45 deg from where this run began (joint 3), 865 deg of joint travel in all
+2026-10-24 15:07:18,544 INFO _robots_driver_openarm_v2: arm left: Dream asks: 65 deg from where this run began (joint 4), 4145 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:19,776 INFO _robots_driver_openarm_v2: arm right: Dream asks: 40 deg from where this run began (joint 3), 886 deg of joint travel in all
+2026-10-24 15:07:20,224 INFO robots.control: chunk 22: 48 actions, 0 executed since its observation, 29 due by wall time, after 1439 ms, sync
+2026-10-24 15:07:20,545 INFO _robots_driver_openarm_v2: arm left: Dream asks: 79 deg from where this run began (joint 4), 4257 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:21,777 INFO _robots_driver_openarm_v2: arm right: Dream asks: 39 deg from where this run began (joint 7), 903 deg of joint travel in all
+2026-10-24 15:07:22,547 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 4345 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:23,782 INFO _robots_driver_openarm_v2: arm right: Dream asks: 41 deg from where this run began (joint 7), 915 deg of joint travel in all
+2026-10-24 15:07:23,981 INFO robots.control: chunk 23: 48 actions, 0 executed since its observation, 27 due by wall time, after 1359 ms, sync
+2026-10-24 15:07:24,548 INFO _robots_driver_openarm_v2: arm left: Dream asks: 77 deg from where this run began (joint 4), 4451 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:25,783 INFO _robots_driver_openarm_v2: arm right: Dream asks: 38 deg from where this run began (joint 7), 934 deg of joint travel in all
+2026-10-24 15:07:26,552 INFO _robots_driver_openarm_v2: arm left: Dream asks: 71 deg from where this run began (joint 4), 4525 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:27,580 INFO robots.control: chunk 24: 48 actions, 0 executed since its observation, 24 due by wall time, after 1194 ms, sync
+2026-10-24 15:07:27,786 INFO _robots_driver_openarm_v2: arm right: Dream asks: 38 deg from where this run began (joint 7), 939 deg of joint travel in all
+2026-10-24 15:07:28,552 INFO _robots_driver_openarm_v2: arm left: Dream asks: 74 deg from where this run began (joint 4), 4651 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:29,786 INFO _robots_driver_openarm_v2: arm right: Dream asks: 40 deg from where this run began (joint 4), 959 deg of joint travel in all
+2026-10-24 15:07:30,554 INFO _robots_driver_openarm_v2: arm left: Dream asks: 70 deg from where this run began (joint 4), 4703 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:31,789 INFO _robots_driver_openarm_v2: arm right: Dream asks: 40 deg from where this run began (joint 4), 960 deg of joint travel in all
+2026-10-24 15:07:32,029 INFO robots.control: chunk 25: 48 actions, 0 executed since its observation, 41 due by wall time, after 2037 ms, sync
+2026-10-24 15:07:32,557 INFO _robots_driver_openarm_v2: arm left: Dream asks: 76 deg from where this run began (joint 4), 4806 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:33,790 INFO _robots_driver_openarm_v2: arm right: Dream asks: 49 deg from where this run began (joint 4), 979 deg of joint travel in all
+2026-10-24 15:07:34,557 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 4891 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:35,656 INFO robots.control: chunk 26: 48 actions, 0 executed since its observation, 24 due by wall time, after 1218 ms, sync
+2026-10-24 15:07:35,793 INFO _robots_driver_openarm_v2: arm right: Dream asks: 49 deg from where this run began (joint 4), 983 deg of joint travel in all
+2026-10-24 15:07:36,560 INFO _robots_driver_openarm_v2: arm left: Dream asks: 73 deg from where this run began (joint 4), 5025 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:37,795 INFO _robots_driver_openarm_v2: arm right: Dream asks: 55 deg from where this run began (joint 4), 1001 deg of joint travel in all
+2026-10-24 15:07:38,561 INFO _robots_driver_openarm_v2: arm left: Dream asks: 68 deg from where this run began (joint 4), 5082 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:39,301 INFO robots.control: chunk 27: 48 actions, 0 executed since its observation, 25 due by wall time, after 1231 ms, sync
+2026-10-24 15:07:39,799 INFO _robots_driver_openarm_v2: arm right: Dream asks: 57 deg from where this run began (joint 4), 1008 deg of joint travel in all
+2026-10-24 15:07:40,562 INFO _robots_driver_openarm_v2: arm left: Dream asks: 72 deg from where this run began (joint 4), 5230 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:41,800 INFO _robots_driver_openarm_v2: arm right: Dream asks: 61 deg from where this run began (joint 4), 1029 deg of joint travel in all
+2026-10-24 15:07:42,564 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 5267 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:43,458 INFO robots.control: chunk 28: 48 actions, 0 executed since its observation, 34 due by wall time, after 1714 ms, sync
+2026-10-24 15:07:43,803 INFO _robots_driver_openarm_v2: arm right: Dream asks: 61 deg from where this run began (joint 4), 1032 deg of joint travel in all
+2026-10-24 15:07:44,568 INFO _robots_driver_openarm_v2: arm left: Dream asks: 70 deg from where this run began (joint 4), 5410 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:45,803 INFO _robots_driver_openarm_v2: arm right: Dream asks: 61 deg from where this run began (joint 4), 1052 deg of joint travel in all
+2026-10-24 15:07:46,569 INFO _robots_driver_openarm_v2: arm left: Dream asks: 67 deg from where this run began (joint 4), 5454 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:47,195 INFO robots.control: chunk 29: 48 actions, 0 executed since its observation, 26 due by wall time, after 1281 ms, sync
+2026-10-24 15:07:47,806 INFO _robots_driver_openarm_v2: arm right: Dream asks: 61 deg from where this run began (joint 4), 1059 deg of joint travel in all
+2026-10-24 15:07:48,570 INFO _robots_driver_openarm_v2: arm left: Dream asks: 71 deg from where this run began (joint 4), 5611 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:49,810 INFO _robots_driver_openarm_v2: arm right: Dream asks: 61 deg from where this run began (joint 4), 1069 deg of joint travel in all
+2026-10-24 15:07:50,573 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 5640 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:51,286 INFO robots.control: chunk 30: 48 actions, 0 executed since its observation, 34 due by wall time, after 1689 ms, sync
+2026-10-24 15:07:51,810 INFO _robots_driver_openarm_v2: arm right: Dream asks: 62 deg from where this run began (joint 4), 1071 deg of joint travel in all
+2026-10-24 15:07:52,574 INFO _robots_driver_openarm_v2: arm left: Dream asks: 72 deg from where this run began (joint 4), 5786 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:53,811 INFO _robots_driver_openarm_v2: arm right: Dream asks: 67 deg from where this run began (joint 4), 1088 deg of joint travel in all
+2026-10-24 15:07:54,576 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 5821 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:55,806 INFO robots.control: chunk 31: 48 actions, 0 executed since its observation, 42 due by wall time, after 2092 ms, sync
+2026-10-24 15:07:55,815 INFO _robots_driver_openarm_v2: arm right: Dream asks: 67 deg from where this run began (joint 4), 1088 deg of joint travel in all
+2026-10-24 15:07:56,578 INFO _robots_driver_openarm_v2: arm left: Dream asks: 74 deg from where this run began (joint 4), 5941 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:57,816 INFO _robots_driver_openarm_v2: arm right: Dream asks: 69 deg from where this run began (joint 4), 1126 deg of joint travel in all
+2026-10-24 15:07:58,580 INFO _robots_driver_openarm_v2: arm left: Dream asks: 66 deg from where this run began (joint 4), 6009 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:07:59,819 INFO _robots_driver_openarm_v2: arm right: Dream asks: 69 deg from where this run began (joint 4), 1132 deg of joint travel in all
+2026-10-24 15:08:00,162 INFO robots.control: chunk 32: 48 actions, 0 executed since its observation, 39 due by wall time, after 1944 ms, sync
+2026-10-24 15:08:00,583 INFO _robots_driver_openarm_v2: arm left: Dream asks: 78 deg from where this run began (joint 4), 6114 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:01,824 INFO _robots_driver_openarm_v2: arm right: Dream asks: 65 deg from where this run began (joint 4), 1155 deg of joint travel in all
+2026-10-24 15:08:02,586 INFO _robots_driver_openarm_v2: arm left: Dream asks: 65 deg from where this run began (joint 4), 6205 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:03,826 INFO _robots_driver_openarm_v2: arm right: Dream asks: 64 deg from where this run began (joint 4), 1166 deg of joint travel in all
+2026-10-24 15:08:04,518 INFO robots.control: chunk 33: 48 actions, 0 executed since its observation, 39 due by wall time, after 1934 ms, sync
+2026-10-24 15:08:04,587 INFO _robots_driver_openarm_v2: arm left: Dream asks: 79 deg from where this run began (joint 4), 6304 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:05,826 INFO _robots_driver_openarm_v2: arm right: Dream asks: 59 deg from where this run began (joint 4), 1201 deg of joint travel in all
+2026-10-24 15:08:06,588 INFO _robots_driver_openarm_v2: arm left: Dream asks: 69 deg from where this run began (joint 4), 6390 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:07,826 INFO _robots_driver_openarm_v2: arm right: Dream asks: 59 deg from where this run began (joint 4), 1218 deg of joint travel in all
+2026-10-24 15:08:08,589 INFO _robots_driver_openarm_v2: arm left: Dream asks: 68 deg from where this run began (joint 4), 6398 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:08,670 INFO robots.control: chunk 34: 48 actions, 0 executed since its observation, 35 due by wall time, after 1736 ms, sync
+2026-10-24 15:08:09,759 INFO __main__: station: running -> stopping (run 4, prompt 'grab the wooden block')
+2026-10-24 15:08:10,068 INFO __main__: station: stopping -> idle (run 4, prompt 'grab the wooden block')
+2026-10-24 15:08:10,068 INFO __main__: station: idle -> homing (run 4, prompt 'grab the wooden block')
+2026-10-24 15:08:10,069 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.384 rad
+2026-10-24 15:08:10,069 INFO _robots_driver_openarm_v2: arm right: Dream asks: 56 deg from where this run began (joint 4), 1237 deg of joint travel in all
+2026-10-24 15:08:10,594 INFO _robots_driver_openarm_v2: arm left: Dream asks: 65 deg from where this run began (joint 4), 6617 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:12,069 INFO _robots_driver_openarm_v2: arm right: Dream asks: 18 deg from where this run began (joint 4), 1392 deg of joint travel in all
+2026-10-24 15:08:12,594 INFO _robots_driver_openarm_v2: arm left: Dream asks: 12 deg from where this run began (joint 4), 6704 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:13,070 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 15:08:13,071 INFO __main__: station: homing -> idle (run 4, prompt 'grab the wooden block')
+2026-10-24 15:08:24,668 INFO __main__: station: idle -> starting (run 5, prompt 'return to home position')
+2026-10-24 15:08:25,935 INFO __main__: station: starting -> running (run 5, prompt 'return to home position')
+2026-10-24 15:08:28,735 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 55 due by wall time, after 2737 ms, sync (first chunk; motion starts)
+2026-10-24 15:08:29,755 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 5), 15 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:29,999 INFO _robots_driver_openarm_v2: arm right: Dream asks: 5 deg from where this run began (joint 3), 19 deg of joint travel in all
+2026-10-24 15:08:31,757 INFO _robots_driver_openarm_v2: arm left: Dream asks: 27 deg from where this run began (joint 5), 71 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:32,002 INFO _robots_driver_openarm_v2: arm right: Dream asks: 15 deg from where this run began (joint 3), 58 deg of joint travel in all
+2026-10-24 15:08:32,670 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 30 due by wall time, after 1519 ms, sync
+2026-10-24 15:08:33,759 INFO _robots_driver_openarm_v2: arm left: Dream asks: 15 deg from where this run began (joint 5), 190 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:34,003 INFO _robots_driver_openarm_v2: arm right: Dream asks: 23 deg from where this run began (joint 3), 102 deg of joint travel in all
+2026-10-24 15:08:35,761 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 241 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:36,006 INFO _robots_driver_openarm_v2: arm right: Dream asks: 24 deg from where this run began (joint 3), 110 deg of joint travel in all
+2026-10-24 15:08:36,311 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 24 due by wall time, after 1203 ms, sync
+2026-10-24 15:08:37,763 INFO _robots_driver_openarm_v2: arm left: Dream asks: 22 deg from where this run began (joint 5), 404 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:38,007 INFO _robots_driver_openarm_v2: arm right: Dream asks: 26 deg from where this run began (joint 3), 121 deg of joint travel in all
+2026-10-24 15:08:39,766 INFO _robots_driver_openarm_v2: arm left: Dream asks: 33 deg from where this run began (joint 5), 433 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:39,989 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 25 due by wall time, after 1264 ms, sync
+2026-10-24 15:08:40,009 INFO _robots_driver_openarm_v2: arm right: Dream asks: 26 deg from where this run began (joint 3), 125 deg of joint travel in all
+2026-10-24 15:08:41,539 INFO __main__: station: running -> stopping (run 5, prompt 'return to home position')
+2026-10-24 15:08:41,877 INFO __main__: station: stopping -> idle (run 5, prompt 'return to home position')
+2026-10-24 15:08:41,877 INFO __main__: station: idle -> homing (run 5, prompt 'return to home position')
+2026-10-24 15:08:41,878 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.384 rad
+2026-10-24 15:08:42,029 INFO _robots_driver_openarm_v2: arm right: Dream asks: 26 deg from where this run began (joint 3), 143 deg of joint travel in all
+2026-10-24 15:08:42,053 INFO _robots_driver_openarm_v2: arm left: Dream asks: 5 deg from where this run began (joint 4), 664 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:44,054 INFO _robots_driver_openarm_v2: arm left: Dream asks: 58 deg from where this run began (joint 4), 752 deg of joint travel in all; this arm is LOCKED, so it holds still
+2026-10-24 15:08:44,054 INFO _robots_driver_openarm_v2: arm right: Dream asks: 7 deg from where this run began (joint 3), 198 deg of joint travel in all
+2026-10-24 15:08:44,879 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 15:08:44,879 INFO __main__: station: homing -> idle (run 5, prompt 'return to home position')
+2026-10-24 15:10:15,940 INFO __main__: station: shutting down; stopping the run if one exists
+2026-10-24 15:10:17,530 INFO _robots_driver_openarm_v2: arm right: parking at rest along the path before switching off
+2026-10-24 15:10:17,539 INFO _robots_driver_openarm_v2: arm right: smooth move of 61.7 s, peak joint speed 26 deg/s

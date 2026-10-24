@@ -199,7 +199,7 @@ class EditorPanel:
                 self.f_front_cm = g.add_number("", t.x_range[0] * 100, step=1.0)
                 self.f_depth_cm = g.add_number("", (t.x_range[1] - t.x_range[0]) * 100, min=5.0, step=1.0)
                 self.f_width_cm = g.add_number("", (t.y_range[1] - t.y_range[0]) * 100, min=5.0, step=1.0)
-                self.f_lower_cm = g.add_number("", t.lower_cm, min=0.0, max=ed.LOWER_MAX_CM, step=0.5)
+                self.f_lower_cm = g.add_number("", t.lower_cm, min=-ed.RAISE_MAX_CM, max=ed.LOWER_MAX_CM, step=0.5)
                 tx(self.f_lower_cm, "label", "table.lower")
                 tx(g.add_markdown(""), "content", "table.lower.help")
                 self.f_lower_cm.on_update(lambda _e: self.lower_changed())
@@ -586,7 +586,7 @@ class EditorPanel:
 
     def lower_changed(self) -> None:
         """Danger area tab: how far the table's danger box top is lowered below the real surface (0 keeps it at the surface); warns past the safe limit."""
-        self.state.table.lower_cm = min(max(float(self.f_lower_cm.value), 0.0), ed.LOWER_MAX_CM)
+        self.state.table.lower_cm = min(max(float(self.f_lower_cm.value), -ed.RAISE_MAX_CM), ed.LOWER_MAX_CM)
         warning = self.state.table.lower_warning()
         self.out_msg.content = self.lang.t("msg.lowerwarn", cm=self.state.table.lower_cm, dip=self.state.table.lower_cm - ed.SAFE_LOWER_CM, safe=ed.SAFE_LOWER_CM) if warning else ""
         self.redraw()

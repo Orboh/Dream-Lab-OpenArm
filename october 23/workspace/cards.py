@@ -106,6 +106,8 @@ def build_checklist(state: ed.EditorState, session, lang: i18n.Lang = i18n.EN) -
     if not state.danger_only:
         overlap = state.region_overlap_cm()
         items.append((lang.t("check.overlap"), overlap == 0.0, lang.t("check.overlap.hint", cm=f"{overlap:g}")))
+    path_problems = state.path_warnings()
+    items.append((lang.t("check.pathclear"), not path_problems, path_problems[0] if path_problems else lang.t("check.pathclear.hint")))
     items.append((lang.t("check.table"), bool(state.table_set), lang.t("check.table.hint")))
     items.append((lang.t("check.clash"), not state.clashes(), lang.t("check.clash.hint")))
     return items

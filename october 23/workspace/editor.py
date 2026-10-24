@@ -22,6 +22,10 @@ BASE_OFFSET = {"left": np.array([0.0, 0.031, 0.698]), "right": np.array([0.0, -0
 ## stays 6 cm (ball centre) from it; lowering the box by d cm lets the balls come d cm lower. Past #SAFE_LOWER_CM a ball can dip into the real table, so the editor warns.
 LOWER_MAX_CM = 4.0
 SAFE_LOWER_CM = 2.0
+## A shortened home path may leave this much less clearance than the recorded one (cm) when the recorded one was already short of the required clearance; a path that was clear must stay clear.
+SHORTCUT_SLACK_LOSS_CM = 0.5
+## A NEGATIVE lowering raises the box top above the real surface: an extra safety margin for the arm over the table (added 2026-10-24 after the arm seemed to drag on the table in the first live run).
+RAISE_MAX_CM = 15.0
 ## The table top is this far above the hand hanging at rest (user, 2026-10-23).
 TABLE_ABOVE_HANGING_HAND_M = 0.30
 
@@ -44,7 +48,7 @@ class Table:
     x_range: tuple[float, float]
     y_range: tuple[float, float]
     thickness: float = zb.TABLE_THICKNESS_M
-    lower_cm: float = 0.0   # the danger box's top sits this far below the real surface (0: at the surface, the safest); see #LOWER_MAX_CM
+    lower_cm: float = 0.0   # the danger box's top sits this far below the real surface (0: at the surface; negative: above it, an extra margin); see #LOWER_MAX_CM and #RAISE_MAX_CM
 
     def lower_warning(self) -> str | None:
         """Text when the box top is lowered so far that a safety ball (4 cm radius) can dip into the real table, else None."""
@@ -69,12 +73,12 @@ def table_from_measurements(front_cm: float, top_above_base_plate_cm: float, dep
     @param front_cm How far in front of the robot's centre line the near edge is.
     @param top_above_base_plate_cm The table top's height above the base plate the arms stand on (the arm's own base joint is #BASE_OFFSET z = 69.8 cm above it).
     @param depth_cm How far the table runs away from the robot. @param width_cm Its width. @param centre_y_cm Where its centre is sideways (0: on the centre line).
-    @param lower_cm How far the danger box's top is lowered below the real surface (0 keeps it at the surface; at most #LOWER_MAX_CM).
+    @param lower_cm How far the danger box's top is lowered below the real surface (0 keeps it at the surface; at most #LOWER_MAX_CM). Negative values raise it: an extra safety margin, at most #RAISE_MAX_CM.
     """
     if depth_cm <= 0 or width_cm <= 0:
         raise ValueError("depth and width must be above 0")
-    if not 0.0 <= lower_cm <= LOWER_MAX_CM:
-        raise ValueError(f"lower_cm must be between 0 and {LOWER_MAX_CM:g}")
+    if not -RAISE_MAX_CM <= lower_cm <= LOWER_MAX_CM:
+        raise ValueError(f"lower_cm must be between {-RAISE_MAX_CM:g} (raised) and {LOWER_MAX_CM:g} (lowered)")
     front, half = front_cm / 100.0, width_cm / 200.0
     centre = centre_y_cm / 100.0
     return Table(top_z=top_above_base_plate_cm / 100.0, x_range=(front, front + depth_cm / 100.0), y_range=(centre - half, centre + half), thickness=thickness_m, lower_cm=lower_cm)
@@ -106,6 +110,8 @@ class EditorState:
 
     def __init__(self, table: Table, boxes: list[DangerBox], arms: dict[str, ArmState]) -> None:
         self.table, self.boxes, self.arms = table, boxes, arms
+        self.park_tolerance_deg = 0.0  # > 0: the saved home path is simplified to this tolerance (degrees) when that keeps it clear of the zones: a shorter raise and park
+        self.last_shortening: dict[str, dict] = {}   # what the last to_bundle() did to each arm's home path: seconds and points before and after
         self.danger_only = False  # True: the bundle names only the danger zones (no painted work area, no allowed region): nothing about the task is handed to the model
         self.table_set = False   # True once the user placed the table (or it came from a saved bundle)
         self.references: dict[str, list[tuple[float, float, float]]] = {side: [] for side in SIDES}   # table points touched with the follower, for the daily verify
@@ -204,6 +210,18 @@ class EditorState:
             bundle["table_danger_lowered_cm"] = float(self.table.lower_cm)  # the box top is this far below the real surface
         if self.danger_only:
             bundle["mode"] = "danger_only"
+        self.last_shortening = {}
+        if self.park_tolerance_deg > 0:
+            for side, path in list(paths.items()):
+                shorter = poses.simplify_path(path, self.park_tolerance_deg)
+                if len(shorter) >= len(path):
+                    continue
+                slack_before, slack_after = zb.taught_path_slack_cm(bundle, side, path), zb.taught_path_slack_cm(bundle, side, shorter)
+                worse = slack_after < min(slack_before, 0.0) - SHORTCUT_SLACK_LOSS_CM   # a shortcut may not come closer to a zone than the recorded path did (a clear path must stay clear)
+                self.last_shortening[side] = {"shortened": not worse, "points_before": len(path), "points_after": len(shorter), "slack_cm_before": round(slack_before, 1), "slack_cm_after": round(slack_after, 1),
+                                              "seconds_before": round(zb.path_seconds(path), 1), "seconds_after": round(zb.path_seconds(shorter), 1)}
+                if not worse:
+                    paths[side] = shorter
         if paths:
             bundle["home_path"] = {side: [list(map(float, p)) for p in path] for side, path in paths.items()}
         return bundle
@@ -271,6 +289,14 @@ class EditorState:
         base = BASE_OFFSET[side]
         over = sum(1 for i, j in cells if x0 <= i * zb.REACH_GRID_M + base[0] <= x1 and y0 <= j * zb.REACH_GRID_M + base[1] <= y1)
         return over, len(cells)
+
+    def path_warnings(self) -> list[str]:
+        """Where the home path as it would be saved (each arm's rest-to-home move) comes too close to a danger zone; empty when it keeps clear (grasp point 2 cm, links 6 cm)."""
+        raw = self.to_bundle("editor", dt.datetime.now(dt.timezone.utc))
+        out: list[str] = []
+        for side in SIDES:
+            out += zb.taught_path_problems(raw, side, limit=1)
+        return out
 
     def region_overlap_cm(self) -> float:
         """How far the two arms' allowed areas run into each other (cm along the body's y axis), 0 when they do not or one is missing."""

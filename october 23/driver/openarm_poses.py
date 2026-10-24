@@ -83,6 +83,32 @@ def nearest(points: list[list[float]], pose: list[float]) -> tuple[int, float]:
     return index, distances[index]
 
 
+def simplify_path(points: list[list[float]], tol_deg: float) -> list[list[float]]:
+    """Ramer-Douglas-Peucker in joint space: keeps the ends and the points that matter.
+
+    @param points Joint poses in degrees.
+    @param tol_deg Largest accepted distance of a dropped point to the line between kept points, degrees.
+    @return A subset of `points` including the first and the last.
+    """
+    if len(points) < 3:
+        return [list(p) for p in points]
+    a, b = np.asarray(points[0], dtype=float), np.asarray(points[-1], dtype=float)
+    ab = b - a
+    denom = float(ab @ ab)
+    worst, index = 0.0, 0
+    for i in range(1, len(points) - 1):
+        p = np.asarray(points[i], dtype=float)
+        t = 0.0 if denom == 0.0 else min(max(float((p - a) @ ab) / denom, 0.0), 1.0)
+        d = float(np.max(np.abs(p - (a + t * ab))))
+        if d > worst:
+            worst, index = d, i
+    if worst <= tol_deg:
+        return [list(points[0]), list(points[-1])]
+    left = simplify_path(points[: index + 1], tol_deg)
+    right = simplify_path(points[index:], tol_deg)
+    return left[:-1] + right
+
+
 def densify(points: list[list[float]], max_dps: float, dt: float) -> list[list[float]]:
     """Samples a path every `dt` seconds so no joint moves faster than `max_dps` on average, easing in and out of every point.
 

@@ -398,3 +398,39 @@ def test_leader_reader_refuses_when_its_calibration_is_missing(tmp_path, monkeyp
     cfg = types.SimpleNamespace(can_channel="left", gripper_closed_deg=0.0, gripper_open_deg=-65.0)
     with pytest.raises(errors.ArmError, match="calibration"):
         drv.ReadOnlyLeader(cfg, "left")
+
+
+# -- the gripper is approached in steps, never refused; a long move is warned about --------------------------------------------
+
+def test_a_big_gripper_jump_is_approached_in_steps_instead_of_ending_the_run(make_arm, caplog):
+    import logging
+
+    arm, bus = make_arm(drv.Arm, follow=True)  # the gripper sits at -32.5 deg; 0.0 asks for 0 deg: a 32.5 deg step, more than the 20 deg limit
+    caplog.set_level(logging.INFO)
+    pose = np.radians([LOGICAL[n] for n in drv.JOINTS])
+    arm.write(pose, 0.0)  # no ArmError (the first live run ended on exactly this)
+    assert bus.mit_targets["gripper"] == pytest.approx(-32.5 + drv.GRIPPER_MAX_STEP_DEG + OFFSETS["gripper"], abs=0.05)
+    assert "approached in steps" in caplog.text
+    arm.write(pose, 0.0)
+    assert bus.mit_targets["gripper"] == pytest.approx(0.0 + OFFSETS["gripper"], abs=0.05)  # the second step arrives
+    bus.mit_targets.clear()
+    arm.write(pose, 1.0)  # and the other way: open by 65 deg
+    assert bus.mit_targets["gripper"] == pytest.approx(0.0 - drv.GRIPPER_MAX_STEP_DEG + OFFSETS["gripper"], abs=0.05)
+
+
+def test_a_big_joint_jump_still_ends_the_run_only_the_gripper_is_exempt(make_arm):
+    arm, bus = make_arm(drv.Arm, follow=True)
+    jump = np.radians([LOGICAL[n] + (drv.MAX_STEP_DEG + 5.0 if n == "joint_4" else 0.0) for n in drv.JOINTS])
+    with pytest.raises(errors.ArmError, match="joint_4"):
+        arm.write(jump, 0.5)
+
+
+def test_a_move_that_takes_longer_than_a_stop_waits_is_warned_about(make_arm, monkeypatch, caplog):
+    import logging
+
+    monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
+    monkeypatch.setattr(drv, "LONG_MOVE_WARN_S", 1.0)  # the park of the built-in path takes more than this
+    arm, bus = make_arm(drv.Arm, logical=as_logical(poses.READY_DEG["left"]), follow=True, smooth=True)
+    caplog.set_level(logging.INFO)
+    arm.torque_off()
+    assert "dreamcli robot down" in caplog.text and "takes" in caplog.text

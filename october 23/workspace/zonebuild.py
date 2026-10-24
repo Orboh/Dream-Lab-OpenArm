@@ -275,6 +275,80 @@ def merge_leader(base: dict[str, Any], extra: dict[str, ArmCapture], operator: s
     return merged
 
 
+PATH_SAMPLE_S = 0.1   # the planned move is checked every 0.1 s
+PARK_MAX_S = 45.0     # a raise or park along the home path must take less than this: `dreamcli robot down` gives up after 60 s
+
+
+def planned_path(path_deg: list[list[float]]):
+    """The driver's own smooth move through `path_deg` (degrees, seven joints, the first is where the arm is): its samples every #PATH_SAMPLE_S and its duration in seconds."""
+    import openarm_motion as motion
+    import openarm_v2 as drv
+
+    plan = motion.smooth_path(np.asarray(path_deg, dtype=float), drv.LIMITS, drv.SAMPLE_DT_S)
+    return plan.samples[:: max(1, int(round(PATH_SAMPLE_S / drv.SAMPLE_DT_S)))], float(plan.duration)
+
+
+def path_seconds(path_deg: list[list[float]]) -> float:
+    """How long the driver's smooth move along `path_deg` takes, seconds."""
+    return planned_path(path_deg)[1]
+
+
+def taught_path_slack_cm(raw: dict[str, Any], side: str, path_deg: list[list[float]]) -> float:
+    """The smallest clearance left along the driver's planned move through `path_deg`, in cm beyond what is required: the grasp point must keep 2 cm from a zone, every link sphere 6 cm.
+
+    Negative means a zone is too close somewhere (by that many cm); positive is room to spare. No zones: a large number.
+    """
+    import copy
+
+    strict = copy.deepcopy(raw)
+    kin = zones.ArmKinematics(side, logical=True)
+    samples, _ = planned_path(path_deg)
+    slack = 1e3
+    for zone in strict["arms"][side]["keep_out"]:
+        center = np.asarray(zone["center"], dtype=float)
+        for q in samples:
+            for name, point in kin.points(np.radians(q)).items():
+                required = zones.CLEARANCE_M + (0.0 if name == "tcp" else zones.LINK_RADIUS_M)
+                if zone["kind"] == "box":
+                    distance = zones.distance_to_box(point, center, np.asarray(zone["size"], dtype=float))
+                else:
+                    distance = zones.distance_to_capsule(point, center, float(zone["radius"]), float(zone["height"]))
+                slack = min(slack, (distance - required) * 100)
+    return float(slack)
+
+
+def taught_path_problems(raw: dict[str, Any], side: str, path_deg: list[list[float]] | None = None, limit: int = 3) -> list[str]:
+    """Where the move along an arm's home path (the one the driver follows to raise it and to park it) comes too close to a danger zone.
+
+    Stricter than the guard for Dream's targets: the grasp point may NOT touch a zone here (it keeps 2 cm, links 6 cm), because this is the driver's own move, not a grasp.
+    Checked on the driver's planned smooth move (its corners rounded), not on the straight segments between the waypoints.
+
+    @param raw The zones bundle. @param path_deg The path to check; the bundle's own `home_path` for `side` by default.
+    @return At most `limit` texts naming the place on the path and the zone; empty when the whole move keeps clear.
+    """
+    path = path_deg if path_deg is not None else (raw.get("home_path") or {}).get(side)
+    if not path:
+        return []
+    import copy
+
+    strict = copy.deepcopy(raw)
+    for arm in strict["arms"].values():
+        arm["reach"], arm["region"] = None, None
+        for zone in arm["keep_out"]:
+            zone.pop("allow_tcp_touch", None)
+    parsed = zones.parse_zones(strict)
+    kin = zones.ArmKinematics(side, logical=True)
+    samples, _ = planned_path(path)
+    out: list[str] = []
+    for index, q in enumerate(samples):
+        found = parsed.violations(side, kin.points(np.radians(q)), check_reach=False, check_region=False)
+        if found:
+            out.append(f"{side} taught path, {index * PATH_SAMPLE_S:.1f} s into the move: {found[0]}")
+            if len(out) >= limit:
+                break
+    return out
+
+
 def free_pose_problems(raw: dict[str, Any]) -> list[str]:
     """Violations of the rest pose, the ready pose, the bundle's home pose and the path between them against the bundle's zones (empty when all are free)."""
     parsed = zones.parse_zones(raw)
