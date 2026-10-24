@@ -107,3 +107,47 @@ def test_an_arm_follows_the_record_when_no_variable_is_set(make_arm, tmp_path, m
     mapping.write_record("official")
     arm, _ = make_arm(drv.ReadOnlyArm)
     assert np.degrees(arm.read().positions_rad)[4] == pytest.approx(LOGICAL["joint_5"] + 90, abs=0.05)
+
+
+# -- the dry-run arm: accepts Dream's targets, sends nothing, says what the guard would do ---------------------------------
+
+def frames_that_move_a_motor(bus) -> list:
+    """Enable frames and MIT command frames among everything sent (the state queries are parameter reads and are not these)."""
+    return [m for m in bus.sent if m[1][:7] == b"\xff" * 7 or m[0] in {drv.CAN_IDS[n] for n in drv.MOTORS}]
+
+
+def test_the_dry_run_arm_takes_targets_and_sends_nothing_that_could_move_a_motor(make_arm, caplog):
+    import logging
+
+    arm, bus = make_arm(drv.DryRunArm)
+    arm.read()
+    sent_before = len(bus.sent)
+    caplog.set_level(logging.INFO)
+    target = np.radians([LOGICAL[n] + 40.0 for n in drv.JOINTS])  # a big move: far more than the real arm's step limit would allow
+    for _ in range(3):
+        arm.write(target, 0.5)  # no ArmError, unlike ReadOnlyArm
+    assert len(bus.sent) == sent_before and not frames_that_move_a_motor(bus) and not any(bus.enabled.values()) and not bus.mit_targets
+    text = "\n".join(r.getMessage() for r in caplog.records)
+    assert "DRY RUN target" in text and "farthest joint 40 deg" in text and "guard: allows it" in text
+    assert arm.disengage() is True
+
+
+def test_the_dry_run_arm_logs_a_run_and_says_when_the_guard_would_stop_or_refuse_it(make_arm, tmp_path, monkeypatch, caplog):
+    import logging
+
+    import test_openarm_guard as g
+
+    monkeypatch.setenv("OPENARM_ZONES_REQUIRED", "1")
+    monkeypatch.setenv("OPENARM_ZONES", str(tmp_path / "zones.yaml"))
+    arm, _ = make_arm(drv.DryRunArm)
+    arm.NOTE_EVERY_S = 0.0  # a line for every target
+    arm.read()
+    caplog.set_level(logging.INFO)
+    arm.write(np.radians([LOGICAL[n] for n in drv.JOINTS]), 0.5)
+    assert "refused" in caplog.text and "no safety zones" in caplog.text  # no zones file: the guard would refuse, the dry run only says so
+    caplog.clear()
+    box = {"kind": "box", "center": [0.0, 0.0, -0.3], "size": [3.0, 3.0, 3.0], "name": "everything"}  # a zone around the whole arm: nothing may be inside it
+    g.write_zones(tmp_path / "zones.yaml", captured=g.dt.datetime.now(g.dt.timezone.utc), left_keep=[box])
+    arm._guard._stamp = None
+    arm.write(np.radians([LOGICAL[n] + 10.0 for n in drv.JOINTS]), 0.5)
+    assert "guard: " in caplog.text and ("refused" in caplog.text or "would stop it" in caplog.text)

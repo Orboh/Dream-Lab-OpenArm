@@ -12,6 +12,8 @@ import re
 import statistics
 import sys
 
+import numpy as np
+
 HOME = pathlib.Path("~").expanduser()
 STATION_LOG = HOME / ".dreamlabs" / "station.log"
 INFERENCE_LOG = HOME / "robots-inference.jsonl"
@@ -103,6 +105,35 @@ def render_timeline(sessions: list[dict]) -> str:
     return "\n".join(out)
 
 
+TARGET = re.compile(r"arm (left|right): DRY RUN target: hand \[(-?\d+), (-?\d+), (-?\d+)\] cm \(measured \[(-?\d+), (-?\d+), (-?\d+)\] cm\), farthest joint (\d+) deg from the measured pose \(joint (\d)\), gripper ([\d.]+); guard: (.*)$")
+STATE = re.compile(r"station: (\w+) -> (\w+) \(run (\d+), prompt '(.*)'\)")
+
+
+def dryrun_summary(lines: list[str]) -> list[dict]:
+    """What Dream asked in a dry run (the `DryRunArm` driver), per run and per station phase, from the log lines of ONE station start.
+
+    @return One dict per `(run, phase)` that has target lines: the prompt, the arm, the number of targets, the mean and the largest hand offset from the measured hand (cm: x forward, y left, z up),
+        the largest joint swing (deg) and how many targets the guard would have stopped (with the first reason).
+    """
+    phase, prompts, groups = None, {}, collections.OrderedDict()
+    for line in lines:
+        state = STATE.search(line)
+        if state:
+            phase = (int(state.group(3)), state.group(2))
+            prompts[phase[0]] = state.group(4)
+        target = TARGET.search(line.split("openarm_v2: ", 1)[-1]) if "DRY RUN target" in line else None
+        if target and phase:
+            groups.setdefault((phase[0], phase[1], target.group(1)), []).append(target)
+    out = []
+    for (run, name, side), rows in groups.items():
+        delta = np.array([[int(m.group(2)) - int(m.group(5)), int(m.group(3)) - int(m.group(6)), int(m.group(4)) - int(m.group(7))] for m in rows])
+        stops = [m.group(11) for m in rows if m.group(11).startswith("would stop")]
+        out.append({"run": run, "phase": name, "arm": side, "prompt": prompts.get(run, ""), "targets": len(rows), "mean_cm": delta.mean(axis=0).round(1).tolist(),
+                    "largest_cm": delta[int(np.abs(delta).max(axis=1).argmax())].tolist(), "swing_deg": max(int(m.group(8)) for m in rows), "guard_stops": len(stops),
+                    "first_stop": stops[0].replace("would stop it: ", "") if stops else None})
+    return out
+
+
 def latency(rows: list[dict]) -> dict:
     """Round-trip numbers from the inference log: overall, per local hour, and per run (chunks, stalls, clamps, why it stopped)."""
     inf = [r for r in rows if r.get("kind") == "inference" and r.get("rtt_ms") is not None]
@@ -131,6 +162,11 @@ def main(argv: list[str]) -> int:
             print(digest, mtime, path)
     elif command == "timeline":
         print(render_timeline(parse_station_log(STATION_LOG.read_text(encoding="utf-8", errors="replace"))))
+    elif command == "dryrun":
+        text = STATION_LOG.read_text(encoding="utf-8", errors="replace").splitlines()
+        start = max(i for i, line in enumerate(text) if line.startswith("=== dreamcli robot up"))
+        for row in dryrun_summary(text[start:]):
+            print(json.dumps(row))
     elif command == "latency":
         rows = [json.loads(line) for line in INFERENCE_LOG.read_text(encoding="utf-8").splitlines() if line.strip()]
         print(json.dumps(latency(rows), indent=1))

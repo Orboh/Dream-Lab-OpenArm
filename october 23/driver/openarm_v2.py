@@ -908,6 +908,63 @@ class Arm(ReadOnlyArm):
             self.bus.close()
 
 
+class DryRunArm(ReadOnlyArm):
+    """A dry-run arm: it reads like #ReadOnlyArm (state queries only, every motor stays off) and ACCEPTS Dream's targets without sending them anywhere.
+
+    For each arm it logs what Dream asks (the net move of the run, as #Arm does), the target's hand position against the measured one, and what the guard would have done with it
+    (cut it at a zone edge, or refuse it). The arm never moves, so Dream keeps seeing the same pictures and asks again from the same pose: the log shows its plan, not a motion.
+    Select it with `custom.driver: .../openarm_v2.py:DryRunArm` in a copy of the station file; it needs no gripper range and sends no frame but the queries.
+    """
+
+    NOTE_EVERY_S = 1.0  # between target lines while Dream keeps asking
+
+    def __init__(self, cfg: config.ArmConfig, side: str) -> None:
+        super().__init__(cfg, side)
+        self._guard = openarm_guard.Guard(self.side)
+        self._lock = openarm_lock.ArmLock(self.side)
+        self._tally = motion.RequestTally()
+        self._kin = zones_module.ArmKinematics(self.side)
+        self._noted = 0.0
+        self._cut = False
+
+    def write(self, positions_rad: npt.NDArray[np.float64], gripper: float) -> None:
+        """Takes a target, records it and its guard verdict, and sends nothing.
+
+        @param positions_rad Seven joint targets in Dream's arm model, radians.
+        @param gripper 0 shut to 1 open.
+        """
+        q = np.asarray(positions_rad, dtype=np.float64)
+        now = time.monotonic()
+        locked = "" if self._lock.is_active() else "; this arm is LOCKED, so a live run would hold it still"
+        for kind, net, joint, path in self._tally.update(np.degrees(q), now):
+            _log.info("arm %s: DRY RUN, Dream %s: %.0f deg from where this run began (joint %d), %.0f deg of joint travel in all%s", self.side, kind, net, joint + 1, path, locked)
+        verdict = self._verdict(q)
+        cut = verdict is not None
+        if now - self._noted >= self.NOTE_EVERY_S or cut != self._cut:
+            self._noted, self._cut = now, cut
+            here = self._deg if self._deg is not None else self._logical()
+            measured = self._sign * np.radians([here[n] for n in JOINTS]) + self._zero
+            want, have = self._kin.points(q)["tcp"], self._kin.points(measured)["tcp"]
+            far = np.degrees(np.abs(self._sign * (q - self._zero) - np.radians([here[n] for n in JOINTS])))
+            _log.info("arm %s: DRY RUN target: hand %s cm (measured %s cm), farthest joint %.0f deg from the measured pose (joint %d), gripper %.2f; guard: %s%s",
+                      self.side, np.round(want * 100).astype(int).tolist(), np.round(have * 100).astype(int).tolist(), float(far.max()), int(far.argmax()) + 1, gripper,
+                      "would stop it: " + verdict if cut else "allows it", locked)
+
+    def _verdict(self, q: np.ndarray) -> str | None:
+        """Why the guard would not let this target through as it is (None when it would)."""
+        here = self._deg if self._deg is not None else self._logical()
+        prev = self._zero + self._sign * np.radians([here[n] for n in JOINTS])
+        try:
+            _, found = self._guard.limit(prev, q)
+        except errors.ArmError as exc:
+            return f"refused ({exc})"
+        return found[0] if found else None
+
+    def disengage(self) -> bool:
+        """Nothing is on. @return True."""
+        return True
+
+
 def describe(arm: ReadOnlyArm) -> dict[str, Any]:
     """One read of `arm` as plain numbers, for a quick look: model radians, logical degrees and the gripper.
 

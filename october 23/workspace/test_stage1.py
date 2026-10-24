@@ -44,3 +44,21 @@ def test_latency_counts_chunks_over_the_timeout_and_run_stops():
     out = stage1.latency(rows)
     assert out["all"]["median_ms"] == 2000 and out["all"]["over_timeout"] == 1 and out["runs"][0]["reason"] == "ArmError"
     json.dumps(out)
+
+
+DRY = """=== dreamcli robot up: 2026-10-24 14:46:12 x
+2026-10-24 14:48:14,402 INFO __main__: station: starting -> running (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:48:26,000 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -19, -50] cm (measured [16, -17, -60] cm), farthest joint 99 deg from the measured pose (joint 3), gripper 0.90; guard: allows it
+2026-10-24 14:48:27,000 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 10 deg from the measured pose (joint 3), gripper 0.90; guard: allows it
+2026-10-24 14:49:04,000 INFO __main__: station: running -> stopping (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:49:05,000 INFO __main__: station: idle -> homing (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:49:06,000 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [25, -14, -50] cm (measured [0, -14, -60] cm), farthest joint 50 deg from the measured pose (joint 3), gripper 0.90; guard: would stop it: right tcp is -4.1 cm from keep-out zone 'table'
+"""
+
+
+def test_dryrun_summary_splits_by_run_and_phase_and_counts_guard_stops():
+    rows = stage1.dryrun_summary(DRY.splitlines())
+    running = next(r for r in rows if r["phase"] == "running")
+    homing = next(r for r in rows if r["phase"] == "homing")
+    assert running["prompt"].startswith("go near") and running["targets"] == 2 and running["largest_cm"] == [-16, -2, 10] and running["swing_deg"] == 99 and running["guard_stops"] == 0
+    assert homing["guard_stops"] == 1 and "table" in homing["first_stop"] and homing["largest_cm"] == [25, 0, 10]

@@ -1,0 +1,834 @@
+=== dreamcli robot up: 2026-10-24 14:46:12 /home/kota-ueda/dream-env/bin/python -m robots.station --config /tmp/claude-1000/-home-kota-ueda-projects-Dream-Lab-OpenArm/04b12ad2-ff65-475f-8d7f-dd8a85a5ec90/scratchpad/station-dryrun.yaml --arms-lock /home/kota-ueda/.dreamlabs/arms.lock
+2026-10-24 14:46:52,025 INFO __main__: station: cameras ['head', 'wrist_l', 'wrist_r'] open and publishing
+2026-10-24 14:48:13,138 INFO __main__: station: idle -> starting (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:48:13,139 INFO dream.live: live: start prm_32056e72dbfa0d61 applied
+2026-10-24 14:48:14,402 INFO __main__: station: starting -> running (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:48:17,418 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.19; guard: allows it
+2026-10-24 14:48:17,438 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.73; guard: allows it
+2026-10-24 14:48:18,444 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.19; guard: allows it
+2026-10-24 14:48:18,445 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.73; guard: allows it
+2026-10-24 14:48:20,315 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 32 due by wall time, after 1575 ms, sync (first chunk; motion starts)
+2026-10-24 14:48:20,317 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 1), gripper 0.19; guard: allows it
+2026-10-24 14:48:20,318 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.73; guard: allows it
+2026-10-24 14:48:21,229 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 13 deg of joint travel in all
+2026-10-24 14:48:21,319 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.27; guard: allows it
+2026-10-24 14:48:21,320 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 3), gripper 0.80; guard: allows it
+2026-10-24 14:48:21,330 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 17 deg of joint travel in all
+2026-10-24 14:48:22,321 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 5), gripper 0.36; guard: allows it
+2026-10-24 14:48:22,321 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 28 deg from the measured pose (joint 5), gripper 0.87; guard: allows it
+2026-10-24 14:48:23,230 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 36 deg from where this run began (joint 3), 105 deg of joint travel in all
+2026-10-24 14:48:23,324 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 36 deg from the measured pose (joint 3), gripper 0.88; guard: allows it
+2026-10-24 14:48:23,326 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 28 deg from the measured pose (joint 5), gripper 0.39; guard: allows it
+2026-10-24 14:48:23,333 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 28 deg from where this run began (joint 5), 79 deg of joint travel in all
+2026-10-24 14:48:23,963 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 25 due by wall time, after 1256 ms, sync
+2026-10-24 14:48:24,326 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 3 deg from the measured pose (joint 4), gripper 0.92; guard: allows it
+2026-10-24 14:48:24,329 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:48:25,231 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 44 deg from where this run began (joint 4), 357 deg of joint travel in all
+2026-10-24 14:48:25,326 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-6, -16, -55] cm (measured [1, -15, -59] cm), farthest joint 48 deg from the measured pose (joint 4), gripper 0.95; guard: allows it
+2026-10-24 14:48:25,329 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 21 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:48:25,336 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 21 deg from where this run began (joint 5), 231 deg of joint travel in all
+2026-10-24 14:48:26,330 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:48:26,331 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-15, -17, -49] cm (measured [1, -15, -59] cm), farthest joint 66 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:48:27,233 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 66 deg from where this run began (joint 4), 459 deg of joint travel in all
+2026-10-24 14:48:27,332 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:48:27,333 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-15, -17, -49] cm (measured [1, -15, -59] cm), farthest joint 66 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:48:27,339 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 264 deg of joint travel in all
+2026-10-24 14:48:27,657 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 25 due by wall time, after 1265 ms, sync
+2026-10-24 14:48:28,333 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 7 deg from the measured pose (joint 3), gripper 0.48; guard: allows it
+2026-10-24 14:48:28,335 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-7, -22, -55] cm (measured [1, -15, -59] cm), farthest joint 41 deg from the measured pose (joint 4), gripper 0.95; guard: allows it
+2026-10-24 14:48:29,235 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 32 deg from where this run began (joint 3), 664 deg of joint travel in all
+2026-10-24 14:48:29,334 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 26 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:48:29,336 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 34 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:48:29,341 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 26 deg from where this run began (joint 5), 446 deg of joint travel in all
+2026-10-24 14:48:30,337 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:48:30,339 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:48:31,237 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 44 deg from where this run began (joint 3), 697 deg of joint travel in all
+2026-10-24 14:48:31,337 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:48:31,338 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:48:31,341 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 465 deg of joint travel in all
+2026-10-24 14:48:31,383 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 26 due by wall time, after 1315 ms, sync
+2026-10-24 14:48:32,337 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 13 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:48:32,342 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-3, -15, -54] cm (measured [1, -15, -59] cm), farthest joint 55 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:33,238 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 91 deg from where this run began (joint 4), 1064 deg of joint travel in all
+2026-10-24 14:48:33,337 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 29 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:48:33,342 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-13, -17, -42] cm (measured [1, -15, -59] cm), farthest joint 93 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:48:33,345 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 29 deg from where this run began (joint 5), 655 deg of joint travel in all
+2026-10-24 14:48:34,340 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:48:34,345 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-15, -18, -40] cm (measured [1, -15, -59] cm), farthest joint 97 deg from the measured pose (joint 4), gripper 0.91; guard: allows it
+2026-10-24 14:48:35,055 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 25 due by wall time, after 1268 ms, sync
+2026-10-24 14:48:35,243 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 90 deg from where this run began (joint 4), 1132 deg of joint travel in all
+2026-10-24 14:48:35,341 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:48:35,346 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-13, -21, -43] cm (measured [1, -15, -59] cm), farthest joint 87 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:48:35,644 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 790 deg of joint travel in all
+2026-10-24 14:48:36,342 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 18 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:48:36,347 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-8, -21, -53] cm (measured [1, -15, -59] cm), farthest joint 52 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:37,246 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 61 deg from where this run began (joint 4), 1348 deg of joint travel in all
+2026-10-24 14:48:37,345 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 32 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:48:37,346 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-13, -16, -51] cm (measured [1, -15, -59] cm), farthest joint 61 deg from the measured pose (joint 4), gripper 0.92; guard: allows it
+2026-10-24 14:48:37,646 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 870 deg of joint travel in all
+2026-10-24 14:48:38,347 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:48:38,348 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-14, -16, -51] cm (measured [1, -15, -59] cm), farthest joint 62 deg from the measured pose (joint 4), gripper 0.92; guard: allows it
+2026-10-24 14:48:38,727 INFO robots.control: chunk 6: 48 actions, 0 executed since its observation, 24 due by wall time, after 1225 ms, sync
+2026-10-24 14:48:39,250 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 44 deg from where this run began (joint 4), 1422 deg of joint travel in all
+2026-10-24 14:48:39,350 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 6 deg from the measured pose (joint 3), gripper 0.50; guard: allows it
+2026-10-24 14:48:39,351 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-6, -21, -56] cm (measured [1, -15, -59] cm), farthest joint 40 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:39,648 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 12 deg from where this run began (joint 5), 1003 deg of joint travel in all
+2026-10-24 14:48:40,350 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 25 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:48:40,353 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 33 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:48:41,253 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 44 deg from where this run began (joint 3), 1586 deg of joint travel in all
+2026-10-24 14:48:41,351 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.52; guard: allows it
+2026-10-24 14:48:41,351 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:48:41,650 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1057 deg of joint travel in all
+2026-10-24 14:48:42,354 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.52; guard: allows it
+2026-10-24 14:48:42,355 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:48:42,539 INFO robots.control: chunk 7: 48 actions, 0 executed since its observation, 28 due by wall time, after 1417 ms, sync
+2026-10-24 14:48:43,255 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 26 deg from where this run began (joint 4), 1759 deg of joint travel in all
+2026-10-24 14:48:43,357 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 10 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:48:43,358 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-1, -15, -57] cm (measured [1, -15, -59] cm), farthest joint 33 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:48:43,653 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 16 deg from where this run began (joint 5), 1203 deg of joint travel in all
+2026-10-24 14:48:44,359 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 28 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:48:44,360 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-10, -16, -46] cm (measured [1, -15, -59] cm), farthest joint 84 deg from the measured pose (joint 4), gripper 0.92; guard: allows it
+2026-10-24 14:48:45,255 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 88 deg from where this run began (joint 4), 1980 deg of joint travel in all
+2026-10-24 14:48:45,361 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:48:45,362 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-14, -17, -44] cm (measured [1, -15, -59] cm), farthest joint 88 deg from the measured pose (joint 4), gripper 0.89; guard: allows it
+2026-10-24 14:48:45,653 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1251 deg of joint travel in all
+2026-10-24 14:48:46,156 INFO robots.control: chunk 8: 48 actions, 0 executed since its observation, 24 due by wall time, after 1215 ms, sync
+2026-10-24 14:48:46,364 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:48:46,365 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-12, -19, -46] cm (measured [1, -15, -59] cm), farthest joint 81 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:48:47,256 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 41 deg from where this run began (joint 4), 2121 deg of joint travel in all
+2026-10-24 14:48:47,367 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 18 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:48:47,369 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-5, -21, -56] cm (measured [1, -15, -59] cm), farthest joint 36 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:47,655 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 23 deg from where this run began (joint 5), 1424 deg of joint travel in all
+2026-10-24 14:48:48,370 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 32 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:48:48,371 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-10, -13, -55] cm (measured [1, -15, -59] cm), farthest joint 46 deg from the measured pose (joint 4), gripper 0.91; guard: allows it
+2026-10-24 14:48:49,257 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 49 deg from where this run began (joint 4), 2256 deg of joint travel in all
+2026-10-24 14:48:49,372 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:48:49,372 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-10, -13, -54] cm (measured [1, -15, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.91; guard: allows it
+2026-10-24 14:48:49,658 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1449 deg of joint travel in all
+2026-10-24 14:48:49,806 INFO robots.control: chunk 9: 48 actions, 0 executed since its observation, 25 due by wall time, after 1237 ms, sync
+2026-10-24 14:48:50,375 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 4 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:48:50,378 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-4, -18, -57] cm (measured [1, -15, -59] cm), farthest joint 32 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:51,260 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 28 deg from where this run began (joint 3), 2438 deg of joint travel in all
+2026-10-24 14:48:51,379 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 24 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:48:51,380 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:48:51,659 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 28 deg from where this run began (joint 5), 1621 deg of joint travel in all
+2026-10-24 14:48:52,381 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.51; guard: allows it
+2026-10-24 14:48:52,382 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-1, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 43 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:48:53,262 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 43 deg from where this run began (joint 3), 2482 deg of joint travel in all
+2026-10-24 14:48:53,384 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-1, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 43 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:48:53,388 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.51; guard: allows it
+2026-10-24 14:48:53,595 INFO robots.control: chunk 10: 48 actions, 0 executed since its observation, 27 due by wall time, after 1348 ms, sync
+2026-10-24 14:48:54,230 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 1746 deg of joint travel in all
+2026-10-24 14:48:54,386 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-1, -14, -57] cm (measured [1, -15, -59] cm), farthest joint 33 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:54,389 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 8 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:48:55,265 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 84 deg from where this run began (joint 4), 2833 deg of joint travel in all
+2026-10-24 14:48:55,389 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-9, -15, -45] cm (measured [1, -15, -59] cm), farthest joint 89 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:55,391 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 27 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:48:56,231 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1830 deg of joint travel in all
+2026-10-24 14:48:56,392 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-13, -16, -40] cm (measured [1, -15, -59] cm), farthest joint 99 deg from the measured pose (joint 4), gripper 0.91; guard: allows it
+2026-10-24 14:48:56,395 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:48:57,265 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 99 deg from where this run began (joint 4), 2906 deg of joint travel in all
+2026-10-24 14:48:57,305 INFO robots.control: chunk 11: 48 actions, 0 executed since its observation, 25 due by wall time, after 1241 ms, sync
+2026-10-24 14:48:57,396 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-13, -17, -42] cm (measured [1, -15, -59] cm), farthest joint 95 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:48:57,399 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:48:58,232 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 12 deg from where this run began (joint 5), 1972 deg of joint travel in all
+2026-10-24 14:48:58,399 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-7, -22, -53] cm (measured [1, -15, -59] cm), farthest joint 55 deg from the measured pose (joint 4), gripper 0.95; guard: allows it
+2026-10-24 14:48:58,402 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 16 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:48:59,265 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 63 deg from where this run began (joint 4), 3143 deg of joint travel in all
+2026-10-24 14:48:59,401 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-12, -15, -51] cm (measured [1, -15, -59] cm), farthest joint 65 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:48:59,405 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 31 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:49:00,233 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 2030 deg of joint travel in all
+2026-10-24 14:49:00,403 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-14, -15, -50] cm (measured [1, -15, -59] cm), farthest joint 68 deg from the measured pose (joint 4), gripper 0.92; guard: allows it
+2026-10-24 14:49:00,406 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:49:00,969 INFO robots.control: chunk 12: 48 actions, 0 executed since its observation, 25 due by wall time, after 1237 ms, sync
+2026-10-24 14:49:01,267 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 61 deg from where this run began (joint 4), 3190 deg of joint travel in all
+2026-10-24 14:49:01,405 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [-9, -19, -53] cm (measured [1, -15, -59] cm), farthest joint 56 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:49:01,408 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:49:02,235 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 18 deg from where this run began (joint 5), 2182 deg of joint travel in all
+2026-10-24 14:49:02,407 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 27 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:49:02,410 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:49:03,271 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 3402 deg of joint travel in all
+2026-10-24 14:49:03,410 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 43 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:49:03,414 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.52; guard: allows it
+2026-10-24 14:49:04,238 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 2220 deg of joint travel in all
+2026-10-24 14:49:04,410 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 43 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:49:04,413 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.52; guard: allows it
+2026-10-24 14:49:04,713 INFO __main__: station: running -> stopping (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:49:05,169 INFO __main__: station: stopping -> idle (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:49:05,169 INFO __main__: station: idle -> homing (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:49:05,174 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.433 rad
+2026-10-24 14:49:05,351 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 4), 3512 deg of joint travel in all
+2026-10-24 14:49:05,426 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [5, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 7 deg from the measured pose (joint 4), gripper 0.26; guard: allows it
+2026-10-24 14:49:05,428 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [6, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 8 deg from the measured pose (joint 4), gripper 0.75; guard: allows it
+2026-10-24 14:49:05,760 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [12, -16, -58] cm (measured [1, -15, -59] cm), farthest joint 16 deg from the measured pose (joint 4), gripper 0.78; guard: would stop it: right wrist_pitch is 5.8 cm from keep-out zone 'table'
+2026-10-24 14:49:05,979 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [14, 13, -56] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 4), gripper 0.41; guard: would stop it: left tcp is -0.8 cm from keep-out zone 'table'
+2026-10-24 14:49:06,250 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 29 deg from where this run began (joint 4), 2356 deg of joint travel in all
+2026-10-24 14:49:06,759 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [26, -15, -49] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 4), gripper 0.87; guard: would stop it: right tcp is -4.1 cm from keep-out zone 'table'
+2026-10-24 14:49:07,001 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [27, 11, -45] cm (measured [0, 13, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.69; guard: allows it
+2026-10-24 14:49:07,051 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [30, -13, -45] cm (measured [1, -15, -59] cm), farthest joint 52 deg from the measured pose (joint 4), gripper 0.90; guard: allows it
+2026-10-24 14:49:07,376 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 61 deg from where this run began (joint 4), 3614 deg of joint travel in all
+2026-10-24 14:49:08,001 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [33, 9, -29] cm (measured [0, 13, -59] cm), farthest joint 76 deg from the measured pose (joint 4), gripper 0.96; guard: allows it
+2026-10-24 14:49:08,052 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [36, -7, -30] cm (measured [1, -15, -59] cm), farthest joint 79 deg from the measured pose (joint 4), gripper 0.99; guard: allows it
+2026-10-24 14:49:08,176 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 14:49:08,176 INFO __main__: station: homing -> idle (run 1, prompt 'go near the block by right arm')
+2026-10-24 14:49:08,177 INFO dream.live: live: stop prm_6004a20f0ec6abe7 applied
+2026-10-24 14:49:29,414 INFO __main__: station: idle -> starting (run 2, prompt 'move the right hand 5 cm up')
+2026-10-24 14:49:29,414 INFO dream.live: live: start prm_332d6f036402da5e applied
+2026-10-24 14:49:30,620 INFO __main__: station: starting -> running (run 2, prompt 'move the right hand 5 cm up')
+2026-10-24 14:49:33,157 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 50 due by wall time, after 2502 ms, sync (first chunk; motion starts)
+2026-10-24 14:49:33,160 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream run ended: 80 deg from where this run began (joint 4), 2440 deg of joint travel in all
+2026-10-24 14:49:33,161 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 2), gripper 0.19; guard: allows it
+2026-10-24 14:49:33,162 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream run ended: 82 deg from where this run began (joint 4), 3652 deg of joint travel in all
+2026-10-24 14:49:33,162 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 2), gripper 0.73; guard: allows it
+2026-10-24 14:49:34,081 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 20 deg of joint travel in all
+2026-10-24 14:49:34,162 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.27; guard: allows it
+2026-10-24 14:49:34,164 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 3), gripper 0.81; guard: allows it
+2026-10-24 14:49:34,174 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 15 deg of joint travel in all
+2026-10-24 14:49:35,164 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 20 deg from the measured pose (joint 5), gripper 0.35; guard: allows it
+2026-10-24 14:49:35,166 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 26 deg from the measured pose (joint 3), gripper 0.87; guard: allows it
+2026-10-24 14:49:36,084 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 33 deg from where this run began (joint 3), 106 deg of joint travel in all
+2026-10-24 14:49:36,166 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 26 deg from the measured pose (joint 5), gripper 0.38; guard: allows it
+2026-10-24 14:49:36,167 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 33 deg from the measured pose (joint 3), gripper 0.89; guard: allows it
+2026-10-24 14:49:36,177 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 26 deg from where this run began (joint 5), 69 deg of joint travel in all
+2026-10-24 14:49:36,857 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 26 due by wall time, after 1297 ms, sync
+2026-10-24 14:49:37,170 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 3), gripper 0.41; guard: allows it
+2026-10-24 14:49:37,171 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 4), gripper 0.93; guard: allows it
+2026-10-24 14:49:38,087 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 23 deg from where this run began (joint 3), 303 deg of joint travel in all
+2026-10-24 14:49:38,171 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 20 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:49:38,172 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 25 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:49:38,178 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 20 deg from where this run began (joint 5), 197 deg of joint travel in all
+2026-10-24 14:49:39,171 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:49:39,173 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -58] cm (measured [1, -15, -59] cm), farthest joint 41 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:49:40,091 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 354 deg of joint travel in all
+2026-10-24 14:49:40,172 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:49:40,174 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -58] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:49:40,179 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 228 deg of joint travel in all
+2026-10-24 14:49:40,628 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 27 due by wall time, after 1350 ms, sync
+2026-10-24 14:49:41,175 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 4 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:49:41,176 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.94; guard: allows it
+2026-10-24 14:49:42,094 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 29 deg from where this run began (joint 3), 577 deg of joint travel in all
+2026-10-24 14:49:42,175 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 24 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:49:42,177 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:49:42,183 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 24 deg from where this run began (joint 5), 385 deg of joint travel in all
+2026-10-24 14:49:43,178 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:49:43,179 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:49:44,096 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 611 deg of joint travel in all
+2026-10-24 14:49:44,183 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:49:44,185 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:49:44,188 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 407 deg of joint travel in all
+2026-10-24 14:49:44,241 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 24 due by wall time, after 1216 ms, sync
+2026-10-24 14:49:45,181 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 12 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:49:45,186 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 16 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:49:46,098 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 36 deg from where this run began (joint 3), 851 deg of joint travel in all
+2026-10-24 14:49:46,183 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 29 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:49:46,187 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 37 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:49:46,190 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 29 deg from where this run began (joint 5), 575 deg of joint travel in all
+2026-10-24 14:49:47,184 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:49:47,188 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:49:48,022 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 27 due by wall time, after 1364 ms, sync
+2026-10-24 14:49:48,101 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 7 deg from where this run began (joint 3), 979 deg of joint travel in all
+2026-10-24 14:49:48,187 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:49:48,191 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:49:48,609 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 691 deg of joint travel in all
+2026-10-24 14:49:49,186 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 17 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:49:49,191 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 22 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:49:50,101 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 38 deg from where this run began (joint 5), 1122 deg of joint travel in all
+2026-10-24 14:49:50,189 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 31 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:49:50,194 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 39 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:49:50,609 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 766 deg of joint travel in all
+2026-10-24 14:49:51,190 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:49:51,195 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:49:51,713 INFO robots.control: chunk 6: 48 actions, 0 executed since its observation, 25 due by wall time, after 1240 ms, sync
+2026-10-24 14:49:52,191 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:49:52,196 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 3 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:49:52,285 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 1274 deg of joint travel in all
+2026-10-24 14:49:52,611 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 10 deg from where this run began (joint 5), 887 deg of joint travel in all
+2026-10-24 14:49:53,192 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:49:53,197 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 28 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:49:54,196 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:49:54,198 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:49:54,285 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 1384 deg of joint travel in all
+2026-10-24 14:49:54,615 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 944 deg of joint travel in all
+2026-10-24 14:49:55,197 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:49:55,198 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:49:55,366 INFO robots.control: chunk 7: 48 actions, 0 executed since its observation, 24 due by wall time, after 1190 ms, sync
+2026-10-24 14:49:56,198 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 10 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:49:56,198 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 13 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:49:56,289 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 15 deg from where this run began (joint 3), 1559 deg of joint travel in all
+2026-10-24 14:49:56,616 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 19 deg from where this run began (joint 5), 1085 deg of joint travel in all
+2026-10-24 14:49:57,200 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 28 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:49:57,202 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 36 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:49:58,204 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:49:58,205 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:49:58,290 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 1636 deg of joint travel in all
+2026-10-24 14:49:58,618 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1122 deg of joint travel in all
+2026-10-24 14:49:59,173 INFO robots.control: chunk 8: 48 actions, 0 executed since its observation, 28 due by wall time, after 1405 ms, sync
+2026-10-24 14:49:59,206 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:49:59,208 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -17, -59] cm (measured [1, -15, -59] cm), farthest joint 24 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:00,208 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 14 deg from the measured pose (joint 5), gripper 0.41; guard: allows it
+2026-10-24 14:50:00,209 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 18 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:00,290 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 21 deg from where this run began (joint 3), 1839 deg of joint travel in all
+2026-10-24 14:50:00,620 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 23 deg from where this run began (joint 5), 1275 deg of joint travel in all
+2026-10-24 14:50:01,212 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 30 deg from the measured pose (joint 5), gripper 0.41; guard: allows it
+2026-10-24 14:50:01,213 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 38 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:02,215 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:02,216 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:02,292 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 1899 deg of joint travel in all
+2026-10-24 14:50:02,622 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1304 deg of joint travel in all
+2026-10-24 14:50:02,766 INFO robots.control: chunk 9: 48 actions, 0 executed since its observation, 24 due by wall time, after 1180 ms, sync
+2026-10-24 14:50:03,216 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 3 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:50:03,218 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 3 deg from the measured pose (joint 5), gripper 0.93; guard: allows it
+2026-10-24 14:50:04,218 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 23 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:50:04,219 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 29 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:04,296 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 30 deg from where this run began (joint 3), 2133 deg of joint travel in all
+2026-10-24 14:50:04,624 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 28 deg from where this run began (joint 5), 1476 deg of joint travel in all
+2026-10-24 14:50:05,226 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:05,227 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:06,225 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:06,230 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:06,297 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 2168 deg of joint travel in all
+2026-10-24 14:50:06,426 INFO robots.control: chunk 10: 48 actions, 0 executed since its observation, 25 due by wall time, after 1237 ms, sync
+2026-10-24 14:50:07,021 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 1592 deg of joint travel in all
+2026-10-24 14:50:07,225 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 9 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:07,229 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 12 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:08,229 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 27 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:50:08,231 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 35 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:08,298 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 36 deg from where this run began (joint 3), 2414 deg of joint travel in all
+2026-10-24 14:50:09,024 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1665 deg of joint travel in all
+2026-10-24 14:50:09,229 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:50:09,234 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:50:10,161 INFO robots.control: chunk 11: 48 actions, 0 executed since its observation, 26 due by wall time, after 1324 ms, sync
+2026-10-24 14:50:10,230 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:10,235 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 8 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:10,685 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 4), 2580 deg of joint travel in all
+2026-10-24 14:50:11,028 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 11 deg from where this run began (joint 5), 1788 deg of joint travel in all
+2026-10-24 14:50:11,231 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 15 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:11,236 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 20 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:50:12,235 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 31 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:12,236 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 39 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:50:12,686 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 2696 deg of joint travel in all
+2026-10-24 14:50:13,031 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1849 deg of joint travel in all
+2026-10-24 14:50:13,237 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:13,239 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:14,143 INFO robots.control: chunk 12: 48 actions, 0 executed since its observation, 32 due by wall time, after 1583 ms, sync
+2026-10-24 14:50:14,239 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 3), gripper 0.44; guard: allows it
+2026-10-24 14:50:14,240 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 3 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:14,690 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 2845 deg of joint travel in all
+2026-10-24 14:50:15,035 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 11 deg from where this run began (joint 5), 1979 deg of joint travel in all
+2026-10-24 14:50:15,242 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 16 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:15,243 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 20 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:50:16,242 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 31 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:16,243 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 39 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:16,688 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 2957 deg of joint travel in all
+2026-10-24 14:50:17,038 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 2036 deg of joint travel in all
+2026-10-24 14:50:17,243 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:17,245 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:17,748 INFO robots.control: chunk 13: 48 actions, 0 executed since its observation, 24 due by wall time, after 1198 ms, sync
+2026-10-24 14:50:18,244 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 3 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:50:18,246 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 4 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:18,689 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 16 deg from where this run began (joint 3), 3142 deg of joint travel in all
+2026-10-24 14:50:19,040 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 20 deg from where this run began (joint 5), 2184 deg of joint travel in all
+2026-10-24 14:50:19,244 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 23 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:50:19,245 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 30 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:20,246 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:50:20,248 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:20,693 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 3218 deg of joint travel in all
+2026-10-24 14:50:21,040 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 2220 deg of joint travel in all
+2026-10-24 14:50:21,247 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:50:21,249 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:21,321 INFO robots.control: chunk 14: 48 actions, 0 executed since its observation, 23 due by wall time, after 1153 ms, sync
+2026-10-24 14:50:22,248 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 12 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:22,249 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 15 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:22,698 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 27 deg from where this run began (joint 3), 3444 deg of joint travel in all
+2026-10-24 14:50:23,045 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 27 deg from where this run began (joint 5), 2387 deg of joint travel in all
+2026-10-24 14:50:23,251 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 29 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:23,252 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 37 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:24,254 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:24,254 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:24,700 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 3482 deg of joint travel in all
+2026-10-24 14:50:24,947 INFO robots.control: chunk 15: 48 actions, 0 executed since its observation, 24 due by wall time, after 1213 ms, sync
+2026-10-24 14:50:25,259 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:25,261 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 5), gripper 0.94; guard: allows it
+2026-10-24 14:50:25,535 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 2513 deg of joint travel in all
+2026-10-24 14:50:26,261 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 20 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:26,263 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 26 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:26,701 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 35 deg from where this run began (joint 3), 3718 deg of joint travel in all
+2026-10-24 14:50:27,264 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:27,266 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:27,535 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 2588 deg of joint travel in all
+2026-10-24 14:50:28,263 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:28,268 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:28,550 INFO robots.control: chunk 16: 48 actions, 0 executed since its observation, 24 due by wall time, after 1202 ms, sync
+2026-10-24 14:50:29,077 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 3881 deg of joint travel in all
+2026-10-24 14:50:29,264 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 7 deg from the measured pose (joint 3), gripper 0.47; guard: allows it
+2026-10-24 14:50:29,268 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 10 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:29,537 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 13 deg from where this run began (joint 5), 2717 deg of joint travel in all
+2026-10-24 14:50:30,266 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 26 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:50:30,271 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 34 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:31,080 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 3994 deg of joint travel in all
+2026-10-24 14:50:31,269 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:50:31,273 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:31,538 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 2769 deg of joint travel in all
+2026-10-24 14:50:32,071 INFO robots.control: chunk 17: 48 actions, 0 executed since its observation, 22 due by wall time, after 1105 ms, sync
+2026-10-24 14:50:32,272 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:32,274 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 4), gripper 0.94; guard: allows it
+2026-10-24 14:50:33,082 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 17 deg from where this run began (joint 3), 4191 deg of joint travel in all
+2026-10-24 14:50:33,274 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 18 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:33,276 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 23 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:33,539 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 23 deg from where this run began (joint 5), 2925 deg of joint travel in all
+2026-10-24 14:50:34,278 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 32 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:34,281 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 40 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:35,084 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 4259 deg of joint travel in all
+2026-10-24 14:50:35,281 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:35,282 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:35,542 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 2951 deg of joint travel in all
+2026-10-24 14:50:35,712 INFO robots.control: chunk 18: 48 actions, 0 executed since its observation, 24 due by wall time, after 1222 ms, sync
+2026-10-24 14:50:36,281 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:36,285 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 5), gripper 0.94; guard: allows it
+2026-10-24 14:50:37,086 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 27 deg from where this run began (joint 3), 4480 deg of joint travel in all
+2026-10-24 14:50:37,283 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 24 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:37,289 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:37,544 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 28 deg from where this run began (joint 5), 3119 deg of joint travel in all
+2026-10-24 14:50:38,284 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:38,293 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:39,087 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 4520 deg of joint travel in all
+2026-10-24 14:50:39,288 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:39,294 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:39,341 INFO robots.control: chunk 19: 48 actions, 0 executed since its observation, 24 due by wall time, after 1206 ms, sync
+2026-10-24 14:50:39,937 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 3239 deg of joint travel in all
+2026-10-24 14:50:40,292 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 13 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:50:40,296 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 16 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:50:41,091 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 34 deg from where this run began (joint 3), 4755 deg of joint travel in all
+2026-10-24 14:50:41,295 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 29 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:50:41,300 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 37 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:50:41,940 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 3313 deg of joint travel in all
+2026-10-24 14:50:42,296 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:50:42,301 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:50:42,868 INFO robots.control: chunk 20: 48 actions, 0 executed since its observation, 22 due by wall time, after 1120 ms, sync
+2026-10-24 14:50:43,298 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.41; guard: allows it
+2026-10-24 14:50:43,302 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 3 deg from the measured pose (joint 4), gripper 0.96; guard: allows it
+2026-10-24 14:50:43,397 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 4), 4924 deg of joint travel in all
+2026-10-24 14:50:43,941 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 15 deg from where this run began (joint 5), 3446 deg of joint travel in all
+2026-10-24 14:50:44,298 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 5), gripper 0.41; guard: allows it
+2026-10-24 14:50:44,305 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 28 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:50:45,301 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:45,307 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:45,400 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 5038 deg of joint travel in all
+2026-10-24 14:50:45,945 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 3494 deg of joint travel in all
+2026-10-24 14:50:46,304 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:46,312 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:46,584 INFO robots.control: chunk 21: 48 actions, 0 executed since its observation, 26 due by wall time, after 1288 ms, sync
+2026-10-24 14:50:47,309 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 8 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:50:47,311 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 10 deg from the measured pose (joint 5), gripper 0.94; guard: allows it
+2026-10-24 14:50:47,401 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 12 deg from where this run began (joint 3), 5213 deg of joint travel in all
+2026-10-24 14:50:47,951 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 21 deg from where this run began (joint 5), 3643 deg of joint travel in all
+2026-10-24 14:50:48,325 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 27 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:50:48,326 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 34 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:49,325 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:49,326 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:49,403 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 5297 deg of joint travel in all
+2026-10-24 14:50:49,954 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 3673 deg of joint travel in all
+2026-10-24 14:50:50,186 INFO robots.control: chunk 22: 48 actions, 0 executed since its observation, 24 due by wall time, after 1191 ms, sync
+2026-10-24 14:50:50,327 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:50,329 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 2), gripper 0.91; guard: allows it
+2026-10-24 14:50:51,330 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 17 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:51,332 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 21 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:50:51,407 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 23 deg from where this run began (joint 3), 5504 deg of joint travel in all
+2026-10-24 14:50:51,955 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 27 deg from where this run began (joint 3), 3834 deg of joint travel in all
+2026-10-24 14:50:52,331 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 31 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:52,332 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 40 deg from the measured pose (joint 5), gripper 0.92; guard: allows it
+2026-10-24 14:50:53,333 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:50:53,335 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 5), gripper 0.91; guard: allows it
+2026-10-24 14:50:53,411 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 5), 5554 deg of joint travel in all
+2026-10-24 14:50:53,782 INFO robots.control: chunk 23: 48 actions, 0 executed since its observation, 24 due by wall time, after 1190 ms, sync
+2026-10-24 14:50:54,335 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 4 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:54,336 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 4), gripper 0.95; guard: allows it
+2026-10-24 14:50:54,375 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 3958 deg of joint travel in all
+2026-10-24 14:50:55,337 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 24 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:50:55,340 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:55,412 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 32 deg from where this run began (joint 3), 5792 deg of joint travel in all
+2026-10-24 14:50:56,341 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:56,343 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -58] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:56,376 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 4033 deg of joint travel in all
+2026-10-24 14:50:57,344 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:50:57,346 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -58] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:50:57,416 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 5819 deg of joint travel in all
+2026-10-24 14:50:57,443 INFO robots.control: chunk 24: 48 actions, 0 executed since its observation, 24 due by wall time, after 1206 ms, sync
+2026-10-24 14:50:58,348 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 12 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:58,350 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 15 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:58,380 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 12 deg from where this run began (joint 5), 4161 deg of joint travel in all
+2026-10-24 14:50:59,348 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 29 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:50:59,352 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 37 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:50:59,416 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 38 deg from where this run began (joint 3), 6072 deg of joint travel in all
+2026-10-24 14:51:00,348 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:51:00,358 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:51:00,380 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 4213 deg of joint travel in all
+2026-10-24 14:51:01,031 INFO robots.control: chunk 25: 48 actions, 0 executed since its observation, 24 due by wall time, after 1190 ms, sync
+2026-10-24 14:51:01,348 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 3), gripper 0.47; guard: allows it
+2026-10-24 14:51:01,358 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.92; guard: allows it
+2026-10-24 14:51:01,560 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 6235 deg of joint travel in all
+2026-10-24 14:51:02,351 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 20 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:51:02,360 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 26 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:51:02,380 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 21 deg from where this run began (joint 5), 4359 deg of joint travel in all
+2026-10-24 14:51:03,352 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:51:03,362 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:51:03,561 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 6346 deg of joint travel in all
+2026-10-24 14:51:03,926 INFO __main__: station: running -> stopping (run 2, prompt 'move the right hand 5 cm up')
+2026-10-24 14:51:04,751 INFO __main__: station: stopping -> idle (run 2, prompt 'move the right hand 5 cm up')
+2026-10-24 14:51:04,751 INFO __main__: station: idle -> homing (run 2, prompt 'move the right hand 5 cm up')
+2026-10-24 14:51:04,755 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.433 rad
+2026-10-24 14:51:04,756 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 4), gripper 0.19; guard: allows it
+2026-10-24 14:51:04,757 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 4), gripper 0.73; guard: allows it
+2026-10-24 14:51:04,931 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 4), 4489 deg of joint travel in all
+2026-10-24 14:51:05,338 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [12, -16, -58] cm (measured [1, -15, -59] cm), farthest joint 16 deg from the measured pose (joint 4), gripper 0.78; guard: would stop it: right wrist_pitch is 5.8 cm from keep-out zone 'table'
+2026-10-24 14:51:05,563 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [14, 13, -56] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 4), gripper 0.41; guard: would stop it: left tcp is -0.8 cm from keep-out zone 'table'
+2026-10-24 14:51:05,564 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 23 deg from where this run began (joint 4), 6513 deg of joint travel in all
+2026-10-24 14:51:06,338 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [26, -15, -49] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 4), gripper 0.87; guard: would stop it: right tcp is -4.1 cm from keep-out zone 'table'
+2026-10-24 14:51:06,560 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [27, 11, -46] cm (measured [0, 13, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.68; guard: would stop it: left tcp is -0.7 cm from keep-out zone 'table'
+2026-10-24 14:51:06,582 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [27, 11, -45] cm (measured [0, 13, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.69; guard: allows it
+2026-10-24 14:51:06,632 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [30, -13, -45] cm (measured [1, -15, -59] cm), farthest joint 52 deg from the measured pose (joint 4), gripper 0.90; guard: allows it
+2026-10-24 14:51:06,956 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 59 deg from where this run began (joint 4), 4578 deg of joint travel in all
+2026-10-24 14:51:07,581 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 78 deg from where this run began (joint 4), 6614 deg of joint travel in all
+2026-10-24 14:51:07,606 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [33, 9, -29] cm (measured [0, 13, -59] cm), farthest joint 76 deg from the measured pose (joint 4), gripper 0.97; guard: allows it
+2026-10-24 14:51:07,632 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [36, -7, -30] cm (measured [1, -15, -59] cm), farthest joint 79 deg from the measured pose (joint 4), gripper 0.99; guard: allows it
+2026-10-24 14:51:07,756 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 14:51:07,757 INFO __main__: station: homing -> idle (run 2, prompt 'move the right hand 5 cm up')
+2026-10-24 14:51:07,757 INFO dream.live: live: stop prm_158b62da51d85fc4 applied
+2026-10-24 14:51:46,000 INFO __main__: station: idle -> starting (run 3, prompt 'move the right hand 5 cm up')
+2026-10-24 14:51:46,000 INFO dream.live: live: start prm_cd9bb807bb04f36b applied
+2026-10-24 14:51:47,475 INFO __main__: station: starting -> running (run 3, prompt 'move the right hand 5 cm up')
+2026-10-24 14:51:48,672 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 23 due by wall time, after 1137 ms, sync (first chunk; motion starts)
+2026-10-24 14:51:48,677 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream run ended: 80 deg from where this run began (joint 4), 4612 deg of joint travel in all
+2026-10-24 14:51:48,679 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 4), gripper 0.19; guard: allows it
+2026-10-24 14:51:48,679 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream run ended: 82 deg from where this run began (joint 4), 6622 deg of joint travel in all
+2026-10-24 14:51:48,685 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 4), gripper 0.73; guard: allows it
+2026-10-24 14:51:49,150 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 17 deg of joint travel in all
+2026-10-24 14:51:49,220 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 15 deg of joint travel in all
+2026-10-24 14:51:49,682 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 12 deg from the measured pose (joint 5), gripper 0.27; guard: allows it
+2026-10-24 14:51:49,683 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -17, -59] cm (measured [1, -15, -59] cm), farthest joint 15 deg from the measured pose (joint 3), gripper 0.80; guard: allows it
+2026-10-24 14:51:50,685 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 27 deg from the measured pose (joint 5), gripper 0.35; guard: allows it
+2026-10-24 14:51:50,687 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -17, -59] cm (measured [1, -15, -59] cm), farthest joint 34 deg from the measured pose (joint 3), gripper 0.87; guard: allows it
+2026-10-24 14:51:51,155 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 41 deg from where this run began (joint 3), 128 deg of joint travel in all
+2026-10-24 14:51:51,223 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 32 deg from where this run began (joint 5), 97 deg of joint travel in all
+2026-10-24 14:51:51,689 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 32 deg from the measured pose (joint 5), gripper 0.38; guard: allows it
+2026-10-24 14:51:51,692 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -16, -58] cm (measured [1, -15, -59] cm), farthest joint 41 deg from the measured pose (joint 3), gripper 0.89; guard: allows it
+2026-10-24 14:51:52,558 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 29 due by wall time, after 1442 ms, sync
+2026-10-24 14:51:52,690 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.40; guard: allows it
+2026-10-24 14:51:52,691 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -17, -59] cm (measured [1, -15, -59] cm), farthest joint 14 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:51:53,159 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 7 deg from where this run began (joint 3), 266 deg of joint travel in all
+2026-10-24 14:51:53,227 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 7 deg from where this run began (joint 5), 199 deg of joint travel in all
+2026-10-24 14:51:53,693 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 17 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:51:53,694 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 21 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:51:54,693 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 31 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:51:54,694 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -12, -59] cm (measured [1, -15, -59] cm), farthest joint 41 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:51:55,159 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 44 deg from where this run began (joint 3), 378 deg of joint travel in all
+2026-10-24 14:51:55,232 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 268 deg of joint travel in all
+2026-10-24 14:51:55,693 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:51:55,694 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -11, -59] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:51:56,164 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 24 due by wall time, after 1193 ms, sync
+2026-10-24 14:51:56,696 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 4 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:51:56,698 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 5 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:51:57,161 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 18 deg from where this run began (joint 3), 535 deg of joint travel in all
+2026-10-24 14:51:57,235 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 15 deg from where this run began (joint 5), 404 deg of joint travel in all
+2026-10-24 14:51:57,697 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 24 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:51:57,698 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:51:58,698 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:51:58,699 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -13, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:51:59,165 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 605 deg of joint travel in all
+2026-10-24 14:51:59,237 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 448 deg of joint travel in all
+2026-10-24 14:51:59,699 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:51:59,700 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -13, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:52:00,067 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 30 due by wall time, after 1490 ms, sync
+2026-10-24 14:52:00,702 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 6 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:52:00,703 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 7 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:52:01,166 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 20 deg from where this run began (joint 3), 805 deg of joint travel in all
+2026-10-24 14:52:01,239 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 17 deg from where this run began (joint 5), 592 deg of joint travel in all
+2026-10-24 14:52:01,706 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 25 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:52:01,707 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 32 deg from the measured pose (joint 3), gripper 0.93; guard: allows it
+2026-10-24 14:52:02,707 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:02,708 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.92; guard: allows it
+2026-10-24 14:52:03,170 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 866 deg of joint travel in all
+2026-10-24 14:52:03,242 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 634 deg of joint travel in all
+2026-10-24 14:52:03,641 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 23 due by wall time, after 1163 ms, sync
+2026-10-24 14:52:03,708 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 2), gripper 0.42; guard: allows it
+2026-10-24 14:52:03,709 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -17, -59] cm (measured [1, -15, -59] cm), farthest joint 13 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:04,711 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 15 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:52:04,712 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 19 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:52:05,174 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 30 deg from where this run began (joint 3), 1100 deg of joint travel in all
+2026-10-24 14:52:05,246 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 25 deg from where this run began (joint 5), 800 deg of joint travel in all
+2026-10-24 14:52:05,714 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 31 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:52:05,715 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 39 deg from the measured pose (joint 5), gripper 0.96; guard: allows it
+2026-10-24 14:52:06,715 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:52:06,716 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:07,177 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 1130 deg of joint travel in all
+2026-10-24 14:52:07,250 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 821 deg of joint travel in all
+2026-10-24 14:52:07,350 INFO robots.control: chunk 6: 48 actions, 0 executed since its observation, 26 due by wall time, after 1283 ms, sync
+2026-10-24 14:52:07,718 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:52:07,719 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:52:08,722 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 21 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:52:08,725 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 27 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:52:09,180 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 35 deg from where this run began (joint 3), 1375 deg of joint travel in all
+2026-10-24 14:52:09,253 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 29 deg from where this run began (joint 5), 994 deg of joint travel in all
+2026-10-24 14:52:09,723 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:09,724 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:10,725 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:10,726 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:10,995 INFO robots.control: chunk 7: 48 actions, 0 executed since its observation, 25 due by wall time, after 1250 ms, sync
+2026-10-24 14:52:11,534 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 1539 deg of joint travel in all
+2026-10-24 14:52:11,599 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 1109 deg of joint travel in all
+2026-10-24 14:52:11,727 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 8 deg from the measured pose (joint 3), gripper 0.48; guard: allows it
+2026-10-24 14:52:11,728 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 10 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:12,730 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 26 deg from the measured pose (joint 3), gripper 0.49; guard: allows it
+2026-10-24 14:52:12,732 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 34 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:13,539 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 1652 deg of joint travel in all
+2026-10-24 14:52:13,603 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1183 deg of joint travel in all
+2026-10-24 14:52:13,731 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:52:13,732 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:52:14,735 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.50; guard: allows it
+2026-10-24 14:52:14,736 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:52:14,753 INFO robots.control: chunk 8: 48 actions, 0 executed since its observation, 27 due by wall time, after 1333 ms, sync
+2026-10-24 14:52:15,542 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 11 deg from where this run began (joint 3), 1827 deg of joint travel in all
+2026-10-24 14:52:15,603 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 10 deg from where this run began (joint 5), 1306 deg of joint travel in all
+2026-10-24 14:52:15,738 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 13 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:52:15,740 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 17 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:52:16,740 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 30 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:52:16,742 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 38 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:52:17,545 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 1918 deg of joint travel in all
+2026-10-24 14:52:17,606 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 1364 deg of joint travel in all
+2026-10-24 14:52:17,743 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:52:17,744 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -58] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:18,647 INFO robots.control: chunk 9: 48 actions, 0 executed since its observation, 30 due by wall time, after 1496 ms, sync
+2026-10-24 14:52:18,745 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 3), gripper 0.46; guard: allows it
+2026-10-24 14:52:18,747 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:52:19,549 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 15 deg from where this run began (joint 3), 2105 deg of joint travel in all
+2026-10-24 14:52:19,610 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 13 deg from where this run began (joint 5), 1494 deg of joint travel in all
+2026-10-24 14:52:19,745 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 16 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:19,747 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 20 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:52:20,627 INFO __main__: station: running -> stopping (run 3, prompt 'move the right hand 5 cm up')
+2026-10-24 14:52:20,933 INFO __main__: station: stopping -> idle (run 3, prompt 'move the right hand 5 cm up')
+2026-10-24 14:52:20,934 INFO __main__: station: idle -> homing (run 3, prompt 'move the right hand 5 cm up')
+2026-10-24 14:52:20,937 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.433 rad
+2026-10-24 14:52:20,938 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 4), gripper 0.19; guard: allows it
+2026-10-24 14:52:20,939 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 4), gripper 0.73; guard: allows it
+2026-10-24 14:52:21,517 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [12, -16, -58] cm (measured [1, -15, -59] cm), farthest joint 16 deg from the measured pose (joint 4), gripper 0.78; guard: would stop it: right wrist_pitch is 5.8 cm from keep-out zone 'table'
+2026-10-24 14:52:21,563 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 18 deg from where this run began (joint 4), 2320 deg of joint travel in all
+2026-10-24 14:52:21,612 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 18 deg from where this run began (joint 4), 1647 deg of joint travel in all
+2026-10-24 14:52:21,745 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [14, 13, -56] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 4), gripper 0.41; guard: would stop it: left tcp is -0.8 cm from keep-out zone 'table'
+2026-10-24 14:52:22,524 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [26, -15, -49] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 4), gripper 0.87; guard: would stop it: right tcp is -4.1 cm from keep-out zone 'table'
+2026-10-24 14:52:22,746 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [27, 11, -46] cm (measured [0, 13, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.68; guard: would stop it: left tcp is -0.7 cm from keep-out zone 'table'
+2026-10-24 14:52:22,764 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [27, 11, -45] cm (measured [0, 13, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.69; guard: allows it
+2026-10-24 14:52:22,815 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [30, -13, -45] cm (measured [1, -15, -59] cm), farthest joint 52 deg from the measured pose (joint 4), gripper 0.90; guard: allows it
+2026-10-24 14:52:23,588 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 73 deg from where this run began (joint 4), 2422 deg of joint travel in all
+2026-10-24 14:52:23,612 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 72 deg from where this run began (joint 4), 1735 deg of joint travel in all
+2026-10-24 14:52:23,765 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [33, 9, -29] cm (measured [0, 13, -59] cm), farthest joint 76 deg from the measured pose (joint 4), gripper 0.96; guard: allows it
+2026-10-24 14:52:23,815 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [36, -7, -30] cm (measured [1, -15, -59] cm), farthest joint 79 deg from the measured pose (joint 4), gripper 0.99; guard: allows it
+2026-10-24 14:52:23,938 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 14:52:23,939 INFO __main__: station: homing -> idle (run 3, prompt 'move the right hand 5 cm up')
+2026-10-24 14:52:23,939 INFO dream.live: live: stop prm_718ffe664341f152 applied
+2026-10-24 14:52:31,563 INFO __main__: station: idle -> starting (run 4, prompt 'move the right hand 5 cm forward')
+2026-10-24 14:52:31,563 INFO dream.live: live: start prm_2e104ca7094897c1 applied
+2026-10-24 14:52:32,772 INFO __main__: station: starting -> running (run 4, prompt 'move the right hand 5 cm forward')
+2026-10-24 14:52:35,775 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream run ended: 80 deg from where this run began (joint 4), 1748 deg of joint travel in all
+2026-10-24 14:52:35,776 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [34, 9, -26] cm (measured [0, 13, -59] cm), farthest joint 80 deg from the measured pose (joint 4), gripper 1.00; guard: allows it
+2026-10-24 14:52:35,776 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream run ended: 82 deg from where this run began (joint 4), 2438 deg of joint travel in all
+2026-10-24 14:52:35,777 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [36, -6, -29] cm (measured [1, -15, -59] cm), farthest joint 82 deg from the measured pose (joint 4), gripper 1.00; guard: allows it
+2026-10-24 14:52:37,278 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 21 due by wall time, after 1066 ms, sync (first chunk; motion starts)
+2026-10-24 14:52:37,283 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 80 deg from where this run began (joint 4), 132 deg of joint travel in all
+2026-10-24 14:52:37,284 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 2), gripper 0.19; guard: allows it
+2026-10-24 14:52:37,285 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 82 deg from where this run began (joint 4), 150 deg of joint travel in all
+2026-10-24 14:52:37,286 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.73; guard: allows it
+2026-10-24 14:52:38,287 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.27; guard: allows it
+2026-10-24 14:52:38,289 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 3), gripper 0.81; guard: allows it
+2026-10-24 14:52:39,283 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 72 deg from where this run began (joint 4), 194 deg of joint travel in all
+2026-10-24 14:52:39,288 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 5), gripper 0.35; guard: allows it
+2026-10-24 14:52:39,292 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 68 deg from where this run began (joint 4), 240 deg of joint travel in all
+2026-10-24 14:52:39,293 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -17, -59] cm (measured [1, -15, -59] cm), farthest joint 28 deg from the measured pose (joint 3), gripper 0.89; guard: allows it
+2026-10-24 14:52:40,291 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 28 deg from the measured pose (joint 5), gripper 0.38; guard: allows it
+2026-10-24 14:52:40,294 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -16, -58] cm (measured [1, -15, -59] cm), farthest joint 35 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:52:41,002 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 27 due by wall time, after 1326 ms, sync
+2026-10-24 14:52:41,283 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 80 deg from where this run began (joint 4), 289 deg of joint travel in all
+2026-10-24 14:52:41,292 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:52:41,293 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 79 deg from where this run began (joint 4), 375 deg of joint travel in all
+2026-10-24 14:52:41,296 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 4 deg from the measured pose (joint 5), gripper 0.93; guard: allows it
+2026-10-24 14:52:42,293 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 19 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:52:42,298 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 24 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:52:43,286 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 72 deg from where this run began (joint 4), 372 deg of joint travel in all
+2026-10-24 14:52:43,295 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 32 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:43,295 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 65 deg from where this run began (joint 4), 504 deg of joint travel in all
+2026-10-24 14:52:43,300 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 41 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:44,299 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:44,300 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:44,766 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 26 due by wall time, after 1299 ms, sync
+2026-10-24 14:52:45,289 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 78 deg from where this run began (joint 4), 470 deg of joint travel in all
+2026-10-24 14:52:45,299 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 79 deg from where this run began (joint 4), 654 deg of joint travel in all
+2026-10-24 14:52:45,303 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 4 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:52:45,305 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:52:46,303 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 24 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:52:46,308 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:52:47,291 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 72 deg from where this run began (joint 4), 545 deg of joint travel in all
+2026-10-24 14:52:47,299 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 65 deg from where this run began (joint 4), 763 deg of joint travel in all
+2026-10-24 14:52:47,304 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:52:47,309 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:52:48,307 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:52:48,311 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.94; guard: allows it
+2026-10-24 14:52:48,717 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 31 due by wall time, after 1554 ms, sync
+2026-10-24 14:52:49,294 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 77 deg from where this run began (joint 4), 646 deg of joint travel in all
+2026-10-24 14:52:49,302 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 76 deg from where this run began (joint 4), 915 deg of joint travel in all
+2026-10-24 14:52:49,307 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:52:49,311 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:52:50,309 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 25 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:52:50,314 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:52:51,297 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 69 deg from where this run began (joint 4), 723 deg of joint travel in all
+2026-10-24 14:52:51,306 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 62 deg from where this run began (joint 4), 1025 deg of joint travel in all
+2026-10-24 14:52:51,310 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:52:51,316 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 5), gripper 0.96; guard: allows it
+2026-10-24 14:52:52,311 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:52:52,318 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 5), gripper 0.96; guard: allows it
+2026-10-24 14:52:52,337 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 24 due by wall time, after 1206 ms, sync
+2026-10-24 14:52:53,299 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 74 deg from where this run began (joint 4), 854 deg of joint travel in all
+2026-10-24 14:52:53,307 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 70 deg from where this run began (joint 4), 1216 deg of joint travel in all
+2026-10-24 14:52:53,312 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 13 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:52:53,320 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 17 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:52:54,314 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 30 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:52:54,322 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 38 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:52:55,302 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 68 deg from where this run began (joint 4), 908 deg of joint travel in all
+2026-10-24 14:52:55,311 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 64 deg from where this run began (joint 4), 1286 deg of joint travel in all
+2026-10-24 14:52:55,315 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:55,324 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:52:55,994 INFO robots.control: chunk 6: 48 actions, 0 executed since its observation, 25 due by wall time, after 1238 ms, sync
+2026-10-24 14:52:56,316 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 3), gripper 0.47; guard: allows it
+2026-10-24 14:52:56,326 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:52:57,305 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 72 deg from where this run began (joint 4), 1060 deg of joint travel in all
+2026-10-24 14:52:57,314 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 68 deg from where this run began (joint 4), 1500 deg of joint travel in all
+2026-10-24 14:52:57,319 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 20 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:52:57,327 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 26 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:52:58,322 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.49; guard: allows it
+2026-10-24 14:52:58,331 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:59,308 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 69 deg from where this run began (joint 4), 1094 deg of joint travel in all
+2026-10-24 14:52:59,316 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 62 deg from where this run began (joint 4), 1548 deg of joint travel in all
+2026-10-24 14:52:59,325 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:52:59,331 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.95; guard: allows it
+2026-10-24 14:52:59,569 INFO robots.control: chunk 7: 48 actions, 0 executed since its observation, 23 due by wall time, after 1163 ms, sync
+2026-10-24 14:53:00,328 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 8 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:53:00,332 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 11 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:53:01,311 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 70 deg from where this run began (joint 4), 1263 deg of joint travel in all
+2026-10-24 14:53:01,320 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 64 deg from where this run began (joint 4), 1796 deg of joint travel in all
+2026-10-24 14:53:01,329 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 27 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:53:01,334 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 34 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:53:02,331 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:53:02,336 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 5), gripper 0.96; guard: allows it
+2026-10-24 14:53:02,502 INFO __main__: station: running -> stopping (run 4, prompt 'move the right hand 5 cm forward')
+2026-10-24 14:53:03,271 INFO __main__: station: stopping -> idle (run 4, prompt 'move the right hand 5 cm forward')
+2026-10-24 14:53:03,272 INFO __main__: station: idle -> homing (run 4, prompt 'move the right hand 5 cm forward')
+2026-10-24 14:53:03,275 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.433 rad
+2026-10-24 14:53:03,325 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 78 deg from where this run began (joint 4), 1376 deg of joint travel in all
+2026-10-24 14:53:03,326 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 80 deg from where this run began (joint 4), 1952 deg of joint travel in all
+2026-10-24 14:53:03,351 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [2, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 3 deg from the measured pose (joint 4), gripper 0.21; guard: allows it
+2026-10-24 14:53:03,352 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [3, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 3 deg from the measured pose (joint 4), gripper 0.74; guard: allows it
+2026-10-24 14:53:03,858 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [12, -16, -58] cm (measured [1, -15, -59] cm), farthest joint 16 deg from the measured pose (joint 4), gripper 0.78; guard: would stop it: right wrist_pitch is 5.8 cm from keep-out zone 'table'
+2026-10-24 14:53:04,081 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [14, 13, -56] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 4), gripper 0.41; guard: would stop it: left tcp is -0.8 cm from keep-out zone 'table'
+2026-10-24 14:53:04,866 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [26, -15, -49] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 4), gripper 0.87; guard: would stop it: right tcp is -4.1 cm from keep-out zone 'table'
+2026-10-24 14:53:05,101 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [27, 11, -45] cm (measured [0, 13, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.69; guard: allows it
+2026-10-24 14:53:05,152 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [30, -13, -45] cm (measured [1, -15, -59] cm), farthest joint 52 deg from the measured pose (joint 4), gripper 0.90; guard: allows it
+2026-10-24 14:53:05,326 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 25 deg from where this run began (joint 4), 1464 deg of joint travel in all
+2026-10-24 14:53:05,327 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 25 deg from where this run began (joint 4), 2052 deg of joint travel in all
+2026-10-24 14:53:06,101 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [33, 9, -29] cm (measured [0, 13, -59] cm), farthest joint 76 deg from the measured pose (joint 4), gripper 0.96; guard: allows it
+2026-10-24 14:53:06,153 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [36, -7, -30] cm (measured [1, -15, -59] cm), farthest joint 79 deg from the measured pose (joint 4), gripper 0.99; guard: allows it
+2026-10-24 14:53:06,276 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 14:53:06,277 INFO __main__: station: homing -> idle (run 4, prompt 'move the right hand 5 cm forward')
+2026-10-24 14:53:06,277 INFO dream.live: live: stop prm_cb0aea807c412abc applied
+2026-10-24 14:53:10,953 INFO __main__: station: idle -> starting (run 5, prompt 'move the left hand 5 cm to the left')
+2026-10-24 14:53:10,953 INFO dream.live: live: start prm_dd6927a69e129af9 applied
+2026-10-24 14:53:12,164 INFO __main__: station: starting -> running (run 5, prompt 'move the left hand 5 cm to the left')
+2026-10-24 14:53:15,135 INFO robots.control: chunk 1: 48 actions, 0 executed since its observation, 58 due by wall time, after 2918 ms, sync (first chunk; motion starts)
+2026-10-24 14:53:15,141 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 2), gripper 0.19; guard: allows it
+2026-10-24 14:53:15,142 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 0 deg from the measured pose (joint 1), gripper 0.73; guard: allows it
+2026-10-24 14:53:16,054 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 19 deg of joint travel in all
+2026-10-24 14:53:16,140 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 5 deg from the measured pose (joint 5), gripper 0.27; guard: allows it
+2026-10-24 14:53:16,145 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 3), gripper 0.81; guard: allows it
+2026-10-24 14:53:16,148 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 16 deg of joint travel in all
+2026-10-24 14:53:17,143 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 21 deg from the measured pose (joint 5), gripper 0.34; guard: allows it
+2026-10-24 14:53:17,146 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -17, -59] cm (measured [1, -15, -59] cm), farthest joint 26 deg from the measured pose (joint 3), gripper 0.89; guard: allows it
+2026-10-24 14:53:18,056 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 34 deg from where this run began (joint 3), 107 deg of joint travel in all
+2026-10-24 14:53:18,146 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [1, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 27 deg from the measured pose (joint 5), gripper 0.37; guard: allows it
+2026-10-24 14:53:18,148 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -16, -59] cm (measured [1, -15, -59] cm), farthest joint 34 deg from the measured pose (joint 3), gripper 0.91; guard: allows it
+2026-10-24 14:53:18,149 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 27 deg from where this run began (joint 5), 70 deg of joint travel in all
+2026-10-24 14:53:18,796 INFO robots.control: chunk 2: 48 actions, 0 executed since its observation, 25 due by wall time, after 1260 ms, sync
+2026-10-24 14:53:19,148 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 3), gripper 0.41; guard: allows it
+2026-10-24 14:53:19,150 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 2 deg from the measured pose (joint 5), gripper 0.95; guard: allows it
+2026-10-24 14:53:20,058 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 24 deg from where this run began (joint 3), 293 deg of joint travel in all
+2026-10-24 14:53:20,151 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 21 deg from where this run began (joint 5), 202 deg of joint travel in all
+2026-10-24 14:53:20,152 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 21 deg from the measured pose (joint 5), gripper 0.42; guard: allows it
+2026-10-24 14:53:20,155 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 26 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:53:21,158 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:53:21,164 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:53:22,060 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 341 deg of joint travel in all
+2026-10-24 14:53:22,154 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 231 deg of joint travel in all
+2026-10-24 14:53:22,158 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.43; guard: allows it
+2026-10-24 14:53:22,158 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:53:22,596 INFO robots.control: chunk 3: 48 actions, 0 executed since its observation, 27 due by wall time, after 1374 ms, sync
+2026-10-24 14:53:23,162 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 4 deg from the measured pose (joint 3), gripper 0.46; guard: allows it
+2026-10-24 14:53:23,163 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 6 deg from the measured pose (joint 5), gripper 0.97; guard: allows it
+2026-10-24 14:53:24,061 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 29 deg from where this run began (joint 3), 557 deg of joint travel in all
+2026-10-24 14:53:24,154 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 24 deg from where this run began (joint 5), 388 deg of joint travel in all
+2026-10-24 14:53:24,163 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 24 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:53:24,163 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 31 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:53:25,167 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:53:25,168 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:53:26,065 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 592 deg of joint travel in all
+2026-10-24 14:53:26,155 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 410 deg of joint travel in all
+2026-10-24 14:53:26,168 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.46; guard: allows it
+2026-10-24 14:53:26,168 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.97; guard: allows it
+2026-10-24 14:53:26,510 INFO robots.control: chunk 4: 48 actions, 0 executed since its observation, 30 due by wall time, after 1514 ms, sync
+2026-10-24 14:53:27,171 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 5 deg from the measured pose (joint 3), gripper 0.47; guard: allows it
+2026-10-24 14:53:27,172 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 7 deg from the measured pose (joint 5), gripper 0.96; guard: allows it
+2026-10-24 14:53:28,066 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 30 deg from where this run began (joint 3), 805 deg of joint travel in all
+2026-10-24 14:53:28,155 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 25 deg from where this run began (joint 5), 569 deg of joint travel in all
+2026-10-24 14:53:28,174 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 25 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:53:28,176 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 32 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:53:29,175 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:53:29,176 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:53:30,069 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 42 deg from where this run began (joint 3), 838 deg of joint travel in all
+2026-10-24 14:53:30,159 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 33 deg from where this run began (joint 5), 590 deg of joint travel in all
+2026-10-24 14:53:30,177 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.48; guard: allows it
+2026-10-24 14:53:30,179 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.96; guard: allows it
+2026-10-24 14:53:30,217 INFO robots.control: chunk 5: 48 actions, 0 executed since its observation, 25 due by wall time, after 1248 ms, sync
+2026-10-24 14:53:31,180 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 13 deg from the measured pose (joint 5), gripper 0.44; guard: allows it
+2026-10-24 14:53:31,181 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 17 deg from the measured pose (joint 3), gripper 0.99; guard: allows it
+2026-10-24 14:53:32,071 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 36 deg from where this run began (joint 3), 1071 deg of joint travel in all
+2026-10-24 14:53:32,160 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 29 deg from where this run began (joint 5), 762 deg of joint travel in all
+2026-10-24 14:53:32,181 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 29 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:53:32,182 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 38 deg from the measured pose (joint 3), gripper 0.99; guard: allows it
+2026-10-24 14:53:33,183 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 33 deg from the measured pose (joint 5), gripper 0.45; guard: allows it
+2026-10-24 14:53:33,185 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -14, -59] cm (measured [1, -15, -59] cm), farthest joint 42 deg from the measured pose (joint 3), gripper 0.98; guard: allows it
+2026-10-24 14:53:33,950 INFO robots.control: chunk 6: 48 actions, 0 executed since its observation, 27 due by wall time, after 1331 ms, sync
+2026-10-24 14:53:34,185 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 0 deg from the measured pose (joint 3), gripper 0.46; guard: allows it
+2026-10-24 14:53:34,186 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 5), gripper 0.98; guard: allows it
+2026-10-24 14:53:34,476 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 5), 1231 deg of joint travel in all
+2026-10-24 14:53:34,545 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 3), 878 deg of joint travel in all
+2026-10-24 14:53:35,185 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 19 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:53:35,186 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [1, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 24 deg from the measured pose (joint 3), gripper 0.99; guard: allows it
+2026-10-24 14:53:36,187 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 12, -59] cm (measured [0, 13, -59] cm), farthest joint 32 deg from the measured pose (joint 5), gripper 0.47; guard: allows it
+2026-10-24 14:53:36,188 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [0, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 41 deg from the measured pose (joint 3), gripper 0.99; guard: allows it
+2026-10-24 14:53:36,369 INFO __main__: station: running -> stopping (run 5, prompt 'move the left hand 5 cm to the left')
+2026-10-24 14:53:37,807 INFO __main__: station: stopping -> idle (run 5, prompt 'move the left hand 5 cm to the left')
+2026-10-24 14:53:37,807 INFO __main__: station: idle -> homing (run 5, prompt 'move the left hand 5 cm to the left')
+2026-10-24 14:53:37,811 INFO robots.home: home: moving ['left', 'right'] home with grippers open over 3.0 s in 120 steps; largest joint delta 1.433 rad
+2026-10-24 14:53:37,812 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [0, 13, -59] cm (measured [0, 13, -59] cm), farthest joint 1 deg from the measured pose (joint 4), gripper 0.19; guard: allows it
+2026-10-24 14:53:37,813 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [2, -15, -59] cm (measured [1, -15, -59] cm), farthest joint 1 deg from the measured pose (joint 4), gripper 0.73; guard: allows it
+2026-10-24 14:53:37,986 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 5 deg from where this run began (joint 4), 1049 deg of joint travel in all
+2026-10-24 14:53:37,988 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 5 deg from where this run began (joint 4), 1469 deg of joint travel in all
+2026-10-24 14:53:38,393 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [12, -16, -58] cm (measured [1, -15, -59] cm), farthest joint 16 deg from the measured pose (joint 4), gripper 0.78; guard: would stop it: right wrist_pitch is 5.8 cm from keep-out zone 'table'
+2026-10-24 14:53:38,619 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [14, 13, -56] cm (measured [0, 13, -59] cm), farthest joint 22 deg from the measured pose (joint 4), gripper 0.41; guard: would stop it: left tcp is -0.8 cm from keep-out zone 'table'
+2026-10-24 14:53:39,397 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [26, -15, -49] cm (measured [1, -15, -59] cm), farthest joint 44 deg from the measured pose (joint 4), gripper 0.87; guard: would stop it: right tcp is -4.1 cm from keep-out zone 'table'
+2026-10-24 14:53:39,637 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [27, 11, -45] cm (measured [0, 13, -59] cm), farthest joint 49 deg from the measured pose (joint 4), gripper 0.69; guard: allows it
+2026-10-24 14:53:39,689 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [30, -13, -45] cm (measured [1, -15, -59] cm), farthest joint 52 deg from the measured pose (joint 4), gripper 0.90; guard: allows it
+2026-10-24 14:53:40,011 INFO _robots_driver_openarm_v2: arm left: DRY RUN, Dream asks: 59 deg from where this run began (joint 4), 1138 deg of joint travel in all
+2026-10-24 14:53:40,012 INFO _robots_driver_openarm_v2: arm right: DRY RUN, Dream asks: 61 deg from where this run began (joint 4), 1571 deg of joint travel in all
+2026-10-24 14:53:40,638 INFO _robots_driver_openarm_v2: arm left: DRY RUN target: hand [33, 9, -29] cm (measured [0, 13, -59] cm), farthest joint 76 deg from the measured pose (joint 4), gripper 0.96; guard: allows it
+2026-10-24 14:53:40,689 INFO _robots_driver_openarm_v2: arm right: DRY RUN target: hand [36, -7, -30] cm (measured [1, -15, -59] cm), farthest joint 79 deg from the measured pose (joint 4), gripper 0.99; guard: allows it
+2026-10-24 14:53:40,813 INFO robots.home: home: arms ['left', 'right'] at home and holding
+2026-10-24 14:53:40,813 INFO __main__: station: homing -> idle (run 5, prompt 'move the left hand 5 cm to the left')
+2026-10-24 14:53:40,814 INFO dream.live: live: stop prm_61c631ae343b4994 applied
+2026-10-24 14:54:20,763 INFO __main__: station: shutting down; stopping the run if one exists
+2026-10-24 14:54:22,697 INFO __main__: station: exited with the arms switched off
