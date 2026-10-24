@@ -154,6 +154,7 @@ GRIPPER_STALL_DEG, GRIPPER_STALL_S = 4.0, 2.0
 ## Soft start: the gains start at this share and reach full over this many seconds.
 SOFT_START_GAIN0, SOFT_START_S = 0.4, 0.5
 ## Soft limits: a target stays this far inside a joint's limits, degrees (the gripper's margin is smaller).
+SAFE_Q_FRESH_S = 0.5  # how long the last target sent serves as the starting point for cutting the next one back
 GRIPPER_LIMIT_MARGIN_DEG = 1.0
 
 ## Tries to confirm a motor switched off: leaving one energized is not acceptable.
@@ -354,13 +355,22 @@ class ReadOnlyLeader(ReadOnlyArm):
         return homing_offsets(self.side, directory / f"{LEADER_CALIBRATION_IDS[self.side]}.json")
 
 
+def targets_clamped_from(offsets: dict[str, float], commands: dict[str, tuple]) -> dict[str, float]:
+    """The logical target (degrees) inside each command tuple `(kp, kd, native position, vel, torque)`."""
+    return {name: commands[name][2] - offsets[name] for name in commands}
+
+
 class Arm(ReadOnlyArm):
     """One OpenArm arm, switched on and holding where it is, then following Dream's targets."""
 
-    def __init__(self, cfg: config.ArmConfig, side: str) -> None:
-        """Opens the link, reads the arm, then switches each motor on holding the pose it read.
+    ## Class defaults: smooth, motor-safe motion on, run by a control thread. A test arm can switch either off per arm (`cfg.smooth`, `cfg.sync`).
+    smooth_default = True
+    sync_default = False
 
-        @param cfg As #ReadOnlyArm.
+    def __init__(self, cfg: config.ArmConfig, side: str) -> None:
+        """Opens the link, reads the arm, switches each motor on holding the pose it read (the gains ramp up softly), raises the arm to its home if it rests, then starts the control thread.
+
+        @param cfg As #ReadOnlyArm; optional `smooth`, `sync` (no thread: every write ticks once, for tests), `sync_dt` (that tick's seconds).
         @param side `"left"` or `"right"`.
         @throws ArmError A motor is silent, faulted, or reads outside its limits; no motor is switched on then. Or a
             motor does not confirm switching on, and those already on are switched off again.
@@ -369,14 +379,38 @@ class Arm(ReadOnlyArm):
         self._guard = openarm_guard.Guard(self.side)
         self._lock = openarm_lock.ArmLock(self.side)
         self._held: dict[str, float] | None = None  # the pose a locked arm holds
+        self._safe_q: np.ndarray | None = None      # the last target the guard let through, Dream's model, radians
+        self._safe_time = 0.0
+        self._tally = motion.RequestTally()         # what Dream asks of this arm, for the log
+        self._at_edge = False                       # the last target was cut back to the edge of the allowed space
+        self._smooth = bool(getattr(cfg, "smooth", type(self).smooth_default))
+        self._sync = bool(getattr(cfg, "sync", type(self).sync_default))
+        self._sync_dt = float(getattr(cfg, "sync_dt", CONTROL_PERIOD))
+        self._cl = threading.RLock()                       # guards the tracker and the target
+        self._tracker: motion.SmoothTracker | None = None
+        self._target: np.ndarray | None = None             # the latest target per motor, logical degrees, in MOTORS order
+        self._alarms: dict[str, str] = {}                  # heat, fault, gripper
+        self._hot = False
+        self._stall_since: float | None = None
+        self._soft_t0: float | None = None
+        self._thread: threading.Thread | None = None
+        self._stop = threading.Event()
+        self._deg_time = 0.0
+        self._sim_t = 0.0                                  # simulated seconds of an inline arm (tests): the monitors' clock when there is no thread
+        self._warned: dict[str, float] = {}
         home = getattr(cfg, "home", None)
         self._home_deg = None if home is None else np.degrees(MODEL_SIGN * (np.asarray(home, dtype=float) - MODEL_ZERO_RAD))
         try:
             self._logical()  # refuses a bad reading before any motor is on
             self._switch_on()
-            if self._should_go_ready():
+            if not self._lock.is_active():
+                _log.info("arm %s: locked (arms.py), so it stays where it is: not raised to ready", self.side)
+            elif self._should_go_ready():
                 self.go_ready()
+            if self._smooth and not self._sync:
+                self._start_thread()
         except BaseException:
+            self._stop_thread()
             self.bus.close()
             raise
 
@@ -384,26 +418,37 @@ class Arm(ReadOnlyArm):
         """A logical angle in the motor's own frame, degrees."""
         return logical_deg + self._offsets[name]
 
-    def _hold(self, name: str, logical_deg: float) -> None:
-        """One MIT frame holding `name` at `logical_deg` with the fork's gains."""
-        self.bus.mit(name, KP[name], KD[name], self._native_of(name, logical_deg), 0.0, 0.0)
+    def _hold(self, name: str, logical_deg: float, gain: float = 1.0) -> None:
+        """One MIT frame holding `name` at `logical_deg` with the fork's gains (times `gain`)."""
+        self.bus.mit(name, KP[name] * gain, KD[name], self._native_of(name, logical_deg), 0.0, 0.0)
 
     def _switch_on(self) -> None:
-        """Enables each motor and sends it, at once, the angle it reads, so its first target is where it is."""
+        """Enables each motor and sends it, at once, the angle it reads, so its first target is where it is; with smooth motion the gains then ramp up softly."""
         assert self._deg is not None
         enabled: list[str] = []
+        first = SOFT_START_GAIN0 if self._smooth else 1.0
         try:
             for name in MOTORS:
                 state = self.bus.command(name, damiao.CMD_ENABLE)
                 enabled.append(name)
-                self._hold(name, self._deg[name])
+                self._hold(name, self._deg[name], first)
                 state = self.bus.motors[name].state or state
                 if state is None or state.status != damiao.STATUS_ENABLED:
                     raise errors.ArmError(f"arm {self.side} {name} did not confirm switching on")
+            if self._smooth:
+                self._soft_start()
         except BaseException:
             self._disable(enabled)
             raise
         self._limp = False
+
+    def _soft_start(self, steps: int = 25) -> None:
+        """Ramps every motor's gain from #SOFT_START_GAIN0 to full over #SOFT_START_S seconds, holding where the arm is."""
+        for k in range(steps + 1):
+            gain = SOFT_START_GAIN0 + (1.0 - SOFT_START_GAIN0) * k / steps
+            self.bus.mit_batch({n: (KP[n] * gain, KD[n], self._native_of(n, self._deg[n]), 0.0, 0.0) for n in MOTORS})
+            if CONTROL_PERIOD_S > 0:
+                time.sleep(SOFT_START_S / steps)
 
     def _disable(self, names: list[str]) -> None:
         """Switches `names` off, retrying until each confirms; raises if one stays on.
@@ -441,34 +486,75 @@ class Arm(ReadOnlyArm):
                 f"arm {self.side}: the gripper's shut and open angles are not measured; run the gripper step of "
                 "`dreamcli setup` (they become gripper_closed_deg and gripper_open_deg)"
             )
+        self._note_request(positions_rad)
         if self._limp:
+            self._safe_q = None
+            self._stop_thread()
             self._logical()
             self._switch_on()
+            self._start_control()
             return  # the arm now holds where the hand left it; this target is dropped
         if not self._lock.is_active():
+            if self._smooth:
+                self._lock_target()
+                return
             self._hold_locked()
             return  # this arm is locked (arms.py): it keeps its pose whatever it is asked
         self._held = None
-        self._guard.check(positions_rad)
         here = self._deg if self._deg is not None else self._logical()
+        positions_rad = self._limited(positions_rad, here)
         logical = np.degrees(MODEL_SIGN * (np.asarray(positions_rad, dtype=np.float64) - MODEL_ZERO_RAD))
         targets = dict(zip(JOINTS, logical.tolist(), strict=True))
         targets[GRIPPER] = closed + float(np.clip(gripper, 0.0, 1.0)) * (opened - closed)
         commands: dict[str, tuple[float, float, float, float, float]] = {}
+        before = here
+        if self._smooth and self._target is not None:
+            before = dict(zip(MOTORS, self._target.tolist(), strict=True))   # the tracker keeps the arm behind Dream's targets: the step is from the last target
         for name in MOTORS:
             low, high = LIMITS_DEG[self.side][name]
             target = min(max(targets[name], low), high)
-            if abs(target - here[name]) > MAX_STEP_DEG:
+            if abs(target - before[name]) > MAX_STEP_DEG:
                 raise errors.ArmError(
-                    f"arm {self.side} {name}: target {target:.1f} deg is {abs(target - here[name]):.1f} deg from the "
-                    f"arm ({here[name]:.1f} deg); nothing was sent. A wrong angle mapping looks like this"
+                    f"arm {self.side} {name}: target {target:.1f} deg is {abs(target - before[name]):.1f} deg from the "
+                    f"{'last target' if before is not here else 'arm'} ({before[name]:.1f} deg); nothing was sent. A wrong angle mapping looks like this"
                 )
             commands[name] = (KP[name], KD[name], self._native_of(name, target), 0.0, 0.0)
+        if self._smooth:
+            self._ensure_tracker()
+            with self._cl:
+                clamped = targets_clamped_from(self._offsets, commands)
+                self._target[:] = [clamped[name] for name in MOTORS]
+            if self._sync:
+                self._tick(self._sync_dt)
+            return
         self.bus.mit_batch(commands)
         for name in MOTORS:  # the replies carry where each motor is now
             state = self.bus.motors[name].state
             if state is not None:
                 here[name] = state.position_deg - self._offsets[name]
+
+    def _note_request(self, positions_rad: np.ndarray) -> None:
+        """Logs what Dream asks of this arm (net move of the run, joint, travel), and says when the arm is locked and so holds still."""
+        for kind, net, joint, path in self._tally.update(np.degrees(np.asarray(positions_rad, dtype=float)), self._time()):
+            _log.info("arm %s: Dream %s: %.0f deg from where this run began (joint %d), %.0f deg of joint travel in all%s", self.side, kind, net,
+                      joint + 1, path, "; this arm is LOCKED, so it holds still" if not self._lock.is_active() else "")
+
+    def _limited(self, positions_rad: np.ndarray, here: dict[str, float]) -> np.ndarray:
+        """Cuts a target back to the edge of the allowed space (the guard) instead of refusing it, and says so once per stretch outside.
+
+        The reference is the last target sent a moment ago, else the measured pose (an arm already outside is still refused).
+        """
+        now = self._time()
+        if self._safe_q is not None and now - self._safe_time <= SAFE_Q_FRESH_S:
+            prev = self._safe_q
+        else:
+            prev = MODEL_ZERO_RAD + MODEL_SIGN * np.radians([here[n] for n in JOINTS])
+        limited, found = self._guard.limit(prev, positions_rad)
+        self._safe_q, self._safe_time = limited, now
+        if found and not self._at_edge:
+            _log.warning("arm %s: stopped at the edge of the allowed space (%s); the target stays out of reach until it comes back inside", self.side, found[0])
+        self._at_edge = bool(found)
+        return limited
 
     def _hold_locked(self) -> None:
         """Keeps a locked arm where it was when the lock first showed, motors alive."""
@@ -482,13 +568,230 @@ class Arm(ReadOnlyArm):
         @return True once every motor confirmed.
         @throws ArmError A motor did not confirm switching off.
         """
+        self._stop_thread()
         self._disable(list(MOTORS))
         self._limp = True
         return True
 
     def close(self) -> None:
-        """Closes the CAN link without a move; motors keep their last target only while their own CAN timeout allows."""
+        """Stops the control thread and closes the CAN link without a move; motors keep their last target only while their own CAN timeout allows."""
+        self._stop_thread()
         self.bus.close()
+
+    # -- smooth, motor-safe motion ------------------------------------------------------------------------------
+
+    def _logical(self) -> dict[str, float]:
+        """Every motor's logical angle: from the control thread's latest replies when it runs (it owns the bus), else asked directly."""
+        if self._thread is not None:
+            if self._time() - self._deg_time > 0.5:
+                raise errors.ArmError(f"arm {self.side}: no recent reply from the motors (the control thread is not getting answers)")
+            return dict(self._deg)
+        logical = super()._logical()
+        self._deg_time = time.monotonic()
+        return logical
+
+    def _vector(self) -> np.ndarray:
+        """The motors' measured logical angles as a vector in MOTORS order."""
+        return np.array([self._deg[n] for n in MOTORS], dtype=float)
+
+    def _ensure_tracker(self) -> None:
+        if self._tracker is None:
+            self._tracker = motion.SmoothTracker(LIMITS, self._vector())
+            self._target = self._vector().copy()
+
+    def _start_control(self) -> None:
+        """(Re)starts smooth control from where the arm is now: a fresh tracker, the target here, and the thread unless this arm runs inline."""
+        if not self._smooth:
+            return
+        self._tracker, self._target = None, None
+        self._ensure_tracker()
+        if not self._sync:
+            self._start_thread()
+
+    def _start_thread(self) -> None:
+        """Starts the control thread: from now on it alone talks to the motors, and `write()` only sets the target."""
+        if self._thread is not None:
+            return
+        self._ensure_tracker()
+        self._sync = False
+        self._stop.clear()
+        self._deg_time = time.monotonic()
+        self._thread = threading.Thread(target=self._run, name=f"arm-{self.side}", daemon=True)
+        self._thread.start()
+
+    def _stop_thread(self) -> None:
+        """Stops the control thread (it sends nothing after this); the arm keeps its last motor target."""
+        thread, self._thread = self._thread, None
+        if thread is not None:
+            self._stop.set()
+            thread.join(timeout=2.0)
+
+    def _run(self) -> None:
+        last = time.monotonic()
+        next_tick = last
+        try:
+            while not self._stop.is_set():
+                now = time.monotonic()
+                self._tick(min(max(now - last, 0.001), 0.05))
+                last = now
+                next_tick += CONTROL_PERIOD
+                time.sleep(max(0.0, next_tick - time.monotonic()))
+        except Exception as exc:  # a dead thread must be loud
+            self._alarms["thread"] = f"arm {self.side}: the control thread stopped ({exc!r}); the arm holds its last target"
+            _log.exception("arm %s: control thread stopped", self.side)
+
+    def _time(self) -> float:
+        """The monitors' clock: real time with the thread, simulated seconds for an arm that ticks inline."""
+        return self._sim_t if self._sync else time.monotonic()
+
+    def _gain(self) -> float:
+        """The soft-start gain share: below 1 for #SOFT_START_S after a restart of smooth control, else 1."""
+        if self._soft_t0 is None:
+            return 1.0
+        share = (self._time() - self._soft_t0) / SOFT_START_S
+        if share >= 1.0:
+            self._soft_t0 = None
+            return 1.0
+        return SOFT_START_GAIN0 + (1.0 - SOFT_START_GAIN0) * share
+
+    def _tick(self, dt: float) -> None:
+        """One control step: the tracker moves toward the target, the torque budget and soft limits shape the setpoint, one MIT batch goes out, the replies are read and watched."""
+        self._ensure_tracker()
+        self._sim_t += dt
+        with self._cl:
+            target = self._tracker.x.copy() if self._hot else self._target.copy()
+            setpoint = self._tracker.step(target, dt).copy()
+        sent, over = self._send_setpoint(setpoint)
+        if over.any():  # anti wind-up: a blocked joint's tracker does not run away from the arm
+            with self._cl:
+                self._tracker.x = np.where(over, sent, self._tracker.x)
+                self._tracker.v = np.where(over, 0.0, self._tracker.v)
+
+    def _send_setpoint(self, setpoint: np.ndarray, gain: float | None = None) -> tuple[np.ndarray, np.ndarray]:
+        """Sends one batch: the setpoint (logical degrees, MOTORS order) limited to the torque budget around the measured angle and kept inside the soft limits.
+
+        @return `(sent, over)`: what was sent and which joints were held back by the torque budget.
+        """
+        measured = self._vector()
+        lead = LIMITS.lead_deg
+        over = np.abs(setpoint - measured) > lead
+        sent = measured + np.clip(setpoint - measured, -lead, lead)
+        for i, name in enumerate(MOTORS):
+            low, high = LIMITS_DEG[self.side][name]
+            margin = GRIPPER_LIMIT_MARGIN_DEG if name == GRIPPER else motion.SOFT_LIMIT_MARGIN_DEG
+            sent[i] = min(max(sent[i], low + margin), high - margin)
+        gain = self._gain() if gain is None else gain
+        self.bus.mit_batch({n: (KP[n] * gain, KD[n], self._native_of(n, float(sent[i])), 0.0, 0.0) for i, n in enumerate(MOTORS)})
+        self._read_back()
+        return sent, over
+
+    def _read_back(self) -> None:
+        """Takes the motors' positions from the replies to the last batch and runs the monitors."""
+        for name in MOTORS:
+            state = self.bus.motors[name].state
+            if state is not None:
+                self._deg[name] = state.position_deg - self._offsets[name]
+        self._deg_time = self._time()
+        self._monitor()
+
+    def _monitor(self) -> None:
+        """Faults, temperature and gripper stall: sets the alarms; a hot motor makes the arm hold."""
+        now = self._time()
+        faults, hottest = [], ("", 0.0)
+        for name in MOTORS:
+            state = self.bus.motors[name].state
+            if state is None:
+                continue
+            if state.status in damiao.FAULT_STATUSES:
+                faults.append(f"arm {self.side} {name}: {damiao.FAULT_TEXT.get(state.status, state.status)}")
+            temp = max(state.temp_mos_c, state.temp_rotor_c)
+            if temp > hottest[1]:
+                hottest = (name, temp)
+            if temp >= TEMP_WARN_C and now - self._warned.get(name, -1e9) > 30.0:
+                self._warned[name] = now
+                _log.warning("arm %s %s is at %.0f C (warns at %.0f, holds at %.0f)", self.side, name, temp, TEMP_WARN_C, TEMP_STOP_C)
+        if faults:
+            self._alarms["fault"] = faults[0]
+        else:
+            self._alarms.pop("fault", None)
+        if hottest[1] >= TEMP_STOP_C:
+            self._hot = True
+            self._alarms["heat"] = f"arm {self.side} {hottest[0]} is at {hottest[1]:.0f} C (limit {TEMP_STOP_C:.0f}): the arm holds still; stop the run and let it cool"
+        elif self._hot and hottest[1] < TEMP_RESUME_C:
+            self._hot = False
+            self._alarms.pop("heat", None)
+        if self._target is not None and self._tracker is not None:
+            lead = abs(float(self._target[-1]) - self._deg[GRIPPER])
+            if lead > GRIPPER_STALL_DEG:
+                self._stall_since = self._stall_since or now
+                if now - self._stall_since > GRIPPER_STALL_S:
+                    with self._cl:
+                        self._target[-1] = self._deg[GRIPPER]
+                        self._tracker.x[-1], self._tracker.v[-1] = self._deg[GRIPPER], 0.0
+                    self._alarms["gripper"] = f"arm {self.side} gripper is blocked or squeezing (it led its angle by {lead:.0f} deg for {GRIPPER_STALL_S:g} s): relaxed to where it is"
+                    self._stall_since = None
+            else:
+                self._stall_since = None
+
+    def alarm(self) -> str | None:
+        """Why the run must stop although the arm answers (a hot motor, a fault, a blocked gripper, a dead control thread), or None."""
+        return next(iter(self._alarms.values()), None) if self._alarms else None
+
+    def settle(self, max_s: float = 10.0, dt: float = CONTROL_PERIOD) -> bool:
+        """Runs control ticks inline until the arm sits on its target (arms run without the thread: tests, offline moves).
+
+        @return Whether it settled within `max_s` seconds of simulated time.
+        """
+        self._ensure_tracker()
+        for _ in range(int(max_s / dt)):
+            if self._tracker.settled(self._target) and not self._hot:
+                return True
+            self._tick(dt)
+        return self._tracker.settled(self._target)
+
+    def _lock_target(self) -> None:
+        """A locked arm holds the pose it had when the lock first showed: its target becomes that pose."""
+        self._ensure_tracker()
+        if self._held is None:
+            self._held = dict(self._logical())
+        with self._cl:
+            self._target[:] = [self._held[n] for n in MOTORS]
+        if self._sync:
+            self._tick(self._sync_dt)
+
+    def _follow_smooth(self, points: list[list[float]]) -> None:
+        """Moves the joints along `points` (degrees, the first is where the arm is) on a smooth path within the limits, the gripper held.
+
+        The control thread, if it runs, is stopped for the move and restarted afterwards from the end pose.
+
+        @throws ArmError A motor leaves the enabled state, or a joint lags the path by more than #FOLLOW_LAG_DEG.
+        """
+        was_running = self._thread is not None
+        self._stop_thread()
+        grip = self._deg[GRIPPER]
+        path = motion.smooth_path(np.array(points, dtype=float), LIMITS, SAMPLE_DT_S)
+        peak_v = float(np.max(np.abs(np.diff(path.samples, axis=0)) / SAMPLE_DT_S)) if len(path.samples) > 1 else 0.0
+        _log.info("arm %s: smooth move of %.1f s, peak joint speed %.0f deg/s", self.side, path.duration, peak_v)
+        for sample in path.samples[1:]:
+            sent, _ = self._send_setpoint(np.append(sample, grip), 1.0)
+            for name in MOTORS:
+                state = self.bus.motors[name].state
+                if state.status != damiao.STATUS_ENABLED:
+                    raise errors.ArmError(f"arm {self.side} {name} left the enabled state (status {state.status:#x})")
+            for i, name in enumerate(JOINTS):
+                behind = abs(self._deg[name] - float(sample[i]))
+                if behind > FOLLOW_LAG_DEG:
+                    raise errors.ArmError(f"arm {self.side} {name} is {behind:.1f} deg behind its path: stopped (blocked, or a wrong angle mapping)")
+            time.sleep(CONTROL_PERIOD_S)
+        self._logical() if self._thread is None else None
+        self._start_control_after_move(was_running)
+
+    def _start_control_after_move(self, was_running: bool) -> None:
+        """Fresh smooth control from the end pose; the thread comes back if it was running."""
+        self._tracker, self._target = None, None
+        self._ensure_tracker()
+        if was_running:
+            self._start_thread()
 
     # -- ready and rest poses -----------------------------------------------------------------------------------
 
@@ -532,6 +835,9 @@ class Arm(ReadOnlyArm):
 
         @throws ArmError A motor leaves the enabled state, or a joint lags its target by more than #FOLLOW_LAG_DEG.
         """
+        if self._smooth:
+            self._follow_smooth(points)
+            return
         grip = self._deg[GRIPPER]
         for sample in poses.densify(points, FOLLOW_MAX_DPS, SAMPLE_DT_S):
             targets = {}
@@ -593,8 +899,10 @@ class Arm(ReadOnlyArm):
                 self._park()
             except Exception as exc:
                 _log.warning("arm %s: parking failed (%s); switching off where it is", self.side, exc)
+            self._stop_thread()   # the control thread must not share the bus with the switch-off
             self._disable(list(MOTORS))
         finally:
+            self._stop_thread()
             self.bus.close()
 
 

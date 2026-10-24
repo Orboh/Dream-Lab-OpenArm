@@ -5,6 +5,7 @@ Run from this folder with Dream's Python:  env -u PYTHONPATH -u AMENT_PREFIX_PAT
 
 import datetime as dt
 import json
+import logging
 import math
 import time
 import types
@@ -186,7 +187,7 @@ def test_lock_with_a_broken_file_keeps_both_arms_locked_out_safely(tmp_path, mon
 
 # -- driver: guard and lock in Arm.write ------------------------------------------------------------------------------
 
-from test_openarm_v2 import LOGICAL, OFFSETS, make_arm  # noqa: E402,F401  (fixture reuse)
+from test_openarm_v2 import LOGICAL, OFFSETS, as_logical, joints_of, make_arm  # noqa: E402,F401  (fixture reuse)
 
 
 def ready_pose_rad():
@@ -256,6 +257,180 @@ def test_guard_refuses_a_pose_outside_the_allowed_region(monkeypatch, tmp_path):
     path.write_text(yaml.safe_dump(raw))
     with pytest.raises(errors.ArmError, match="region"):
         guard.Guard("left", clock=lambda: NOW).check(q)
+
+
+# -- stop at the boundary: a target outside the allowed region is cut back to the edge, not refused ------------------------------------
+
+def region_zones(monkeypatch, tmp_path, margin=0.05):
+    """Zones whose allowed region is the left arm's pose at q = ready (every link), with `margin` to spare on every side (negative: the pose itself is outside)."""
+    monkeypatch.setenv("OPENARM_ZONES_REQUIRED", "1")
+    q = ready_pose_rad()
+    pts = np.array(list(zones.ArmKinematics("left").points(q).values()))
+    raw = zones_dict(captured=dt.datetime.now(dt.timezone.utc))
+    raw["arms"]["left"]["region"] = {"lo": (pts.min(axis=0) - margin).tolist(), "hi": (pts.max(axis=0) + margin).tolist()}
+    path = tmp_path / "zones.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    monkeypatch.setenv("OPENARM_ZONES", str(path))
+    return q, raw, path
+
+
+def moved_out(q, degrees):
+    """The pose q with joint 1 turned until the hand certainly leaves a 5 cm margin."""
+    out = q.copy()
+    out[0] += math.radians(degrees)
+    return out
+
+
+def test_limit_returns_an_inside_target_unchanged(monkeypatch, tmp_path):
+    q, _, _ = region_zones(monkeypatch, tmp_path)
+    got, found = guard.Guard("left", clock=lambda: dt.datetime.now(dt.timezone.utc)).limit(q, q + 1e-4)
+    assert found == [] and np.allclose(got, q + 1e-4)
+
+
+def test_limit_cuts_an_outside_target_back_to_the_edge_on_the_way(monkeypatch, tmp_path):
+    q, _, _ = region_zones(monkeypatch, tmp_path)
+    g = guard.Guard("left", clock=lambda: dt.datetime.now(dt.timezone.utc))
+    target = moved_out(q, 20.0)
+    got, found = g.limit(q, target)
+    assert found and "region" in found[0]
+    fraction = float(np.dot(got - q, target - q) / np.dot(target - q, target - q))
+    assert 0.0 < fraction < 1.0 and np.allclose(got, q + fraction * (target - q))   # on the segment, short of the target
+    g.check(got)                                                                     # and the cut point itself is allowed
+    near_edge = zones.ArmKinematics("left").points(q + (fraction + 0.02) * (target - q))
+    assert g._load().violations("left", near_edge, check_reach=False)               # a little further is not: it is the edge, not a timid stop
+
+
+def test_limit_holds_where_it_is_when_the_next_target_is_still_outside(monkeypatch, tmp_path):
+    q, _, _ = region_zones(monkeypatch, tmp_path)
+    g = guard.Guard("left", clock=lambda: dt.datetime.now(dt.timezone.utc))
+    edge, _ = g.limit(q, moved_out(q, 20.0))
+    again, found = g.limit(edge, moved_out(q, 30.0))
+    assert found and np.allclose(again, edge, atol=1e-3)
+    g.check(again)
+
+
+def test_limit_still_refuses_when_the_arm_is_already_outside(monkeypatch, tmp_path):
+    q, _, _ = region_zones(monkeypatch, tmp_path)
+    g = guard.Guard("left", clock=lambda: dt.datetime.now(dt.timezone.utc))
+    with pytest.raises(errors.ArmError, match="region"):
+        g.limit(moved_out(q, 20.0), moved_out(q, 25.0))
+
+
+def test_limit_still_refuses_stale_or_missing_zones(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENARM_ZONES_REQUIRED", "1")
+    monkeypatch.setenv("OPENARM_ZONES", str(tmp_path / "missing.yaml"))
+    with pytest.raises(errors.ArmError, match="daily"):
+        guard.Guard("left").limit(np.zeros(7), np.zeros(7))
+    path = write_zones(tmp_path / "zones.yaml", captured=NOW - dt.timedelta(hours=40))
+    monkeypatch.setenv("OPENARM_ZONES", str(path))
+    with pytest.raises(errors.ArmError, match="hours old"):
+        guard.Guard("left", clock=lambda: NOW).limit(np.zeros(7), np.zeros(7))
+
+
+def test_limit_is_a_pass_through_when_the_guard_is_off(monkeypatch, tmp_path):
+    monkeypatch.setenv("OPENARM_ZONES_REQUIRED", "0")
+    got, found = guard.Guard("left").limit(np.zeros(7), np.ones(7))
+    assert found == [] and np.allclose(got, 1.0)
+
+
+def test_a_write_beyond_the_region_stops_at_the_edge_and_does_not_fail(make_arm, monkeypatch, tmp_path, caplog):
+    q, _, _ = region_zones(monkeypatch, tmp_path)
+    arm, bus = make_arm(drv.Arm)
+    target = moved_out(q, 15.0)
+    arm.write(target, 0.5)                                 # was an ArmError that ended the run
+    full = LOGICAL["joint_1"] + 15.0 + OFFSETS["joint_1"]
+    sent = bus.mit_targets["joint_1"]
+    assert LOGICAL["joint_1"] + OFFSETS["joint_1"] < sent < full - 0.5            # moved, but stopped short of the target
+    guard.Guard("left").check(np.radians([sent - OFFSETS["joint_1"]] + [LOGICAL[n] for n in drv.JOINTS[1:]]))
+    arm.write(moved_out(q, 15.0), 0.5)                     # asked again: still no error, still the same edge
+    assert bus.mit_targets["joint_1"] == pytest.approx(sent, abs=0.3)
+    assert any("edge of the allowed" in r.message for r in caplog.records)
+
+
+def test_a_write_inside_the_region_is_sent_whole(make_arm, monkeypatch, tmp_path):
+    q, _, _ = region_zones(monkeypatch, tmp_path)
+    arm, bus = make_arm(drv.Arm)
+    arm.write(q + np.radians(1.0), 0.5)
+    assert bus.mit_targets["joint_1"] == pytest.approx(LOGICAL["joint_1"] + 1.0 + OFFSETS["joint_1"], abs=0.1)
+
+
+def test_a_write_from_an_arm_already_outside_is_still_refused(make_arm, monkeypatch, tmp_path):
+    q, _, _ = region_zones(monkeypatch, tmp_path, margin=-0.05)   # the arm's own pose is outside this region
+    arm, bus = make_arm(drv.Arm)
+    before = dict(bus.mit_targets)
+    with pytest.raises(errors.ArmError, match="region"):
+        arm.write(q + np.radians(1.0), 0.5)
+    assert bus.mit_targets == before
+
+
+def test_limit_accepts_a_prior_pose_a_hair_outside_the_region_so_home_can_move_back(monkeypatch, tmp_path):
+    """An arm that stopped at the edge sits a few millimetres outside (it lags its target): moving it back inside must still work."""
+    q, raw, path = region_zones(monkeypatch, tmp_path, margin=0.5)
+    pts = np.array(list(zones.ArmKinematics("left").points(q).values()))
+    top = int(np.argmax(pts[:, 2]))
+    raw["arms"]["left"]["region"]["hi"][2] = float(pts[top, 2] - 0.005)     # the highest link is 0.5 cm above the ceiling
+    path.write_text(yaml.safe_dump(raw))
+    g = guard.Guard("left", clock=lambda: dt.datetime.now(dt.timezone.utc))
+    with pytest.raises(errors.ArmError):
+        g.check(q)
+    candidates = [q + np.eye(7)[j] * math.radians(sign * 4.0) for j in range(4) for sign in (1, -1)]
+    back = next(t for t in candidates if not g._violations(*g._ready(), "left", t))     # a small move that brings every link under the ceiling
+    got, found = g.limit(q, back)
+    assert found == [] and np.allclose(got, back)                          # whole, no refusal
+    higher = next(t for t in candidates if g._violations(*g._ready(), "left", t))      # a target that stays outside
+    held, found = g.limit(q, higher)
+    assert found and np.allclose(held, q, atol=1e-3)                       # never further out: held where it is
+
+
+def test_limit_still_refuses_an_arm_well_outside_the_region(monkeypatch, tmp_path):
+    q, _, _ = region_zones(monkeypatch, tmp_path, margin=-0.05)
+    g = guard.Guard("left", clock=lambda: dt.datetime.now(dt.timezone.utc))
+    with pytest.raises(errors.ArmError, match="region"):
+        g.limit(q, q + 0.01)
+
+
+def test_a_smooth_arm_may_be_commanded_ahead_of_where_it_lags(make_arm):
+    """The tracker keeps the arm behind Dream's targets on purpose: the 20 deg sanity check is against the previous target, not the measured arm."""
+    arm, bus = make_arm(drv.Arm, smooth=True)
+    q = ready_pose_rad()
+    arm.write(q + np.radians(15.0), 0.5)
+    arm.write(q + np.radians(30.0), 0.5)          # 30 deg from the arm, 15 from the last target: fine
+    arm.write(q + np.radians(45.0), 0.5)
+    with pytest.raises(errors.ArmError, match="nothing was sent"):
+        arm.write(q + np.radians(90.0), 0.5)      # a 45 deg jump in one write is still refused
+
+
+def test_a_locked_arm_is_not_raised_to_ready_when_the_station_opens_it(make_arm, monkeypatch):
+    """A locked arm stays at rest, so a Reset does not park and raise it again each time."""
+    monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
+    lock.set_active("right")
+    arm, bus = make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True, home=poses.ready_rad("left"))
+    assert joints_of(bus) == pytest.approx(poses.REST_DEG["left"], abs=0.05)         # held at rest, not raised
+    lock.set_active("both")
+    arm2, bus2 = make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True, home=poses.ready_rad("left"))
+    assert joints_of(bus2) == pytest.approx(poses.READY_DEG["left"], abs=0.2)        # an active arm still is
+
+
+def test_the_log_shows_what_dream_asks_of_a_locked_arm_and_that_it_holds(make_arm, caplog):
+    caplog.set_level(logging.INFO)
+    lock.set_active("right")
+    arm, bus = make_arm(drv.Arm)
+    q = ready_pose_rad()
+    for step in range(12):                                                           # Dream drifts joint 1 by 1 deg per write
+        arm.write(q + np.radians([step * 1.0, 0, 0, 0, 0, 0, 0]), 0.5)
+    said = [r.message for r in caplog.records if "asks" in r.message]
+    assert said and "LOCKED" in said[0] and "joint 1" in said[0]
+    assert bus.mit_targets["joint_1"] == pytest.approx(LOGICAL["joint_1"] + OFFSETS["joint_1"], abs=0.05)   # and the arm did not follow
+
+
+def test_the_log_shows_what_dream_asks_of_an_active_arm_without_the_locked_note(make_arm, caplog):
+    caplog.set_level(logging.INFO)
+    arm, bus = make_arm(drv.Arm)
+    q = ready_pose_rad()
+    for step in range(12):
+        arm.write(q + np.radians([step * 1.0, 0, 0, 0, 0, 0, 0]), 0.5)
+    said = [r.message for r in caplog.records if "asks" in r.message]
+    assert said and "LOCKED" not in said[0]
 
 
 # -- a recorded home path (from the teach session) replaces the built-in ready path -------------------------------------------------

@@ -128,3 +128,53 @@ def smooth_path(points_deg: np.ndarray, limits: MotionLimits, dt: float) -> Smoo
         duration *= 1.05
     q[0], q[-1] = pts[0], pts[-1]
     return SmoothPath(q, duration)
+
+
+class RequestTally:
+    """Counts what Dream asks of one arm, run by run, so the log can show whether an arm that should stay still is being asked to move.
+
+    A run is a stretch of writes with no silence longer than #IDLE_S. Pure: the caller supplies the clock.
+    """
+
+    IDLE_S = 3.0        # silence that ends a run
+    REPORT_S = 2.0      # between notices while a run keeps asking
+    NOTICE_DEG = 5.0    # the smallest net move worth a line
+
+    def __init__(self) -> None:
+        self._reset()
+
+    def _reset(self) -> None:
+        self._origin: np.ndarray | None = None
+        self._last_q: np.ndarray | None = None
+        self._path = 0.0
+        self._net = 0.0
+        self._joint = 0
+        self._last_t: float | None = None
+        self._reported_t: float | None = None
+
+    def update(self, q_deg: np.ndarray, now: float) -> list[tuple[str, float, int, float]]:
+        """Takes one requested pose.
+
+        @param q_deg The requested joint angles, degrees.
+        @param now Seconds on any steady clock.
+        @return Notices due: `("run ended", net, joint index, path)` for the run that just ended (only if it was a real move), and
+            `("asks", net, joint index, path)` once the run passes #NOTICE_DEG and then every #REPORT_S. `net` is the largest joint's
+            distance from where the run began; `path` is the joint travel summed over joints and writes, degrees.
+        """
+        out: list[tuple[str, float, int, float]] = []
+        if self._last_t is not None and now - self._last_t > self.IDLE_S:
+            if self._net >= self.NOTICE_DEG:
+                out.append(("run ended", self._net, self._joint, self._path))
+            self._reset()
+        q = np.asarray(q_deg, dtype=float)
+        if self._origin is None or self._last_q is None:
+            self._origin, self._last_q = q.copy(), q.copy()
+        self._path += float(np.abs(q - self._last_q).sum())
+        self._last_q = q.copy()
+        diff = np.abs(q - self._origin)
+        self._joint, self._net = int(diff.argmax()), float(diff.max())
+        self._last_t = now
+        if self._net >= self.NOTICE_DEG and (self._reported_t is None or now - self._reported_t >= self.REPORT_S):
+            self._reported_t = now
+            out.append(("asks", self._net, self._joint, self._path))
+        return out

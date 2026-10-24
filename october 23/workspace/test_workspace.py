@@ -8,6 +8,8 @@ import pytest
 import yaml
 
 import capture as cap
+import collect
+import startpose
 import openarm_poses as poses
 import openarm_zones as zones
 import zonebuild as zb
@@ -360,6 +362,9 @@ def ws_check(raw):
 # -- the visual editor panel (no robot meshes, real viser server) ---------------------------------------------------------------
 
 import socket  # noqa: E402
+import sys  # noqa: E402
+
+import test_collect  # noqa: E402
 
 import designer  # noqa: E402
 import editor as ed  # noqa: E402
@@ -419,7 +424,7 @@ def test_panel_home_buttons_and_live_pose_message(panel):
     panel.use_home("left", "rest")
     assert panel.state.arms["left"].home == pytest.approx(np.radians(poses.REST_DEG["left"]))
     panel.use_home("left", "live")
-    assert "No live arm" in panel.out_msg.content
+    assert "No live follower" in panel.out_msg.content
     panel.read_q = lambda side: np.full(7, 0.1)
     panel.use_home("right", "live")
     assert panel.state.arms["right"].home == pytest.approx([0.1] * 7)
@@ -584,7 +589,7 @@ def moving_q(side, j1, j4=None):
 
 
 def test_page_has_the_four_cards_in_order_and_the_top_strip(panel):
-    assert panel.tab_labels == ["1 Position", "2 Home", "3 Danger area", "4 Save"]
+    assert panel.tab_labels == ["1 Position", "2 Home", "3 Danger area", "4 Save", "5 Collect"]
     assert "No clash" in panel.status.content and "waiting" in panel.status.content.lower()
 
 
@@ -849,3 +854,155 @@ def test_reference_buttons_record_the_hand_position_of_the_live_arm(panel):
 def test_reference_button_without_a_live_arm_says_how_to_start_the_listener(panel):
     panel.record_reference_clicked("right")
     assert "--observe" in panel.out_msg.content
+
+
+# -- language and the Collect tab ----------------------------------------------------------------------------------------
+def test_language_button_switches_labels_cards_and_messages(panel):
+    panel.set_language("日本語")
+    assert panel.b_point.label == "この点を記録" and panel.b_home["left"].label == "左ホームをここに設定"
+    assert "干渉なし" in panel.status.content and "ホーム" in panel.home_cards["left"].content
+    assert panel.tab_labels[4] == "5 収集"
+    assert panel.tabs._tab_labels == tuple(panel.tab_labels)  # what the browser is sent
+    panel.use_home("left", "live")
+    assert "ライブのフォロワー" in panel.out_msg.content
+    panel.set_language("English")
+    assert panel.b_point.label == "Record this point" and "No clash" in panel.status.content
+
+
+def test_language_switch_keeps_the_chosen_arm_and_box_side(panel):
+    panel.record_side.value = panel.record_side.options[1]  # right
+    panel.set_language("日本語")
+    assert panel._record_sides() == ("right",)
+    panel.set_language("English")
+    assert panel._record_sides() == ("right",)
+
+
+def test_every_translated_key_has_both_languages():
+    import i18n
+
+    assert all(en.strip() and ja.strip() for en, ja in i18n.STRINGS.values())
+
+
+@pytest.fixture
+def collecting(panel, tmp_path):
+    import collect
+    import test_collect
+
+    script = tmp_path / "fake.py"
+    script.write_text(test_collect.FAKE)
+    env = tmp_path / "x.env"
+    env.write_text("TASK_SLUG=x\n")
+    panel.collector = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}))
+    panel.collect_opts.env_file = env
+    yield panel
+    if panel.collector.active:
+        panel.collector.proc.kill()
+
+
+def test_collect_buttons_start_send_keys_and_stop(collecting):
+    p = collecting
+    assert p.b_cstart.disabled is False and p.b_cnext.disabled is True
+    p.c_return.value = False  # without the automatic return, an episode saved the instant it ends cannot be discarded
+    p.collect_start_clicked()
+    assert p.b_cstart.disabled is True and p.b_cnext.disabled is False and p.b_crerecord.disabled is True
+    test_collect.wait_for(lambda: p.collector.phase == "ready")
+    p.collect_key("next")
+    test_collect.wait_for(lambda: p.collector.phase == "recording")
+    p.collect_tick()
+    assert "RECORDING episode 3" in p.collect_card.content
+    p.set_language("日本語")
+    assert "録画中 エピソード3" in p.collect_card.content
+    p.collect_key("stop")
+    assert p.collector.wait() == 0
+    p.collect_tick()
+    assert p.b_cstart.disabled is False
+
+
+def test_collect_start_refused_with_a_message_while_a_teleop_runs(collecting):
+    collecting.collector._probe = lambda: "run_teleop"
+    collecting.collect_start_clicked()
+    assert "run_teleop" in collecting.out_msg.content and not collecting.collector.active
+    collecting.set_language("日本語")
+    collecting.collect_start_clicked()
+    assert "テレオペがまだ動いています" in collecting.out_msg.content
+
+
+def test_position_card_and_home_tab_show_the_hand_pitch(panel):
+    wood_left = np.radians([64.42, -3.62, -1.23, 95.91, -2.48, 19.01, 21.6])
+    panel.update_position_cards({"left": wood_left}, {"left": True, "right": False})
+    assert "-69" in panel.pos_cards["left"].content and "-69" in panel.pitch_info.content
+    panel.set_language("日本語")
+    assert "手先の向き" in panel.pitch_info.content
+
+
+def test_save_start_set_needs_both_arms_then_saves_and_fills_the_collect_tab(panel, monkeypatch):
+    panel.f_setname.value = "new-v2"
+    panel.save_start_set_clicked()
+    assert "Both arms" in panel.out_msg.content
+    q = np.radians([64.42, -3.62, -1.23, 95.91, -2.48, 19.01, -57.0])
+    panel.update_position_cards({"left": q, "right": q}, {"left": True, "right": True})
+    saved = {}
+    monkeypatch.setattr(designer.startpose, "save", lambda name, base, joints, **k: saved.update(name=name, base=base, joints=joints) or "ok")
+    panel.save_start_set_clicked()
+    assert saved["name"] == "new-v2" and saved["joints"]["left"][6] == pytest.approx(-57.0)
+    assert panel.f_poseset.value == "new-v2" and "new-v2" in panel.out_msg.content
+    monkeypatch.setattr(designer.startpose, "save", lambda *a, **k: (_ for _ in ()).throw(designer.startpose.StartPoseError("start.err.exists|new-v2")))
+    panel.save_start_set_clicked()
+    assert "already exists" in panel.out_msg.content
+
+
+def test_collect_options_carry_the_episode_time_and_pose_set(panel):
+    panel.f_time.value, panel.f_poseset.value = 600, "wood-v2"
+    opts = panel._collect_options()
+    assert (opts.episode_time_s, opts.pose_set) == (600, "wood-v2")
+
+
+def test_collect_pose_set_is_its_own_field_and_defaults_to_the_settings_file(panel):
+    assert panel.f_pose.options == ("live", "home", "rest", "ready")  # the Advanced "show robot at" dropdown, a different widget
+    assert panel._collect_options().pose_set in ("", collect.DEFAULT_POSE_SET)  # the default set or nothing (the settings file decides): never "live"
+    panel.f_poseset.value = ""
+    assert panel._collect_options().pose_set == ""
+
+
+def test_collect_start_refuses_an_unknown_pose_set_before_running(collecting):
+    collecting.f_poseset.value = "no-such-set"
+    collecting.collect_start_clicked()
+    assert "no-such-set" in collecting.out_msg.content and not collecting.collector.active
+
+
+def test_collect_hold_checkbox_reaches_the_options(panel):
+    assert panel._collect_options().start_pose_hold is True  # on by default
+    panel.c_hold.value = False
+    assert panel._collect_options().start_pose_hold is False
+    panel.c_hold.value, panel.f_countdown.value = True, 5
+    opts = panel._collect_options()
+    assert (opts.start_pose_hold, opts.start_countdown_s) == (True, 5)
+
+
+def test_discard_button_works_with_the_automatic_return_even_if_saving_at_the_end(panel):
+    class Running:
+        active = True
+        def snapshot(self, last=12):
+            return {"phase": "ready", "episode": 0, "started": 0, "rc": None, "run_dir": None, "target": None, "done": 0, "left": None, "saved": 0, "lines": [], "active": True}
+    panel.collector = Running()
+    panel.c_saveend.value, panel.c_return.value = True, True
+    panel._collect_buttons()
+    assert panel.b_crerecord.disabled is False
+    panel.c_return.value = False
+    panel._collect_buttons()
+    assert panel.b_crerecord.disabled is True
+
+
+def test_start_pose_set_field_starts_with_the_default_set_when_it_exists(panel, monkeypatch, tmp_path):
+    expected = collect.DEFAULT_POSE_SET if (startpose.pose_sets_dir() / collect.DEFAULT_POSE_SET).is_dir() else ""
+    assert panel.f_poseset.value == expected
+    monkeypatch.setattr(designer.startpose, "pose_sets_dir", lambda repo=None: tmp_path)  # no such set: the field stays empty
+    import viser
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    server = viser.ViserServer(port=port)
+    try:
+        assert designer.EditorPanel(server, ed.EditorState.default(), tmp_path / "out", "tester").f_poseset.value == ""
+    finally:
+        server.stop()

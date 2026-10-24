@@ -349,8 +349,13 @@ def cmd_design(args: argparse.Namespace) -> int:
         read_q = lambda side: observers[side].q_rad()  # noqa: E731
         observer_status = lambda: "  \n".join(o.status() for o in observers.values())  # noqa: E731
     try:
+        import collect
+
+        collect_env = pathlib.Path(args.collect_env).expanduser() if args.collect_env else collect.DEFAULT_ENV
+        if not collect_env.is_absolute():
+            collect_env = collect.REPO / collect_env  # `config/...` as typed inside openarm-orboh
         designer.serve_designer(state, ZONES_DIR, args.operator, port=args.port, detail=args.detail, read_q=read_q, cameras=cameras,
-                                observer_status=observer_status)
+                                observer_status=observer_status, collect_env=collect_env)
     finally:
         close_all(arms)
         for obs in observers.values():
@@ -429,6 +434,7 @@ def main(argv: list[str] | None = None, probes=None, runner=None, opener=None) -
     p.add_argument("--observe", action="store_true", help="TEACH: only LISTEN to the follower's CAN frames while your teleop runs (sends nothing)")
     p.add_argument("--cameras", action="store_true", help="offer the station file's RealSense cameras as switchable feeds")
     p.add_argument("--detail", choices=["visual", "collision"], default="visual")
+    p.add_argument("--collect-env", default=os.environ.get("ENV_FILE", ""), help="settings file of the Collect tab (default: $ENV_FILE, else the openarm-orboh Kitakyushu Takeei file)")
     p.add_argument("--port", type=int, default=8080)
     p.add_argument("--operator", default=getpass.getuser())
     p.set_defaults(func=cmd_design)

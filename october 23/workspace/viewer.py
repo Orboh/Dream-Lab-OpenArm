@@ -104,12 +104,16 @@ class CameraPanel:
         """@param server The viser server. @param cameras `name`/`serial` pairs. @param opener Builds a camera opener from name and serial."""
         self.workers: dict[str, camerapanel.CameraWorker] = {}
         self._status: dict[str, object] = {}
-        with server.gui.add_folder("Cameras"):
+        self.boxes: dict[str, object] = {}  # the checkboxes, so the page can relabel them in another language
+        self.none_note = None
+        self.folder = server.gui.add_folder("Cameras")
+        with self.folder:
             if not cameras:
-                server.gui.add_markdown("No RealSense cameras in the station file.")
+                self.none_note = server.gui.add_markdown("No RealSense cameras in the station file.")
             for cam in cameras:
                 name = cam["name"]
                 box = server.gui.add_checkbox(f"{name} camera on", False)
+                self.boxes[name] = box
                 image = server.gui.add_image(self.BLANK, label=name, jpeg_quality=70)
                 status = server.gui.add_markdown(f"{name}: off")
                 self._status[name] = status

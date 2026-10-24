@@ -117,3 +117,27 @@ def test_a_longer_path_takes_longer_and_a_zero_length_path_is_one_sample():
     assert long.duration > 2 * short.duration
     same = mo.smooth_path(np.array([[1.0] * 7, [1.0] * 7]), lim, DT)
     assert len(same.samples) == 1
+
+
+# -- the tally of what Dream asks of an arm (to see whether an idle arm is asked to move) ----------------------------------------
+
+def test_tally_is_quiet_while_the_arm_is_hardly_asked_to_move():
+    tally = mo.RequestTally()
+    out = []
+    for step in range(100):
+        out += tally.update(np.full(7, 0.02 * step), step * 0.05)       # 2 deg in all over 5 s
+    assert out == []
+
+
+def test_tally_reports_when_a_run_asks_for_a_real_move_then_every_two_seconds_then_the_summary():
+    tally = mo.RequestTally()
+    messages = []
+    for step in range(200):                                              # 10 s at 20 Hz, joint 3 sweeps 30 deg
+        q = np.zeros(7); q[2] = 0.15 * step
+        messages += [(step * 0.05, *m) for m in tally.update(q, step * 0.05)]
+    assert messages[0][1] == "asks" and messages[0][3] == 2             # first notice once 5 deg is passed, naming joint 3 (index 2)
+    times = [m[0] for m in messages if m[1] == "asks"]
+    assert all(b - a >= 2.0 for a, b in zip(times, times[1:])) and len(times) >= 4
+    assert tally.update(np.zeros(7) + 100.0, 20.0)[0][:2] == ("run ended", pytest.approx(29.85, abs=0.2))   # silence for 3 s ends the run
+    final = tally.update(np.zeros(7) + 100.0, 20.1)
+    assert final == []                                                   # and a new run begins from here

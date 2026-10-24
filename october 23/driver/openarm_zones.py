@@ -173,12 +173,14 @@ class Zones:
         now = now or dt.datetime.now(self.captured_at.tzinfo)
         return (now - self.captured_at).total_seconds() / 3600.0
 
-    def violations(self, side: str, points: dict[str, np.ndarray], check_reach: bool = True, check_region: bool = True) -> list[str]:
+    def violations(self, side: str, points: dict[str, np.ndarray], check_reach: bool = True, check_region: bool = True,
+                   region_slack: float = 0.0) -> list[str]:
         """Why an arm pose is not allowed, one text per problem; empty when it is.
 
         @param side `"left"` or `"right"`.
         @param points The pose's points from #ArmKinematics.points().
         @param check_region Also require every point to be inside the arm's allowed `region` box, when it has one.
+        @param region_slack Metres a point may be outside the region before it counts (for judging where an arm measurably is, not a target).
         @param check_reach Also require the grasp point to be over the painted work area (the driver guard does not: Dream clips to it).
         @return The violations: a point inside or too close to a keep-out zone, or the grasp point off the painted area.
         """
@@ -203,7 +205,7 @@ class Zones:
             lo, hi = np.asarray(zones.region["lo"]), np.asarray(zones.region["hi"])
             for name, point in points.items():
                 outside = float(np.max(np.maximum(lo - point, point - hi)))
-                if outside > REGION_TOLERANCE_M:
+                if outside > REGION_TOLERANCE_M + region_slack:
                     out.append(f"{side} {name} is {outside * 100:.1f} cm outside the allowed region")
         if check_reach and zones.reach is not None:
             miss = distance_to_reach(points["tcp"][:2], zones.reach)

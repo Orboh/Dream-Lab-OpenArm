@@ -17,3 +17,5 @@
 | [log-012.md](log-012.md) | Daily safety area: zones, guard, one-arm lock, capture/verify/build/apply tool and 3D viewer (tests only; viewer demo running read-only). |
 | [log-013.md](log-013.md) | Round 2: real OpenArm model in the browser, visual zone editor, fixed output format (home pose + allowed/forbidden coordinates, station keys, layout picture). |
 | [log-014.md](log-014.md) | The editor page as four cards (Position, Home, Danger area, Save) with automatic path recording and live allowed region. |
+| [log-015.md](log-015.md) | Smooth, motor-safe motion (control thread, torque budget, soft limits, temperature and gripper alarms), gentle station settings, preflight/start, reference points. First station start, guard refusals, margin bundle, camera-busy preflight check. |
+| [log-016.md](log-016.md) | Round 8 plan: getting Dream-1 to pick the wooden block (P0 CAN check, P1 collisions, P2 latency, P3 scene, P4 ladder), the other plans to research, and why the earlier plans failed. |

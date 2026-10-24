@@ -6,6 +6,7 @@ Reads the zones file (`~/.dreamlabs/zones.yaml`, or `OPENARM_ZONES`). Settings b
 - `OPENARM_ZONES_REQUIRED`: `0` turns the guard off (tests and bench work); anything else keeps it on (default on).
 - `OPENARM_ZONES_MAX_AGE_H`: hours a zones file stays valid, default 24 (the zones are captured every day).
 A refusal raises `ArmError`; the station then stops the run and the arms hold.
+`limit()` is what `Arm.write` uses: a target past the edge of the allowed space is cut back to the edge (the arm stops there, the run goes on); stale zones and an arm already outside still raise.
 """
 
 import datetime as dt
@@ -19,6 +20,8 @@ import openarm_zones as zones
 from robots import errors
 
 DEFAULT_MAX_AGE_H = 24.0
+MEASURED_SLACK_M = 0.02  # an arm that stopped at the edge lags its target and sits a little outside the region: still where it may move back from
+CUT_STEPS = 16  # halvings of the way to the edge: the stop is within 1/65000 of the move short of it
 
 
 def zones_path() -> pathlib.Path:
@@ -61,14 +64,13 @@ class Guard:
         assert self._zones is not None
         return self._zones
 
-    def check(self, q_rad: np.ndarray) -> None:
-        """Refuses a target pose.
+    def _ready(self) -> tuple[zones.Zones, zones.ArmKinematics] | None:
+        """The loaded zones and kinematics, or None when the guard is off.
 
-        @param q_rad Seven joint targets, radians, in Dream's model.
-        @throws ArmError There are no zones or they are stale, or the pose enters a danger zone or leaves the work area.
+        @throws ArmError There are no zones or they are stale.
         """
         if not required():
-            return
+            return None
         loaded = self._load()
         age = loaded.age_hours(self._clock())
         limit = float(os.environ.get("OPENARM_ZONES_MAX_AGE_H", DEFAULT_MAX_AGE_H))
@@ -78,6 +80,52 @@ class Guard:
             )
         if self._kinematics is None:
             self._kinematics = zones.ArmKinematics(self.side)
-        found = loaded.violations(self.side, self._kinematics.points(np.asarray(q_rad, dtype=float)), check_reach=False)
+        return loaded, self._kinematics
+
+    @staticmethod
+    def _violations(loaded: zones.Zones, kinematics: zones.ArmKinematics, side: str, q_rad: np.ndarray) -> list[str]:
+        return loaded.violations(side, kinematics.points(np.asarray(q_rad, dtype=float)), check_reach=False)
+
+    def check(self, q_rad: np.ndarray) -> None:
+        """Refuses a target pose.
+
+        @param q_rad Seven joint targets, radians, in Dream's model.
+        @throws ArmError There are no zones or they are stale, or the pose enters a danger zone or leaves the work area.
+        """
+        ready = self._ready()
+        if ready is None:
+            return
+        found = self._violations(*ready, self.side, q_rad)
         if found:
             raise errors.ArmError("safety zone: " + "; ".join(found[:3]) + " — nothing was sent")
+
+    def limit(self, prev_rad: np.ndarray, q_rad: np.ndarray) -> tuple[np.ndarray, list[str]]:
+        """Cuts a target back to the edge of the allowed space instead of refusing it.
+
+        The arm moves along the straight joint-space line from `prev_rad` towards `q_rad` and stops at the last point that is still allowed.
+        The same stale or missing zones still raise, and so does an arm that is already well outside (more than 2 cm past the region, or in a keep-out zone); one a few millimetres out, because it lags its target at the edge, may still be moved back and never gets a target further out.
+
+        @param prev_rad Where the arm is or was last sent: a pose that must itself be allowed.
+        @param q_rad The target, seven joint angles in Dream's model, radians.
+        @return `(pose to send, violations of the original target)`; the pose is `q_rad` itself and the list empty when the target is allowed.
+        @throws ArmError There are no zones or they are stale, or `prev_rad` already breaks one.
+        """
+        ready = self._ready()
+        q_rad = np.asarray(q_rad, dtype=float)
+        if ready is None:
+            return q_rad, []
+        found = self._violations(*ready, self.side, q_rad)
+        if not found:
+            return q_rad, []
+        prev_rad = np.asarray(prev_rad, dtype=float)
+        already = ready[0].violations(self.side, ready[1].points(prev_rad), check_reach=False, region_slack=MEASURED_SLACK_M)
+        if already:
+            raise errors.ArmError("safety zone: " + "; ".join(already[:3]) + " — the arm is already there, nothing was sent")
+        low, high = 0.0, 1.0   # `low` is allowed, `high` is not
+        for _ in range(CUT_STEPS):
+            mid = (low + high) / 2
+            if self._violations(*ready, self.side, prev_rad + mid * (q_rad - prev_rad)):
+                high = mid
+            else:
+                low = mid
+        return prev_rad + low * (q_rad - prev_rad), found

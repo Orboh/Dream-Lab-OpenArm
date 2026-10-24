@@ -1,0 +1,214 @@
+"""English / Japanese text for the editor page: one table, one lookup. English is the default so a missing Japanese entry never shows a blank."""
+
+LANGS = ("English", "日本語")
+CODES = {"English": "en", "日本語": "ja"}
+
+# key -> (English, Japanese). `{name}` placeholders are filled by t(..., name=value).
+STRINGS: dict[str, tuple[str, str]] = {
+    # -- page ------------------------------------------------------------------------------------------------------------
+    "language": ("Language", "言語"),
+    "tab.position": ("1 Position", "1 位置"),
+    "tab.home": ("2 Home", "2 ホーム"),
+    "tab.danger": ("3 Danger area", "3 危険エリア"),
+    "tab.save": ("4 Save", "4 保存"),
+    "tab.collect": ("5 Collect", "5 収集"),
+    # -- status strip and cards -------------------------------------------------------------------------------------------
+    "strip.receiving": ("receiving", "受信中"),
+    "strip.waiting": ("waiting", "待機中"),
+    "strip.noclash": ("No clash", "干渉なし"),
+    "strip.clash": ("CLASH:", "干渉:"),
+    "side.left": ("left", "左"),
+    "side.right": ("right", "右"),
+    "pos.title": ("{side} ARM", "{side}アーム"),
+    "pos.waiting": ("waiting for the teleop... (start your teleop in the other terminal)", "テレオペ待ち…（別のターミナルでテレオペを起動してください）"),
+    "pos.receiving": ("receiving from the teleop &middot; joint angles in degrees", "テレオペから受信中 &middot; 関節角度（度）"),
+    "pos.pitch": ("hand pitch {deg:+.0f}° (0 = level, minus = pointing down)", "手先の向き {deg:+.0f}°（0＝水平、マイナス＝下向き）"),
+    "pos.hand": ("hand", "手先"),
+    "pos.gripper": ("gripper", "グリッパー"),
+    "home.title": ("{side} HOME", "{side}ホーム"),
+    "home.unset": ("home not set yet", "ホームは未設定です"),
+    "home.ok": ("home set, path from rest recorded", "ホーム設定済み・待機姿勢からの経路を記録済み"),
+    "home.nopath": ("home set but NO path from rest: move the leader from the rest or ready pose, then press the button again",
+                    "ホームは設定済みですが待機姿勢からの経路がありません。リーダーを待機または準備姿勢から動かして、もう一度ボタンを押してください"),
+    "check.title": ("Before you save", "保存の前に"),
+    # -- checklist --------------------------------------------------------------------------------------------------------
+    "check.home": ("{side} home set", "{side}ホーム設定"),
+    "check.home.hint": ("Home tab: press Set {SIDE} home here", "ホームタブ: 「{side}ホームをここに設定」を押す"),
+    "check.path": ("{side} path recorded", "{side}の経路を記録"),
+    "check.path.hint": ("move the {side} leader from the rest or ready pose to the home, then press Set {SIDE} home here",
+                        "{side}リーダーを待機または準備姿勢からホームまで動かし、「{side}ホームをここに設定」を押す"),
+    "check.area": ("{side} allowed area", "{side}の許可エリア"),
+    "check.area.hint": ("Danger area tab: Record extremes and move the leader to the farthest safe points",
+                        "危険エリアタブ: リーダーを安全な最遠点まで動かして点を記録する"),
+    "check.refs": ("{side} reference points (2)", "{side}の基準点（2点）"),
+    "check.refs.hint": ("Save tab: touch two table points with the {side} hand and press its reference button (the daily check needs them)",
+                        "保存タブ: {side}の手先で机の2点に触れ、基準点ボタンを押す（毎日の確認に必要）"),
+    "check.overlap": ("The two allowed areas do not overlap", "左右の許可エリアが重なっていない"),
+    "check.overlap.hint": ("the areas run {cm} cm into each other, so the two hands can meet in the middle: record the extremes farther out, or keep each hand on its own side",
+                           "エリアが{cm}cm重なっており、両手が中央でぶつかる恐れがあります。最遠点をさらに外側に取るか、各手を自分側に収めてください"),
+    "check.table": ("Table placed", "机を配置"),
+    "check.table.hint": ("Danger area tab: enter the table numbers or drag the table", "危険エリアタブ: 机の数値を入力するか机をドラッグする"),
+    "check.clash": ("No clash", "干渉なし"),
+    "check.clash.hint": ("a zone blocks the rest, ready or home pose: move or resize it", "ゾーンが待機・準備・ホーム姿勢を塞いでいます。移動またはサイズ変更してください"),
+    # -- 2 Home -----------------------------------------------------------------------------------------------------------
+    "home.help": ("Move the **leader** until the camera sees the work space, then press the button for that arm. The way from rest is recorded for you.",
+                  "カメラが作業スペースを映すまで**リーダー**を動かし、そのアームのボタンを押します。待機姿勢からの経路は自動で記録されます。"),
+    "home.set": ("Set {SIDE} home here", "{side}ホームをここに設定"),
+    "home.previewhelp": ("**See the move first:** plays the recorded way from rest to home on the 3D robot (nothing moves for real).",
+                         "**先に動きを確認:** 記録した待機からホームまでの経路を3Dロボットで再生します（実機は動きません）。"),
+    "home.preview": ("Preview {which}: rest to home", "{which}をプレビュー: 待機からホームへ"),
+    "which.LEFT": ("LEFT", "左"), "which.RIGHT": ("RIGHT", "右"), "which.both": ("both arms", "両アーム"),
+    # -- 3 Danger area ----------------------------------------------------------------------------------------------------
+    "area.folder": ("Allowed area: show the farthest safe points", "許可エリア: 安全な最遠点を教える"),
+    "area.help": ("Move the leader to a farthest point the arm may safely reach (down to just above the table), press **Record this point**. Do this for every corner and edge. The safe place is made from your points (green).",
+                  "リーダーをアームが安全に届く最遠点（机のすぐ上まで）へ動かし、**この点を記録**を押します。すべての角と端で繰り返します。安全な場所は記録した点から作られます（緑）。"),
+    "area.arm": ("Arm", "アーム"),
+    "area.record": ("Record this point", "この点を記録"),
+    "area.undo": ("Undo last point", "直前の点を取り消す"),
+    "area.clear": ("Clear all points", "すべての点を消去"),
+    "table.folder": ("Table (cm)", "机（cm）"),
+    "table.height": ("top is this far above the hanging hand", "天板は下垂した手先よりこれだけ上"),
+    "table.front": ("front edge, forward from the body", "手前の縁（体から前方）"),
+    "table.depth": ("depth (away from you)", "奥行き（奥方向）"),
+    "table.width": ("width (left to right)", "幅（左から右）"),
+    "box.folder": ("Danger boxes", "危険ボックス"),
+    "box.add": ("Add a danger box", "危険ボックスを追加"),
+    "box.select": ("box", "ボックス"),
+    "box.size": ("size (cm)", "サイズ（cm）"),
+    "box.applies": ("applies to", "適用先"),
+    "box.delete": ("Delete this box", "このボックスを削除"),
+    "box.drag": ("Drag the arrows in the 3D view to move the box.", "3Dビューの矢印をドラッグしてボックスを動かします。"),
+    "arm.both": ("both", "両方"),
+    "record.points": ("**{side}**: {n} point(s)", "**{side}**: {n}点"),
+    "record.swept": (", {n} swept poses", "、スイープ姿勢{n}個"),
+    "record.few": (" (record at least 3 for the work area; 2 are enough for the box)", "（作業エリアには3点以上、ボックスは2点で足ります）"),
+    "record.none": (" (none yet)", "（まだありません）"),
+    # -- 4 Save -----------------------------------------------------------------------------------------------------------
+    "save.bundle": ("Save bundle + layout picture", "バンドルとレイアウト画像を保存"),
+    "save.export": ("Export station keys", "ステーションキーを出力"),
+    "save.refhelp": ("Reference points: touch a spot on the table with the follower, press the button. Do it twice per arm; `verify` checks them every day.",
+                     "基準点: フォロワーで机上の1点に触れてボタンを押します。各アーム2回行います。`verify` が毎日これを確認します。"),
+    "save.ref": ("Record reference point: {SIDE} hand here", "基準点を記録: {side}の手先をここに"),
+    # -- messages ---------------------------------------------------------------------------------------------------------
+    "msg.nolive": ("No live follower: start with --observe (it listens while your teleop runs).",
+                   "ライブのフォロワーがありません。--observe で起動してください（テレオペ中は受信のみ行います）。"),
+    "msg.nopath": ("No path recorded for the {sides} arm: move the leader from the rest or ready pose and press Set home again.",
+                   "{sides}アームの経路が未記録です。リーダーを待機または準備姿勢から動かして、もう一度ホームを設定してください。"),
+    "msg.playing": ("A preview is already playing.", "プレビューを再生中です。"),
+    "msg.played": ("Played the way from rest to home for the {sides} arm ({sec:.0f} s at {dps:g} deg/s).",
+                   "{sides}アームの待機からホームまでを再生しました（{sec:.0f}秒・{dps:g}度/秒）。"),
+    "msg.pathrec": ("Recording the {side} arm's path from rest. Move it to the home pose, then press Set HOME.",
+                    "{side}アームの待機からの経路を記録中です。ホーム姿勢まで動かして「ホームを設定」を押してください。"),
+    "msg.homeset": ("{side} home set from the follower", "{side}のホームをフォロワーから設定しました"),
+    "msg.homepath": (" with the recorded path from rest.", "（待機からの経路も記録済み）。"),
+    "msg.homenopath": (", but there is NO path from rest.", "が、待機からの経路がありません。"),
+    "msg.refrec": ("{side} reference point {n} recorded.", "{side}の基準点{n}を記録しました。"),
+    "msg.saved": ("Saved `{bundle}` and `{layout}` in `{dir}`.", "`{bundle}` と `{layout}` を `{dir}` に保存しました。"),
+    "msg.clashes": ("**Saved with {n} clash(es): fix them before apply.**", "**干渉が{n}件ある状態で保存しました。apply の前に直してください。**"),
+    "msg.widened": ("The allowed box of the {sides} arm was widened to hold its home pose.", "{sides}アームの許可ボックスをホーム姿勢が入るよう広げました。"),
+    "msg.sweep.on": ("Recording: move the leader to the farthest safe points, then press Stop.", "記録中: リーダーを安全な最遠点まで動かし、停止を押してください。"),
+    "msg.sweep.off": ("Stopped. The green box is the allowed area.", "停止しました。緑のボックスが許可エリアです。"),
+    "msg.applied": ("Applied to the safe place of: {sides}.", "安全な場所に反映しました: {sides}"),
+    "msg.nothing": ("Nothing to apply yet: record at least 2 points (or sweep {n} poses).", "まだ反映するものがありません。2点以上記録してください（またはスイープ{n}姿勢）。"),
+    "cam.folder": ("Cameras", "カメラ"),
+    "cam.on": ("{name} camera on", "{name}カメラをオン"),
+    "cam.none": ("No RealSense cameras in the station file.", "ステーションファイルにRealSenseカメラがありません。"),
+    "start.folder": ("Start pose for collection", "収集の開始姿勢"),
+    "start.help": ("Collection starts every episode from a start-pose set (`openarm-orboh/config/pose_sets`), not from the Home above. Move the follower with the leader until the hand is level (0°), "
+                   "then save it as a new set. The base set's waypoints are kept; frozen sets are never changed.",
+                   "収集は毎エピソード、上のホームではなく開始姿勢セット（`openarm-orboh/config/pose_sets`）から始まります。リーダーでフォロワーを動かして手先を水平（0°）に合わせ、新しいセットとして保存します。"
+                   "元セットの経由地は引き継がれ、凍結済みのセットは変更されません。"),
+    "start.pitch": ("hand pitch {side}: {deg:+.0f}° (0 = level, minus = pointing down)", "手先の向き {side}: {deg:+.0f}°（0＝水平、マイナス＝下向き）"),
+    "start.name": ("new set name", "新しいセット名"),
+    "start.base": ("copy waypoints from", "経由地のコピー元"),
+    "start.save": ("Save the arms' pose now as a start-pose set", "今の腕の姿勢を開始姿勢セットとして保存"),
+    "start.saved": ("Saved the start-pose set `{name}` (draft). It is filled in on the Collect tab as the set to use. {pitch}",
+                    "開始姿勢セット `{name}`（draft）を保存しました。収集タブの「開始姿勢セット」に入れてあります。{pitch}"),
+    "start.err.name": ("The set name may use letters, digits, `.`, `-` and `_` only.", "セット名には英数字と `.` `-` `_` だけ使えます。"),
+    "start.err.base": ("The base set `{what}` does not exist.", "元セット `{what}` がありません。"),
+    "start.err.exists": ("A set named `{what}` already exists: choose another name.", "`{what}` という名前のセットがすでにあります。別の名前にしてください。"),
+    "start.err.format": ("The base set's pose file has no joint lines to replace.", "元セットの姿勢ファイルに置き換える関節の行がありません。"),
+    "start.err.tool": ("pose_set.py failed: {what}", "pose_set.py が失敗しました: {what}"),
+    "start.err.nolive": ("Both arms must be sending (start your teleop) before the pose can be saved.", "姿勢を保存するには両アームから受信している必要があります（テレオペを起動してください）。"),
+    "msg.keys": ("Wrote the station keys to `{path}`.", "ステーションキーを `{path}` に書き出しました。"),
+    # -- 5 Collect --------------------------------------------------------------------------------------------------------
+    "col.help": ("Starts and stops **episode collection** (`openarm-orboh/scripts/collect_bimanual.sh`) from this page. The data is saved exactly as before (LeRobot dataset + run folder in `~/collections`). "
+                 "Close your own teleop terminal first: collection runs its own leader/follower teleop.",
+                 "このページから**エピソード収集**（`openarm-orboh/scripts/collect_bimanual.sh`）を開始・停止します。データは従来と同じ形式（LeRobotデータセット＋`~/collections`のrunフォルダ）で保存されます。"
+                 "収集は専用のリーダー/フォロワー遠隔操作を使うため、先に自分のテレオペ用ターミナルを閉じてください。"),
+    "col.mode": ("Mode", "モード"),
+    "col.mode.dry": ("dry (2 throw-away episodes)", "dry（捨て2本・動作確認）"),
+    "col.mode.gate": ("gate (10 acceptance episodes)", "gate（受入10本）"),
+    "col.mode.session": ("session (continue)", "session（続きを収集）"),
+    "col.tag": ("session tag (e.g. s2)", "セッションタグ（例 s2）"),
+    "col.episodes": ("episodes this run (0 = default)", "今回の本数（0＝既定）"),
+    "col.time": ("episode time limit (s): it ends by itself after this (0 = settings file: {default})", "エピソードの制限時間（秒）: これを過ぎると自動で終わります（0＝設定ファイルの値: {default}）"),
+    "col.pose": ("start pose set (empty = settings file: {default})", "開始姿勢セット（空欄＝設定ファイルの値: {default}）"),
+    "col.opts": ("Options (same switches as the terminal)", "オプション（ターミナルと同じスイッチ）"),
+    "col.sounds": ("notification sounds", "通知音"),
+    "col.bilateral": ("bilateral feedback", "バイラテラルフィードバック"),
+    "col.return": ("save and walk back to the start pose by itself when an episode ends (hands off the leaders and the table: the arms move alone for a few seconds)",
+                   "エピソード終了で自動的に保存し、開始姿勢へ戻る（リーダーと机から手を離す: 数秒間、腕が自動で動きます）"),
+    "col.saved": ("saved to the dataset: {n}", "データセットに保存済み: {n} 本"),
+    "col.state.saving": ("Saving the episode (the arms do not move)...", "エピソードを保存中（腕は動きません）…"),
+    "col.hold": ("hold the start pose until recording starts (the leader's wrist cannot droop; grip both leaders when you press →)",
+                 "録画が始まるまで開始姿勢で保持する（リーダーの手首が垂れない。→ を押したら両方のリーダーのグリップを握る）"),
+    "col.countdown": ("count-down before recording (s), with the hold", "録画開始前の秒読み（秒）・保持と併用"),
+    "col.saveend": ("save the instant an episode ends", "エピソード終了の瞬間に保存"),
+    "col.start": ("Start collection", "収集を開始"),
+    "col.next": ("Next / finish episode (→)", "次のエピソード開始／録画終了(→)"),
+    "col.rerecord": ("Discard previous take (←)", "直前のテイクを破棄(←)"),
+    "col.align": ("Return arms to start pose (a)", "両腕を開始姿勢へ戻す(a)"),
+    "col.stop": ("Stop collection (Esc)", "収集を停止(Esc)"),
+    "col.kill": ("EMERGENCY STOP (Ctrl-C)", "緊急停止（Ctrl-C）"),
+    "col.log": ("last console lines", "コンソール直近の行"),
+    "col.state.idle": ("Not running", "停止中"),
+    "col.state.starting": ("Starting (checks, cameras, arm alignment: about 30 s)...", "起動中（確認・カメラ・アーム整列で約30秒）…"),
+    "col.state.ready": ("Waiting for you: press Next to begin recording", "待機中: 「次へ」で録画を開始します"),
+    "col.state.recording": ("RECORDING episode {n}", "録画中 エピソード{n}"),
+    "col.state.returning": ("Returning to the start pose / saving", "開始姿勢へ戻し中／保存中"),
+    "col.state.stopping": ("Stopping and saving...", "停止して保存中…"),
+    "col.state.finished": ("Finished (exit {rc})", "終了しました（終了コード {rc}）"),
+    "col.left": ("{left} left", "残り {left} 本"),
+    "col.left.detail": ("{done} of {total} done this run", "今回 {total} 本中 {done} 本完了"),
+    "col.keys": ("Keys work on this page (while this tab is open): → next / finish &nbsp; ← discard &nbsp; a start pose &nbsp; Esc stop",
+                 "このタブを開いている間はキーでも操作できます: → 次へ／録画終了 &nbsp; ← 破棄 &nbsp; a 開始姿勢へ &nbsp; Esc 停止"),
+    "col.run": ("run folder", "runフォルダ"),
+    "col.episodes.done": ("episodes started this run", "今回開始したエピソード"),
+    "col.err.busy": ("A collection is already running.", "すでに収集が動いています。"),
+    "col.err.teleop": ("A teleop is still running ({what}). Stop it first (Ctrl-C in its terminal): collection needs the arms to itself.",
+                       "テレオペがまだ動いています（{what}）。先に停止してください（そのターミナルでCtrl-C）。収集はアームを単独で使います。"),
+    "col.err.env": ("Collection settings file not found: {path}", "収集設定ファイルが見つかりません: {path}"),
+    "col.err.tag": ("A session needs a tag such as s2.", "sessionにはs2のようなタグが必要です。"),
+    "col.err.notrunning": ("No collection is running.", "収集は動いていません。"),
+    "col.camsoff": ("(the camera feeds of this page were switched off so collection can use the cameras)", "（収集がカメラを使えるよう、このページのカメラ映像を停止しました）"),
+}
+
+
+class Lang:
+    """The page's current language. `t(key, **fields)` returns the text for it; unknown keys come back as the key so a typo is visible."""
+
+    def __init__(self, code: str = "en") -> None:
+        self.code = code
+
+    def set(self, name_or_code: str) -> None:
+        """@param name_or_code `"English"`/`"日本語"` (the button labels) or `"en"`/`"ja"`."""
+        self.code = CODES.get(name_or_code, name_or_code if name_or_code in ("en", "ja") else "en")
+
+    def t(self, key: str, **fields: object) -> str:
+        pair = STRINGS.get(key)
+        if pair is None:
+            return key
+        text = pair[1] if self.code == "ja" else pair[0]
+        if "{" in text:
+            if fields.get("side") in ("left", "right"):
+                fields["side"] = self.t(f"side.{fields['side']}")
+            fields.setdefault("SIDE", str(fields.get("side", "")).upper())
+            try:
+                text = text.format(**fields)
+            except (KeyError, IndexError):
+                pass
+        return text
+
+
+EN = Lang("en")
