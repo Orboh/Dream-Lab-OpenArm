@@ -124,7 +124,7 @@ def home_adjustments(raw: dict[str, Any]) -> dict[str, list[tuple[int, float]]]:
     out = {}
     for side in SIDES:
         if raw.get("home"):
-            moved = mapping.clip_to_model_limits(side, mapping.to_model(side, raw["home"][side]))[1]
+            moved = [(joint, deg) for joint, deg in mapping.clip_to_model_limits(side, mapping.to_model(side, raw["home"][side]))[1] if abs(deg) >= 0.01]  # below 0.01 deg is the bundle's 4-decimal rounding of a home the editor already fitted
             if moved:
                 out[side] = moved
     return out

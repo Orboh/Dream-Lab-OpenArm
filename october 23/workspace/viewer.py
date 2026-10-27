@@ -95,17 +95,29 @@ def update_live(handles: dict, side: str, q_rad: np.ndarray) -> list[str]:
     return bad
 
 
+def add_camera_strip(server: viser.ViserServer, cameras: list[dict[str, str]]) -> dict[str, object]:
+    """Builds the camera strip above the robot view (left wrist, head, right wrist) and returns its tiles by camera name.
+    Call it at the top level of the page: inside a tab or folder it only draws while that tab is open."""
+    if not cameras:
+        return {}
+    server.gui.add_html(camerapanel.STRIP_CSS)
+    return {cam["name"]: server.gui.add_html(camerapanel.strip_tile_html(cam["name"], None)) for cam in cameras}
+
+
 class CameraPanel:
     """Checkboxes and pictures for the cameras: tick a box to switch a camera on, untick to release it. All start off."""
 
     BLANK = np.full((90, 160, 3), 40, dtype=np.uint8)
 
-    def __init__(self, server: viser.ViserServer, cameras: list[dict[str, str]], opener=camerapanel.realsense_opener) -> None:
-        """@param server The viser server. @param cameras `name`/`serial` pairs. @param opener Builds a camera opener from name and serial."""
+    def __init__(self, server: viser.ViserServer, cameras: list[dict[str, str]], opener=camerapanel.realsense_opener,
+                 tiles: dict[str, object] | None = None) -> None:
+        """@param server The viser server. @param cameras `name`/`serial` pairs. @param opener Builds a camera opener from name and serial.
+        @param tiles The tiles from `add_camera_strip`: the pictures go to the strip above the robot view; the checkboxes and status stay in the panel."""
         self.workers: dict[str, camerapanel.CameraWorker] = {}
         self._status: dict[str, object] = {}
         self.boxes: dict[str, object] = {}  # the checkboxes, so the page can relabel them in another language
         self.none_note = None
+        self.tiles = tiles or {}
         self.folder = server.gui.add_folder("Cameras")
         with self.folder:
             if not cameras:
@@ -114,12 +126,15 @@ class CameraPanel:
                 name = cam["name"]
                 box = server.gui.add_checkbox(f"{name} camera on", False)
                 self.boxes[name] = box
-                image = server.gui.add_image(self.BLANK, label=name, jpeg_quality=70)
+                if name in self.tiles:
+                    show = lambda frame, tile=self.tiles[name], name=name: setattr(tile, "content", camerapanel.strip_tile_html(name, frame))
+                else:
+                    image = server.gui.add_image(self.BLANK, label=name, jpeg_quality=70)
+                    show = lambda frame, image=image: setattr(image, "image", self.BLANK if frame is None else frame)
                 status = server.gui.add_markdown(f"{name}: off")
                 self._status[name] = status
                 self.workers[name] = camerapanel.CameraWorker(
-                    name, opener(name, cam["serial"]),
-                    lambda frame, image=image: setattr(image, "image", self.BLANK if frame is None else frame),
+                    name, opener(name, cam["serial"]), show,
                     lambda text, status=status: setattr(status, "content", text), period=0.1)
                 box.on_update(lambda event, name=name, box=box: self.toggle(name, box.value))
 

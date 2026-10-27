@@ -43,7 +43,7 @@ def env_file(tmp_path: pathlib.Path) -> pathlib.Path:
 def session(tmp_path: pathlib.Path):
     script = tmp_path / "fake.py"
     script.write_text(FAKE)
-    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}))
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}), set_file=tmp_path / "set.json")
     yield s
     if s.active:
         s.proc.kill()
@@ -173,3 +173,61 @@ def test_automatic_return_is_on_by_default_and_saved_episodes_are_counted(env_fi
     assert s.snapshot()["saved"] == 1 and s.phase == "returning"
     s.feed("INFO Waiting: both arms are held at the start pose.")
     assert s.phase == "ready"
+
+
+def test_remaining_count_follows_the_japanese_banner():
+    """The fork prints `録画中 episode N` and no longer `Recording episode N` (2026-10-26: 残り本数 stayed at 12 for a whole run)."""
+    s = collect.CollectSession(teleop_probe=lambda: None, set_file=None)
+    s.feed("[collect-bi] mode=session tag=bi-x-v1-s2 episodes=12 scene=x")
+    for n in range(3):
+        for line in ("Right arrow key pressed. Exiting loop...", f"  録画中 episode {n}（600 秒で自動終了）", "Right arrow key pressed. Exiting loop...",
+                     f"  episode {n} を保存中（腕は動かない） …", f"  episode {n} を保存した", "INFO Waiting: both arms are held at the start pose."):
+            s.feed(line)
+    snap = s.snapshot()
+    assert (snap["done"], snap["saved"], snap["left"], snap["episode"]) == (3, 3, 9, 2)
+    s.feed("  録画中 episode 3（600 秒で自動終了）")
+    s.feed("Left arrow key pressed. Exiting loop and rerecord the last episode...")  # discarded: not counted
+    assert s.snapshot()["left"] == 9
+
+
+def _dataset(root: pathlib.Path, episodes: int) -> pathlib.Path:
+    (root / "meta").mkdir(parents=True)
+    (root / "meta" / "info.json").write_text(f'{{"total_episodes": {episodes}}}')
+    return root
+
+
+def test_a_stopped_set_resumes_with_only_the_episodes_left_into_its_dataset(tmp_path, env_file):
+    run = tmp_path / "run"
+    run.mkdir()
+    ds = _dataset(tmp_path / "ds_v1_20261026_141740", 8)
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": "%s", "repo_id_stamped": "Orboh/ds_v1_20261026_141740"}}' % ds)
+    script = tmp_path / "fake.py"
+    script.write_text(f"print('[record-bi] 記録: {run}')\n")
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}), set_file=tmp_path / "set.json")
+    s.start(collect.Options(mode="gate", env_file=env_file))
+    assert s.wait() == 0
+    todo = s.pending()
+    assert (todo["mode"], todo["target"], todo["have"], todo["left"]) == ("gate", 10, 8, 2)
+    opts = s.resume_options(collect.Options(env_file=env_file, pose_set="v5"))
+    assert (opts.mode, opts.episodes, opts.pose_set) == ("gate", 2, "v5")
+    _, env = collect.command(opts, pathlib.Path("/r"))
+    assert env["RESUME"] == "true" and env["DATASET_ROOT"] == str(ds) and env["REPO_ID"] == "Orboh/ds_v1_20261026_141740"
+    s.start(opts)  # the resume keeps the set: once the dataset holds 10 there is nothing left
+    assert s.wait() == 0
+    (ds / "meta" / "info.json").write_text('{"total_episodes": 10}')
+    assert s.pending() is None
+    with pytest.raises(collect.CollectError, match="col.err.noresume"):
+        s.resume_options(collect.Options(env_file=env_file))
+
+
+def test_a_set_that_saved_nothing_starts_again_with_a_new_dataset_and_dry_leaves_the_set_alone(tmp_path, env_file):
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "session", "tag": "s2", "target": 12, "dataset_root": "%s", "repo_id": "Orboh/x"}' % _dataset(tmp_path / "empty", 0))
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    opts = s.resume_options(collect.Options(env_file=env_file))
+    assert (opts.mode, opts.tag, opts.episodes, opts.resume_root) == ("session", "s2", 12, "")
+    _, env = collect.command(opts, pathlib.Path("/r"))
+    assert "RESUME" not in env
+    s.start(collect.Options(mode="dry", env_file=env_file))
+    s.wait()
+    assert s.pending()["left"] == 12

@@ -5,6 +5,9 @@ Cameras are the RealSense devices listed in `~/.dreamlabs/station.yaml` (`camera
 The station must be stopped (it holds the cameras while it runs).
 """
 
+import base64
+import html
+import io
 import pathlib
 import threading
 import time
@@ -13,6 +16,7 @@ from typing import Any
 
 import numpy as np
 import yaml
+from PIL import Image
 
 WIDTH, HEIGHT, FPS = 640, 360, 15
 
@@ -75,6 +79,48 @@ class CameraWorker:
             except Exception:
                 pass
             self._on_frame(None)
+
+
+# The camera strip above the robot view (left, center, right). It follows the 3D view's box through a CSS anchor, so it keeps the view's width when the
+# panel is resized; browsers without anchors get the left 60% of the screen. While it shows, the 3D view moves down by the strip's height.
+STRIP_CSS = """<style>
+:root{--cam-h:clamp(110px,22vh,260px);}
+div:has(> canvas){anchor-name:--view3d;}
+body:has(.cam-tile) div:has(> canvas){top:var(--cam-h) !important;}
+.cam-bar{position:fixed;top:0;left:0;width:60vw;height:var(--cam-h);background:#16181c;z-index:4;display:none;}
+body:has(.cam-tile) .cam-bar{display:block;}
+.cam-tile{position:fixed;top:0;height:var(--cam-h);width:calc(20vw - 6px);z-index:4;display:flex;align-items:center;justify-content:center;
+  background:#000;color:#bbb;font:600 14px sans-serif;overflow:hidden;}
+.cam-tile img{width:100%;height:100%;object-fit:contain;}
+.cam-tile span{position:absolute;left:6px;top:4px;padding:1px 6px;border-radius:4px;background:rgba(0,0,0,.55);color:#fff;font-size:12px;}
+.cam-left{left:3px;} .cam-center{left:calc(20vw + 3px);} .cam-right{left:calc(40vw + 3px);}
+@supports (anchor-name:--a){
+  .cam-bar{position-anchor:--view3d;left:anchor(left);right:anchor(right);width:auto;}
+  .cam-tile{position-anchor:--view3d;width:calc(anchor-size(width) / 3 - 6px);}
+  .cam-left{left:calc(anchor(left) + 3px);} .cam-center{left:anchor(center);translate:-50% 0;} .cam-right{left:auto;right:calc(anchor(right) + 3px);}
+}
+</style><div class="cam-bar"></div>"""
+
+
+def strip_slot(name: str) -> str:
+    """The camera's place in the strip: the left wrist `"left"`, the right wrist `"right"`, anything else (the head) `"center"`."""
+    low = name.lower()
+    if low.endswith(("_l", "-l")) or "left" in low:
+        return "left"
+    if low.endswith(("_r", "-r")) or "right" in low:
+        return "right"
+    return "center"
+
+
+def strip_tile_html(name: str, frame: np.ndarray | None, quality: int = 70) -> str:
+    """One tile of the strip: the RGB frame embedded as a JPEG data URL, or a black "off" tile for None."""
+    label = f"<span>{html.escape(name)}</span>"
+    if frame is None:
+        return f'<div class="cam-tile cam-{strip_slot(name)}">{label}{html.escape(name)}: off</div>'
+    buf = io.BytesIO()
+    Image.fromarray(np.ascontiguousarray(frame, dtype=np.uint8)).save(buf, format="JPEG", quality=quality)
+    url = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode("ascii")
+    return f'<div class="cam-tile cam-{strip_slot(name)}"><img src="{url}">{label}</div>'
 
 
 def cameras_from_station(station: pathlib.Path) -> list[dict[str, str]]:

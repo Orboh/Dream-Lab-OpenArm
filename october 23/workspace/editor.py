@@ -10,6 +10,7 @@ from typing import Any
 
 import numpy as np
 
+import openarm_mapping as mapping
 import openarm_poses as poses
 import openarm_zones as zones
 import zonebuild as zb
@@ -111,6 +112,7 @@ class EditorState:
     def __init__(self, table: Table, boxes: list[DangerBox], arms: dict[str, ArmState]) -> None:
         self.table, self.boxes, self.arms = table, boxes, arms
         self.park_tolerance_deg = 0.0  # > 0: the saved home path is simplified to this tolerance (degrees) when that keeps it clear of the zones: a shorter raise and park
+        self.last_fit: dict[str, list[tuple[int, float]]] = {}   # what the last to_bundle() moved to fit each home into Dream's range: [(joint, degrees)]
         self.last_shortening: dict[str, dict] = {}   # what the last to_bundle() did to each arm's home path: seconds and points before and after
         self.danger_only = False  # True: the bundle names only the danger zones (no painted work area, no allowed region): nothing about the task is handed to the model
         self.table_set = False   # True once the user placed the table (or it came from a saved bundle)
@@ -190,8 +192,26 @@ class EditorState:
             out.append(zone)
         return out
 
+    def fit_home_to_dream(self, side: str) -> list[tuple[int, float]]:
+        """Moves a home that is past Dream's joint range just inside it, in our angles, and the end of its path with it (log-031).
+
+        The station file can only hold a home inside Dream's range, and the driver follows a taught path only when it ends within
+        `mapping.HOME_MATCH_DEG` of that home: fitting both here keeps them identical. @return `[(joint number, degrees moved)]`, empty when it fits.
+        """
+        arm = self.arms[side]
+        fitted, moved = mapping.fit_logical(side, arm.home)
+        if moved:
+            arm.home = [float(v) for v in fitted]
+            if arm.home_path:
+                end, fitted_deg = list(arm.home_path[-1]), np.degrees(fitted)
+                for joint, _ in moved:
+                    end[joint - 1] = float(fitted_deg[joint - 1])
+                arm.home_path = [list(p) for p in arm.home_path[:-1]] + [end]
+        return moved
+
     def to_bundle(self, operator: str, now: dt.datetime) -> dict[str, Any]:
-        """The zones bundle in the documented output format (arm base frames); `source` is `editor`."""
+        """The zones bundle in the documented output format (arm base frames); `source` is `editor`. Each home is fitted into Dream's range first (#fit_home_to_dream)."""
+        self.last_fit = {side: moved for side in SIDES if (moved := self.fit_home_to_dream(side))}
         arms = {side: {"table_z": round(float(self.table.top_z - BASE_OFFSET[side][2]), 4),
                        "reach": zb.cells_to_points(self.arms[side].reach) or None, "keep_out": self._arm_keep_out(side)} for side in SIDES}
         if self.danger_only:

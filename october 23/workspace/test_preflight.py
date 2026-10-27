@@ -213,3 +213,24 @@ def test_a_home_that_apply_moved_inside_dreams_joint_range_still_counts_as_the_b
     data["follower_l"]["home"][0] += 0.2  # a real difference is still caught
     station.write_text(yaml.safe_dump(data))
     assert pf.LABEL_HOME in failed(run(setup))
+
+
+def test_a_path_that_ends_further_than_the_drivers_2_degrees_from_the_station_home_fails(setup, monkeypatch):
+    """log-031: `apply` moved the left home's J5 inside Dream's range but not the path's end; the driver then ignored the path and did not raise the arm."""
+    import openarm_mapping as mapping
+
+    station, in_force, zdir, raw = setup
+    monkeypatch.setenv(mapping.ENV, "official")
+    monkeypatch.setenv(mapping.FILE_ENV, "/nonexistent/x")
+    home_deg = [10.2, -2.0, 11.9, 74.1, 2.03, -3.2, -16.5]
+    raw["home"]["left"] = [float(v) for v in np.radians(home_deg)]
+    raw["home_path"]["left"] = [raw["home_path"]["left"][0], home_deg]
+    for path in (zdir / "zones-20261023-1700.yaml", in_force):
+        ws.save_raw(path, raw)
+    zb.apply_to_station(station, zb.station_fragment(raw, {"left": (0.0, 0.1), "right": (0.0, -0.1)}), tuning=zb.GENTLE_STATION)
+    bad = [c for c in run(setup) if c.label == pf.LABEL_PATH_END][0]
+    assert bad.ok is False and "left" in bad.detail and "2.5" in bad.detail
+    raw["home_path"]["left"][-1][4] = -0.5   # the end fitted like the home: the driver's rule holds
+    for path in (zdir / "zones-20261023-1700.yaml", in_force):
+        ws.save_raw(path, raw)
+    assert pf.LABEL_PATH_END not in failed(run(setup))

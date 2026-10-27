@@ -6,6 +6,7 @@ Nothing about the dataset or the run folder is decided here: LeRobot and `record
 
 import collections
 import dataclasses
+import json
 import os
 import pathlib
 import pty
@@ -26,6 +27,8 @@ TELEOP_PATTERNS = ("run_teleop", "lerobot-teleoperate", "launch_bilateral", "lau
 ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[()][A-Za-z0-9]|\r")
 TARGET = re.compile(r"\[collect-bi\] mode=\S+ .*?episodes=(\d+)")  # the line collect_bimanual.sh prints with the number asked for
 RUN_DIR = re.compile(r"\[record-bi\] 記録: (\S+)|run_dir=(\S+)")
+RECORDING = re.compile(r"Recording episode (\d+)|録画中 episode (\d+)")  # lerobot's English log line, or the Japanese banner the fork prints since 2026-10
+SET_FILE = COLLECTIONS / ".collect-set.json"  # the last gate/session set: how many it asked for and where its dataset is, so a stopped set can be finished later
 
 
 class CollectError(Exception):
@@ -48,6 +51,8 @@ class Options:
     start_countdown_s: int = 3  # seconds of count-down before the first frame, used only with the hold
     episode_time_s: int = 0  # how long one episode may run before it ends by itself; 0: the settings file's EPISODE_TIME_S
     pose_set: str = ""  # the start-pose set to use; "": the settings file's POSE_SET
+    resume_root: str = ""  # an existing dataset folder to append to (RESUME=true); "": a new dataset
+    resume_repo_id: str = ""  # its stamped repo id (…_v1_YYYYMMDD_HHMMSS), needed with resume_root
 
 
 def command(opts: Options, repo: pathlib.Path = REPO) -> tuple[list[str], dict[str, str]]:
@@ -74,7 +79,19 @@ def command(opts: Options, repo: pathlib.Path = REPO) -> tuple[list[str], dict[s
         env["POSE_SET"] = opts.pose_set.strip()
     if opts.bilateral:  # the left gripper feels stiffer: the runbook's values
         env.update(L_BILATERAL_GRIPPER_KP="1.25", L_BILATERAL_GRIPPER_KD="0.06")
+    if opts.resume_root:  # record_bimanual_openarm.sh: RESUME needs the real folder and the stamped name, else it makes a new dataset
+        env.update(RESUME="true", DATASET_ROOT=opts.resume_root, REPO_ID=opts.resume_repo_id)
     return argv, env
+
+
+def dataset_episodes(root: str | None) -> int | None:
+    """Episodes a LeRobot dataset holds (`meta/info.json`), or None when there is no readable dataset there."""
+    if not root:
+        return None
+    try:
+        return int(json.loads((pathlib.Path(root) / "meta" / "info.json").read_text(encoding="utf-8"))["total_episodes"])
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
 
 
 def env_value(path: pathlib.Path, key: str) -> str:
@@ -104,10 +121,10 @@ class CollectSession:
     """One collection run at a time: the child process on a pseudo-terminal, its recent output, and what phase it is in."""
 
     def __init__(self, repo: pathlib.Path = REPO, tail: int = 400, teleop_probe: Callable[[], str | None] = running_teleop,
-                 argv_for: Callable[[Options], tuple[list[str], dict[str, str]]] | None = None) -> None:
+                 argv_for: Callable[[Options], tuple[list[str], dict[str, str]]] | None = None, set_file: pathlib.Path | None = SET_FILE) -> None:
         """@param repo The openarm-orboh checkout. @param tail How many output lines to keep. @param teleop_probe Name of a running teleop, or None.
-        @param argv_for Builds `(argv, env)` from the options (tests replace it)."""
-        self.repo, self._probe = repo, teleop_probe
+        @param argv_for Builds `(argv, env)` from the options (tests replace it). @param set_file Where the last set is remembered (None: not at all)."""
+        self.repo, self._probe, self.set_file = repo, teleop_probe, set_file
         self._argv_for = argv_for or (lambda o: command(o, repo))
         self.lines: collections.deque[str] = collections.deque(maxlen=tail)
         self.phase = "idle"  # idle starting ready recording returning stopping finished
@@ -118,6 +135,7 @@ class CollectSession:
         self.saved = 0  # episodes the script reported as written to the dataset ("を保存した")
         self.rc: int | None = None
         self.run_dir: str | None = None
+        self._mode = "dry"  # the mode of the current/last run
         self.proc: subprocess.Popen | None = None
         self._master: int | None = None
         self._lock = threading.Lock()
@@ -139,12 +157,16 @@ class CollectSession:
         if opts.mode == "session" and not opts.tag.strip():
             raise CollectError("col.err.tag")
         argv, extra = self._argv_for(opts)
+        target = opts.episodes or {"dry": 2, "gate": 10, "session": 10}[opts.mode]
+        if opts.mode != "dry" and not opts.resume_root:  # a new set; a resume keeps the set it continues, a dry run leaves it alone
+            self._write_set({"mode": opts.mode, "tag": opts.tag.strip(), "target": target, "dataset_root": None, "repo_id": None})
         master, slave = pty.openpty()
         env = {**os.environ, **extra, "TERM": "xterm", "PYTHONUNBUFFERED": "1"}
         self.lines.clear()
         self.phase, self.episode, self.started, self.rc, self.run_dir = "starting", 0, 0, None, None
         self.saved = 0
-        self.target, self.done = (opts.episodes or {"dry": 2, "gate": 10, "session": 10}[opts.mode]), 0
+        self.target, self.done = target, 0
+        self._mode = opts.mode
         self.proc = subprocess.Popen(argv, stdin=slave, stdout=slave, stderr=slave, cwd=self.repo, env=env, start_new_session=True, close_fds=True)
         os.close(slave)
         self._master = master
@@ -191,6 +213,7 @@ class CollectSession:
         if buffer:
             self.feed(buffer.decode("utf-8", "replace"))
         proc.wait()
+        self._remember_dataset()  # before "finished", so the page offers Resume the moment it sees the run end
         with self._lock:
             self.rc = proc.returncode
             self.phase = "finished"
@@ -212,15 +235,16 @@ class CollectSession:
             counted = TARGET.search(line)
             if counted:
                 self.target = int(counted.group(1))
-            if "Recording episode" in line:
+            recording = RECORDING.search(line)
+            if recording:
                 self.phase = "recording"
-                digits = re.search(r"Recording episode (\d+)", line)
-                self.episode = int(digits.group(1)) if digits else self.episode
+                self.episode = int(recording.group(1) or recording.group(2))
                 self.started += 1
             elif "を保存中" in line:
                 self.phase = "saving"
             elif "を保存した" in line:
                 self.saved += 1
+                self.done = max(self.done, self.saved)  # a save is the surest sign a take was kept
                 self.phase = "returning"  # with the automatic return the arms walk back next; "Waiting" below sets ready when they have
             elif "Right arrow key pressed" in line and self.phase == "recording":
                 self.phase, self.done = "returning", self.done + 1
@@ -245,3 +269,62 @@ class CollectSession:
             return {"phase": self.phase, "episode": self.episode, "started": self.started, "rc": self.rc, "run_dir": self.run_dir,
                     "target": self.target, "done": self.done, "left": left, "saved": self.saved,
                     "lines": list(self.lines)[-last:], "active": self.active}
+
+    # -- the set (gate / session) across runs -------------------------------------------------------------------------
+    def _read_set(self) -> dict | None:
+        if self.set_file is None:
+            return None
+        try:
+            return json.loads(self.set_file.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+
+    def _write_set(self, data: dict) -> None:
+        if self.set_file is None:
+            return
+        try:
+            self.set_file.parent.mkdir(parents=True, exist_ok=True)
+            self.set_file.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+        except OSError:
+            pass  # only the resume offer is lost; the data itself is safe
+
+    def _remember_dataset(self) -> None:
+        """After a gate/session run: notes the dataset it wrote (from the run's manifest.json) so the set can be resumed into it."""
+        current = self._read_set()
+        if current is None or self._mode == "dry" or current.get("dataset_root") or not self.run_dir:
+            return
+        try:
+            artifacts = json.loads((pathlib.Path(self.run_dir) / "manifest.json").read_text(encoding="utf-8")).get("artifacts") or {}
+        except (OSError, ValueError, AttributeError):
+            return
+        if artifacts.get("dataset_root") and artifacts.get("repo_id_stamped"):
+            current.update(dataset_root=artifacts["dataset_root"], repo_id=artifacts["repo_id_stamped"])
+            self._write_set(current)
+
+    def pending(self) -> dict | None:
+        """The last set if it stopped short: `{mode, tag, target, have, left, dataset_root, repo_id}`; None when it is complete, unknown or running.
+
+        `have` is counted in the dataset itself, so it is right however many runs the set took."""
+        if self.active:
+            return None
+        current = self._read_set()
+        if not current or not current.get("target"):
+            return None
+        have = dataset_episodes(current.get("dataset_root")) or 0
+        left = int(current["target"]) - have
+        if left <= 0:
+            return None
+        return {**current, "have": have, "left": left}
+
+    def resume_options(self, base: Options) -> Options:
+        """The options that finish the stopped set: its mode and tag, only the episodes it still needs, appended to its dataset.
+
+        A set that saved nothing (e.g. the arms did not answer at start) starts again with a new dataset.
+        @raise CollectError when there is nothing to resume."""
+        todo = self.pending()
+        if todo is None:
+            raise CollectError("col.err.noresume")
+        opts = dataclasses.replace(base, mode=todo["mode"], tag=todo.get("tag", ""), episodes=todo["left"], resume_root="", resume_repo_id="")
+        if todo["have"] > 0 and todo.get("dataset_root") and todo.get("repo_id"):
+            opts.resume_root, opts.resume_repo_id = todo["dataset_root"], todo["repo_id"]
+        return opts

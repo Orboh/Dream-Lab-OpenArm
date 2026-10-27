@@ -148,7 +148,7 @@ REST_TOLERANCE_DEG = 12.0
 ## On torque_off the arm is parked only if it is within this of the rest-to-ready path, degrees.
 PARK_TOLERANCE_DEG = 20.0
 ## The config's home counts as the ready pose within this, degrees.
-READY_HOME_TOLERANCE_DEG = 2.0
+READY_HOME_TOLERANCE_DEG = mapping.HOME_MATCH_DEG
 
 ## Smooth motion: the limits table (speed, acceleration, torque budget) and the monitors' thresholds. "Gentle" is the chosen style.
 LIMITS = motion.build_limits(KP, MODELS)

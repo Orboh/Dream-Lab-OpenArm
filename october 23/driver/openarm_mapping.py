@@ -126,3 +126,41 @@ def outside_model_limits(side: str, logical_deg, limits_deg: dict[str, tuple[flo
         elif model[i] > high + 1e-9:
             out.append((i + 1, round(float(model[i] - high), 2)))
     return out
+
+
+# -- the converter for poses we keep -----------------------------------------------------------------------------------------------
+# A home and the end of its path are kept in our (logical) angles, the station file holds the home in Dream's model angles, and the driver raises an arm along
+# its path only when the path ends within #HOME_MATCH_DEG of the station's home. With `official`, joint 5 has only half its range inside Dream's (left: ours
+# -180..0, right: ours 0..180), and a wrist near the middle easily ends a few degrees past zero. Fitting a pose HERE, in our angles, before anything is saved,
+# keeps the home and its path's end identical; clipping only the station's home (as `apply` does) leaves them apart and the driver does not raise the arm.
+
+## The driver follows a taught path only when its last point is within this of the config's home, degrees (the driver's READY_HOME_TOLERANCE_DEG).
+HOME_MATCH_DEG = 2.0
+
+
+def logical_limits_deg(side: str, name: str | None = None) -> list[tuple[float, float]]:
+    """Each joint's range in our (logical) degrees that Dream's model accepts under the mapping: Dream's limits seen from our side."""
+    sign, zero = get(side, name)
+    out = []
+    for i, (low, high) in enumerate(MODEL_LIMITS_DEG[side]):
+        a, b = sign[i] * (low - math.degrees(zero[i])), sign[i] * (high - math.degrees(zero[i]))
+        out.append((float(min(a, b)), float(max(a, b))))
+    return out
+
+
+def fit_logical(side: str, logical_rad, name: str | None = None, margin_deg: float = 0.5) -> tuple[np.ndarray, list[tuple[int, float]]]:
+    """The same pose in our angles, with any joint past Dream's range moved `margin_deg` inside it (the step `apply` takes for the station's home).
+
+    @return `(pose in logical radians, [(joint number, degrees moved in our angles)])`; a pose that fits comes back exactly, with an empty list.
+    """
+    sign, _ = get(side, name)
+    clipped, moved = clip_to_model_limits(side, to_model(side, logical_rad, name), margin_deg)
+    if not moved:
+        return np.asarray(logical_rad, dtype=float), []
+    return to_logical(side, clipped, name), [(joint, round(float(sign[joint - 1] * deg), 2)) for joint, deg in moved]
+
+
+def home_path_gap_deg(side: str, station_home_model_rad, path_end_deg, name: str | None = None) -> float:
+    """The driver's own test, in our degrees: how far a taught path's last point is from the station's home (Dream's model angles). Above #HOME_MATCH_DEG the driver ignores the path."""
+    home_deg = np.degrees(to_logical(side, np.asarray(station_home_model_rad, dtype=float), name))
+    return float(np.max(np.abs(home_deg - np.asarray(path_end_deg, dtype=float))))

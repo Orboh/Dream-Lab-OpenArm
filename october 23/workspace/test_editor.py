@@ -218,3 +218,34 @@ def test_region_overlap_is_zero_for_separate_areas_and_the_depth_when_they_run_i
     assert state.region_overlap_cm() == pytest.approx(3.8, abs=0.05)
     state.arms["right"].region = None
     assert state.region_overlap_cm() == 0.0
+
+
+# -- the converter for poses we keep, 2026-10-27 (log-031): the home and its path's end stay identical inside Dream's range -------------
+
+LEFT_HOME_DEG = [10.2, -2.0, 11.9, 74.1, 2.03, -3.2, -16.5]   # the left home taught on 2026-10-27: J5 +2.03 is Dream's +92.03 under `official`
+
+
+def test_saving_fits_a_home_past_dreams_range_together_with_the_end_of_its_path(monkeypatch):
+    import openarm_mapping as mapping
+
+    monkeypatch.setenv(mapping.ENV, "official")
+    state = ed.EditorState.default()
+    arm = state.arms["left"]
+    arm.home, arm.home_path = [float(v) for v in np.radians(LEFT_HOME_DEG)], [[-0.5, -0.8, -4.3, 4.0, -2.1, -0.5, 6.4], list(LEFT_HOME_DEG)]
+    raw = state.to_bundle("t", NOW)
+    home_deg = np.degrees(raw["home"]["left"])
+    assert home_deg[4] == pytest.approx(-0.5, abs=0.01) and home_deg[0] == pytest.approx(10.2, abs=0.01)
+    assert np.max(np.abs(np.asarray(raw["home_path"]["left"][-1]) - home_deg)) < 0.01   # the driver's rule (2 deg) holds with room to spare
+    assert raw["home_path"]["left"][0] == [-0.5, -0.8, -4.3, 4.0, -2.1, -0.5, 6.4]       # the rest of the path is as taught
+    assert state.last_fit == {"left": [(5, -2.53)]}
+
+
+def test_a_home_inside_dreams_range_is_saved_unchanged(monkeypatch):
+    import openarm_mapping as mapping
+
+    monkeypatch.setenv(mapping.ENV, "official")
+    state = ed.EditorState.default()
+    inside = [10.2, -2.0, 11.9, 74.1, -3.0, -3.2, -16.5]
+    state.arms["left"].home, state.arms["left"].home_path = [float(v) for v in np.radians(inside)], [[0.0] * 7, list(inside)]
+    raw = state.to_bundle("t", NOW)
+    assert raw["home_path"]["left"][-1] == inside and state.last_fit == {}

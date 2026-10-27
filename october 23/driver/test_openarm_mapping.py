@@ -151,3 +151,31 @@ def test_the_dry_run_arm_logs_a_run_and_says_when_the_guard_would_stop_or_refuse
     arm._guard._stamp = None
     arm.write(np.radians([LOGICAL[n] + 10.0 for n in drv.JOINTS]), 0.5)
     assert "guard: " in caplog.text and ("refused" in caplog.text or "would stop it" in caplog.text)
+
+
+# -- the converter for poses we keep (a home and the end of its path), 2026-10-27, log-031 -------------------------------------------
+
+def test_our_range_of_each_joint_follows_from_dreams_range():
+    assert mapping.logical_limits_deg("left", "official")[4] == pytest.approx((-180.0, 0.0))   # Dream -90..90 = ours -180..0
+    assert mapping.logical_limits_deg("right", "official")[4] == pytest.approx((0.0, 180.0))  # Dream -90..90 = ours 0..180
+    assert mapping.logical_limits_deg("left", "official")[5] == pytest.approx((-45.0, 45.0))  # a reversed joint keeps a symmetric range
+    assert mapping.logical_limits_deg("left", "identity") == [tuple(r) for r in mapping.MODEL_LIMITS_DEG["left"]]
+
+
+def test_a_home_past_dreams_range_is_moved_just_inside_in_our_angles():
+    home = np.radians([10.2, -2.0, 11.9, 74.1, 2.03, -3.2, -16.5])   # the left home of 2026-10-27: J5 +2.03 is Dream's +92.03
+    fitted, moved = mapping.fit_logical("left", home, "official")
+    assert np.degrees(fitted)[4] == pytest.approx(-0.5) and moved == [(5, -2.53)]
+    assert np.allclose(np.degrees(fitted)[[0, 1, 2, 3, 5, 6]], np.degrees(home)[[0, 1, 2, 3, 5, 6]])  # only J5 moves
+    right = np.radians([-7.4, 0.4, 7.2, 75.2, -4.73, 4.5, 19.1])
+    assert np.degrees(mapping.fit_logical("right", right, "official")[0])[4] == pytest.approx(0.5)
+    inside = np.radians([10, -20, 30, 40, -5, 20, -60])
+    same, none = mapping.fit_logical("left", inside, "official")
+    assert none == [] and same is not None and np.array_equal(same, inside)  # a pose that fits is returned exactly
+
+
+def test_the_driver_rule_home_vs_path_end_is_measured_in_our_angles():
+    station_home_model = mapping.to_model("left", np.radians([10.2, -2.0, 11.9, 74.1, -0.5, -3.2, -16.5]), "official")
+    assert mapping.home_path_gap_deg("left", station_home_model, [10.2, -2.0, 11.9, 74.1, 2.03, -3.2, -16.5], "official") == pytest.approx(2.53)
+    assert mapping.home_path_gap_deg("left", station_home_model, [10.2, -2.0, 11.9, 74.1, -0.5, -3.2, -16.5], "official") == pytest.approx(0.0, abs=1e-9)
+    assert drv.READY_HOME_TOLERANCE_DEG == mapping.HOME_MATCH_DEG  # the driver and the checks use one number

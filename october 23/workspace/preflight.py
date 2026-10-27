@@ -27,6 +27,7 @@ LABEL_NEWEST = "The zones in force are the newest saved bundle"
 LABEL_MAPPING = "The station file was written under the joint mapping now in use"
 LABEL_HOME = "The station's home equals the bundle's home (both arms)"
 LABEL_PATH = "A home path from rest is stored and ends at the home"
+LABEL_PATH_END = "The driver will follow each home path: it ends within 2 deg of the station's home (the driver's own rule)"
 LABEL_PARK = "The raise and park along the home path take less than 45 s for each active arm"
 LABEL_PATH_CLEAR = "The raise and park path of each active arm keeps clear of the danger zones"
 LABEL_CLEAR = "The home, rest, ready poses and the path are clear of every zone and the home is inside the allowed region"
@@ -150,6 +151,15 @@ def run_preflight(station: pathlib.Path, in_force: pathlib.Path, zones_dir: path
         nopath = [s for s in zb.SIDES if not (parsed.home_path or {}).get(s)
                   or float(np.max(np.abs(np.radians(parsed.home_path[s][-1]) - np.asarray(parsed.home[s])))) > 0.02]
         checks.append(Check(not nopath, LABEL_PATH, f"missing or not ending at home for: {nopath}; record it on the Home card" if nopath else ""))
+        # the driver's own rule, in our angles: the path ends within mapping.HOME_MATCH_DEG of the station's home (Dream's model angles, possibly moved inside Dream's range by apply), else the driver ignores the path and does not raise the arm (log-031)
+        gaps = []
+        for side, key in (("left", "follower_l"), ("right", "follower_r")):
+            path, station_home = (parsed.home_path or {}).get(side), (data.get(key) or {}).get("home")
+            if path and station_home is not None and len(station_home) == 7:
+                gap = mapping.home_path_gap_deg(side, station_home, path[-1])
+                if gap > mapping.HOME_MATCH_DEG:
+                    gaps.append(f"{side} {gap:.1f} deg")
+        checks.append(Check(not gaps, LABEL_PATH_END, f"path end vs station home: {', '.join(gaps)} (limit {mapping.HOME_MATCH_DEG:g}): save the bundle again on the website (it fits the home and the path end into Dream's range together), then apply" if gaps else ""))
         # the driver's own raise and park move: short enough for `dreamcli robot down` (it kills the station after 60 s), and clear of the zones
         active = set(openarm_lock.active_arms())
         long_ones, close_calls = [], []

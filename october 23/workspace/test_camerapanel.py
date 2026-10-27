@@ -92,3 +92,14 @@ def test_cameras_from_station_reads_realsense_serials(tmp_path):
     station.write_text("cameras:\n- {name: head, serial: '344422070898', width: 1280}\n- {name: usb, device: 0}\n- {name: wrist_l, serial: '409122272149'}\n")
     assert cp.cameras_from_station(station) == [{"name": "head", "serial": "344422070898"}, {"name": "wrist_l", "serial": "409122272149"}]
     assert cp.cameras_from_station(tmp_path / "missing.yaml") == []
+
+
+def test_strip_puts_the_wrists_left_and_right_and_the_head_in_the_middle():
+    assert [cp.strip_slot(n) for n in ("wrist_l", "head", "wrist_r")] == ["left", "center", "right"]
+
+
+def test_strip_tile_embeds_a_jpeg_or_says_off():
+    tile = cp.strip_tile_html("wrist_l", np.zeros((36, 64, 3), dtype=np.uint8))
+    assert 'class="cam-tile cam-left"' in tile and 'src="data:image/jpeg;base64,' in tile
+    off = cp.strip_tile_html("head", None)
+    assert "cam-center" in off and "head: off" in off and "<img" not in off

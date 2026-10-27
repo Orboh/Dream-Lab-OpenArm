@@ -1,0 +1,513 @@
+[
+ {
+  "side": "left",
+  "q_rad": [
+   -0.14978069697781754,
+   0.07114351496062958,
+   0.12385957544065647,
+   0.16250858319981634,
+   -0.05200065191877107,
+   0.05792429447244542,
+   -0.8912850037918133
+  ],
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -49.88,
+  "table_top_above_plate_cm": 19.92,
+  "resting_parts": [
+   "openarm_left_right_finger",
+   "openarm_left_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_left_right_finger",
+    -49.88
+   ],
+   [
+    "openarm_left_left_finger",
+    -49.76
+   ],
+   [
+    "openarm_left_hand",
+    -48.3
+   ],
+   [
+    "openarm_left_link7",
+    -48.18
+   ],
+   [
+    "openarm_left_link6",
+    -45.06
+   ],
+   [
+    "openarm_left_link5",
+    -44.25
+   ]
+  ],
+  "spot": "middle",
+  "time": "2026-10-27T10:56:42+09:00",
+  "valid": true,
+  "gripper_deg": null,
+  "finger_m": 0.044,
+  "note": "fingers taken as fully open (user: gripper fully open); recomputed"
+ },
+ {
+  "side": "right",
+  "q_rad": [
+   0.1799935603332765,
+   -0.06390501644838426,
+   -0.004640462706896019,
+   0.1934081025406265,
+   -0.09701476651402177,
+   -0.14654659894328595,
+   0.7995481388037478
+  ],
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -50.29,
+  "table_top_above_plate_cm": 19.51,
+  "resting_parts": [
+   "openarm_right_right_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_right_right_finger",
+    -50.29
+   ],
+   [
+    "openarm_right_left_finger",
+    -49.23
+   ],
+   [
+    "openarm_right_hand",
+    -48.0
+   ],
+   [
+    "openarm_right_link7",
+    -47.88
+   ],
+   [
+    "openarm_right_link6",
+    -44.78
+   ],
+   [
+    "openarm_right_link5",
+    -43.92
+   ]
+  ],
+  "spot": "middle",
+  "time": "2026-10-27T10:56:44+09:00",
+  "valid": true,
+  "gripper_deg": null,
+  "finger_m": 0.044,
+  "note": "fingers taken as fully open (user: gripper fully open); recomputed"
+ },
+ {
+  "side": "left",
+  "q_rad": [
+   0.9382066380340074,
+   -0.06275440218288103,
+   -0.020939005470306582,
+   1.6346227206836024,
+   -0.05559605895317762,
+   -0.016444363496578518,
+   0.7354316361715667
+  ],
+  "spread_deg": 20.546,
+  "steady": false,
+  "table_top_arm_cm": -49.08,
+  "table_top_above_plate_cm": 20.72,
+  "resting_parts": [
+   "openarm_left_left_finger",
+   "openarm_left_right_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_left_left_finger",
+    -49.08
+   ],
+   [
+    "openarm_left_right_finger",
+    -49.08
+   ],
+   [
+    "openarm_left_hand",
+    -41.64
+   ],
+   [
+    "openarm_left_link7",
+    -39.14
+   ],
+   [
+    "openarm_left_link5",
+    -32.6
+   ],
+   [
+    "openarm_left_link6",
+    -32.4
+   ]
+  ],
+  "spot": "middle-repeat",
+  "time": "2026-10-27T11:00:29+09:00",
+  "valid": false,
+  "note": "not a touch: the arms were in the teleop start pose (hands about 4 cm BEHIND the robot's centre line, J4 94 deg); the left arm was moving"
+ },
+ {
+  "side": "right",
+  "q_rad": [
+   -0.9900300911506623,
+   0.004007167880599989,
+   0.0986821893111092,
+   1.6361486228732722,
+   -0.13325494351867564,
+   0.0015422085641523056,
+   -0.5635879716715717
+  ],
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -48.57,
+  "table_top_above_plate_cm": 21.23,
+  "resting_parts": [
+   "openarm_right_right_finger",
+   "openarm_right_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_right_right_finger",
+    -48.57
+   ],
+   [
+    "openarm_right_left_finger",
+    -48.46
+   ],
+   [
+    "openarm_right_hand",
+    -42.47
+   ],
+   [
+    "openarm_right_link7",
+    -39.03
+   ],
+   [
+    "openarm_right_link6",
+    -32.45
+   ],
+   [
+    "openarm_right_link5",
+    -32.17
+   ]
+  ],
+  "spot": "middle-repeat",
+  "time": "2026-10-27T11:00:31+09:00",
+  "valid": false,
+  "note": "not a touch: the arms were in the teleop start pose (hands about 4 cm BEHIND the robot's centre line, J4 94 deg); the left arm was moving"
+ },
+ {
+  "side": "left",
+  "q_rad": [
+   -0.052533043052434655,
+   -0.028965205570383974,
+   0.002168875814503006,
+   0.9029526207370111,
+   -0.06642042761114911,
+   -0.08061808746087218,
+   0.11317826011297069
+  ],
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -48.02,
+  "table_top_above_plate_cm": 21.78,
+  "resting_parts": [
+   "openarm_left_right_finger",
+   "openarm_left_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_left_right_finger",
+    -48.02
+   ],
+   [
+    "openarm_left_left_finger",
+    -47.34
+   ],
+   [
+    "openarm_left_hand",
+    -43.25
+   ],
+   [
+    "openarm_left_link7",
+    -42.81
+   ],
+   [
+    "openarm_left_link5",
+    -37.93
+   ],
+   [
+    "openarm_left_link6",
+    -37.77
+   ]
+  ],
+  "spot": "middle-2",
+  "time": "2026-10-27T11:06:06+09:00",
+  "gripper_deg": null,
+  "finger_m": 0.044,
+  "valid": true,
+  "note": "fingers taken as fully open (user: gripper fully open); recomputed"
+ },
+ {
+  "side": "right",
+  "q_rad": [
+   0.09376101283957128,
+   0.06579666967353487,
+   -0.0024088307545041716,
+   0.9136339360646986,
+   0.02347428513776684,
+   -0.06719968508046482,
+   -0.2614307274509251
+  ],
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -48.26,
+  "table_top_above_plate_cm": 21.54,
+  "resting_parts": [
+   "openarm_right_right_finger",
+   "openarm_right_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_right_right_finger",
+    -48.26
+   ],
+   [
+    "openarm_right_left_finger",
+    -47.48
+   ],
+   [
+    "openarm_right_hand",
+    -43.06
+   ],
+   [
+    "openarm_right_link7",
+    -42.2
+   ],
+   [
+    "openarm_right_link5",
+    -36.94
+   ],
+   [
+    "openarm_right_link6",
+    -36.8
+   ]
+  ],
+  "spot": "middle-2",
+  "time": "2026-10-27T11:06:08+09:00",
+  "gripper_deg": null,
+  "finger_m": 0.044,
+  "valid": true,
+  "note": "fingers taken as fully open (user: gripper fully open); recomputed"
+ },
+ {
+  "side": "left",
+  "q_rad": [
+   0.2747252921882754,
+   -0.026504688289541677,
+   0.002168875814503006,
+   0.5649652857251866,
+   0.009731628542054713,
+   -0.08093280478749153,
+   -0.9309203131684823
+  ],
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -49.53,
+  "table_top_above_plate_cm": 20.27,
+  "resting_parts": [
+   "openarm_left_right_finger",
+   "openarm_left_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_left_right_finger",
+    -49.53
+   ],
+   [
+    "openarm_left_left_finger",
+    -49.04
+   ],
+   [
+    "openarm_left_hand",
+    -47.88
+   ],
+   [
+    "openarm_left_link7",
+    -47.77
+   ],
+   [
+    "openarm_left_link6",
+    -44.84
+   ],
+   [
+    "openarm_left_link5",
+    -43.85
+   ]
+  ],
+  "spot": "near-edge",
+  "time": "2026-10-27T11:07:17+09:00",
+  "gripper_deg": null,
+  "finger_m": 0.044,
+  "valid": true,
+  "note": "fingers taken as fully open (user: gripper fully open); recomputed"
+ },
+ {
+  "side": "right",
+  "q_rad": [
+   -0.32584301554221,
+   0.06468085369733895,
+   -0.002418367643189607,
+   0.7637140459296569,
+   0.05288604984364914,
+   -0.026000325959384625,
+   0.6255094571832402
+  ],
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -50.6,
+  "table_top_above_plate_cm": 19.2,
+  "resting_parts": [
+   "openarm_right_right_finger",
+   "openarm_right_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_right_right_finger",
+    -50.6
+   ],
+   [
+    "openarm_right_left_finger",
+    -50.01
+   ],
+   [
+    "openarm_right_hand",
+    -47.54
+   ],
+   [
+    "openarm_right_link7",
+    -47.39
+   ],
+   [
+    "openarm_right_link6",
+    -43.33
+   ],
+   [
+    "openarm_right_link5",
+    -42.77
+   ]
+  ],
+  "spot": "near-edge",
+  "time": "2026-10-27T11:07:19+09:00",
+  "gripper_deg": null,
+  "finger_m": 0.044,
+  "valid": true,
+  "note": "fingers taken as fully open (user: gripper fully open); recomputed"
+ },
+ {
+  "side": "left",
+  "q_rad": [
+   -0.47334825629726607,
+   0.020035328495382247,
+   0.001405924719668177,
+   0.424200808728159,
+   0.009455058770177056,
+   -0.05821593593878481,
+   0.11545757650878971
+  ],
+  "gripper_deg": -64.62003972321196,
+  "finger_m": 0.0431,
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -47.36,
+  "table_top_above_plate_cm": 22.44,
+  "resting_parts": [
+   "openarm_left_right_finger",
+   "openarm_left_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_left_right_finger",
+    -47.36
+   ],
+   [
+    "openarm_left_left_finger",
+    -46.93
+   ],
+   [
+    "openarm_left_hand",
+    -42.19
+   ],
+   [
+    "openarm_left_link7",
+    -41.74
+   ],
+   [
+    "openarm_left_link5",
+    -36.47
+   ],
+   [
+    "openarm_left_link6",
+    -36.29
+   ]
+  ],
+  "spot": "far-light",
+  "time": "2026-10-27T11:10:57+09:00"
+ },
+ {
+  "side": "right",
+  "q_rad": [
+   0.6751488208810771,
+   0.06618768210963771,
+   -0.0015314369954441316,
+   0.1915007248035394,
+   -0.029360078179544318,
+   -0.015309473743011734,
+   -0.11303673950555293
+  ],
+  "gripper_deg": -64.99160768373778,
+  "finger_m": 0.044,
+  "spread_deg": 0.022,
+  "steady": true,
+  "table_top_arm_cm": -45.94,
+  "table_top_above_plate_cm": 23.86,
+  "resting_parts": [
+   "openarm_right_right_finger",
+   "openarm_right_left_finger"
+  ],
+  "lowest": [
+   [
+    "openarm_right_right_finger",
+    -45.94
+   ],
+   [
+    "openarm_right_left_finger",
+    -45.13
+   ],
+   [
+    "openarm_right_hand",
+    -40.77
+   ],
+   [
+    "openarm_right_link7",
+    -39.9
+   ],
+   [
+    "openarm_right_link5",
+    -34.47
+   ],
+   [
+    "openarm_right_link6",
+    -34.26
+   ]
+  ],
+  "spot": "far-light",
+  "time": "2026-10-27T11:10:59+09:00"
+ }
+]

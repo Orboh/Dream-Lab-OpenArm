@@ -127,7 +127,7 @@ def collect_card(snap: dict, lang: i18n.Lang = i18n.EN) -> str:
     if snap.get("saved"):
         left += f'<div style="color:{GREEN};font-size:14px;font-weight:700;margin-top:4px;">&#10004; {lang.t("col.saved", n=snap["saved"])}</div>'
     if snap.get("target") is not None:
-        left = (f'<div style="margin-top:6px;font-size:22px;font-weight:800;color:{RED if snap["left"] else GREEN};">{lang.t("col.left", left=snap["left"])}</div>'
+        left = left + (f'<div style="margin-top:6px;font-size:22px;font-weight:800;color:{RED if snap["left"] else GREEN};">{lang.t("col.left", left=snap["left"])}</div>'
                 f'<div style="color:{GREY};font-size:13px;">{lang.t("col.left.detail", done=snap["done"], total=snap["target"])}</div>')
     folder = f'<div style="color:{GREY};font-size:12px;margin-top:4px;">{lang.t("col.run")}: {html.escape(snap["run_dir"])}</div>' if snap["run_dir"] else ""
     count = f'<div style="color:{GREY};font-size:12px;margin-top:4px;">{lang.t("col.episodes.done")}: {snap["started"]}</div>' if snap["started"] else ""

@@ -893,7 +893,8 @@ def collecting(panel, tmp_path):
     script.write_text(test_collect.FAKE)
     env = tmp_path / "x.env"
     env.write_text("TASK_SLUG=x\n")
-    panel.collector = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}))
+    panel.collector = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}),
+                                             set_file=tmp_path / "set.json")
     panel.collect_opts.env_file = env
     yield panel
     if panel.collector.active:
@@ -985,6 +986,8 @@ def test_discard_button_works_with_the_automatic_return_even_if_saving_at_the_en
         active = True
         def snapshot(self, last=12):
             return {"phase": "ready", "episode": 0, "started": 0, "rc": None, "run_dir": None, "target": None, "done": 0, "left": None, "saved": 0, "lines": [], "active": True}
+        def pending(self):
+            return None
     panel.collector = Running()
     panel.c_saveend.value, panel.c_return.value = True, True
     panel._collect_buttons()
@@ -1007,3 +1010,45 @@ def test_start_pose_set_field_starts_with_the_default_set_when_it_exists(panel, 
         assert designer.EditorPanel(server, ed.EditorState.default(), tmp_path / "out", "tester").f_poseset.value == ""
     finally:
         server.stop()
+
+
+def test_collect_resume_button_offers_only_a_stopped_set(collecting, tmp_path):
+    p = collecting
+    p.collect_tick(force=True)
+    assert p.b_cresume.disabled is True and p.resume_info.content == ""
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 8}')
+    p.collector.set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
+    p.set_language("日本語")
+    p.collect_tick(force=True)
+    assert p.b_cresume.disabled is False and "残り **2 本**" in p.resume_info.content
+    p.collect_resume_clicked()
+    assert p.collector.target == 2
+    test_collect.wait_for(lambda: p.collector.phase == "ready")
+    p.collect_key("stop")
+    assert p.collector.wait() == 0
+
+
+def test_collect_recheck_button_notices_a_dataset_edited_outside_the_page(collecting, tmp_path):
+    p = collecting
+    p.collect_tick(force=True)
+    p.collect_recheck_clicked()
+    assert p.b_cresume.disabled is True and p.out_msg.content != ""  # nothing stopped short: says so
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 9}')  # e.g. one episode deleted after the set finished
+    p.collector.set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
+    p.collect_tick()  # the run did not change, so the periodic tick alone does not see it
+    assert p.b_cresume.disabled is True
+    p.collect_recheck_clicked()
+    assert p.b_cresume.disabled is False and p.b_crecheck.disabled is False and "**1**" in p.resume_info.content and p.out_msg.content == ""
+
+
+def test_an_emptied_episode_count_means_the_default_and_a_bad_one_is_refused(collecting):
+    p = collecting
+    p.f_episodes.value = ""
+    assert p._collect_options().episodes == 0  # the script's default (gate 10, session 10)
+    p.f_episodes.value = " 12 "
+    assert p._collect_options().episodes == 12
+    p.f_episodes.value = "1o"
+    p.collect_start_clicked()
+    assert "1o" in p.out_msg.content and not p.collector.active

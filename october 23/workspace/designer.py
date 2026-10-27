@@ -29,6 +29,7 @@ import zonebuild as zb
 HERE = pathlib.Path(__file__).resolve().parent
 URDF = HERE.parent / "urdf" / "openarm_bimanual.urdf"
 MESH_ROOT = pathlib.Path("~/projects/openarm-orboh/openarm_description").expanduser()
+STATION = pathlib.Path("~/.dreamlabs/station.yaml").expanduser()
 BLUE, RED, AMBER, GREEN, GREY = (60, 120, 220), (220, 50, 47), (255, 191, 0), (60, 180, 75), (150, 150, 150)
 JOINTS = 7
 
@@ -134,6 +135,14 @@ class EditorPanel:
         self.b_lang.on_click(lambda _e: self.set_language(self.b_lang.value))
         self.status = g.add_html(cards.status_strip(self.receiving, None, self.lang))
         self.out_msg = g.add_markdown("")
+        if self.cameras is not None:
+            import viewer
+
+            self.cam_tiles = viewer.add_camera_strip(self.server, self.cameras)  # outside the tabs, so it shows on every tab
+            self.b_show_cams = g.add_checkbox("", True)
+            tx(self.b_show_cams, "label", "cam.show")
+            self.b_show_cams.on_update(lambda _e: self.show_cameras(self.b_show_cams.value))
+        self._build_move_folder(g)
         tabs = self.tabs = g.add_tab_group()
         tab_keys = ("tab.position", "tab.home", "tab.danger", "tab.save", "tab.collect")
         self.tab_labels = [self.lang.t(k) for k in tab_keys]
@@ -164,7 +173,7 @@ class EditorPanel:
             if self.cameras is not None:
                 import viewer
 
-                self.cams = viewer.CameraPanel(self.server, self.cameras)
+                self.cams = viewer.CameraPanel(self.server, self.cameras, tiles=self.cam_tiles)
                 tx(self.cams.folder, "label", "cam.folder")
                 for cam_name, box in self.cams.boxes.items():
                     tx(box, "label", "cam.on", name=cam_name)
@@ -363,7 +372,8 @@ class EditorPanel:
         self.f_mode.value = self.f_mode.options[collect.MODES.index(o.mode)]
         self.f_tag = g.add_text("", o.tag)
         tx(self.f_tag, "label", "col.tag")
-        self.f_episodes = g.add_number("", o.episodes, min=0, step=1)
+        # A text field, not a number: viser's number input never sends an emptied field, so clearing "12" left "1" behind (2026-10-26)
+        self.f_episodes = g.add_text("", str(o.episodes) if o.episodes else "")
         tx(self.f_episodes, "label", "col.episodes")
         env_time, env_pose = collect.env_value(o.env_file, "EPISODE_TIME_S") or "?", collect.env_value(o.env_file, "POSE_SET") or "?"
         self.f_time = g.add_number("", o.episode_time_s, min=0, max=3600, step=10)
@@ -385,6 +395,10 @@ class EditorPanel:
         self.collect_card = g.add_html(cards.collect_card(self.collector.snapshot(), self.lang))
         self.b_cstart = g.add_button("", color="green")
         tx(self.b_cstart, "label", "col.start")
+        self.resume_info = g.add_markdown("")
+        self._retext.append(self._resume_text)
+        self.b_cresume = g.add_button("", color="green")
+        tx(self.b_cresume, "label", "col.resume")
         self.b_cnext = g.add_button("", color="green")
         tx(self.b_cnext, "label", "col.next")
         self.b_crerecord = g.add_button("", color="gray")
@@ -396,6 +410,7 @@ class EditorPanel:
         self.b_ckill = g.add_button("", color="red")
         tx(self.b_ckill, "label", "col.kill")
         self.b_cstart.on_click(lambda _e: self.collect_start_clicked())
+        self.b_cresume.on_click(lambda _e: self.collect_resume_clicked())
         self.b_cnext.on_click(lambda _e: self.collect_key("next"))
         self.b_crerecord.on_click(lambda _e: self.collect_key("rerecord"))
         self.b_calign.on_click(lambda _e: self.collect_key("align"))
@@ -413,7 +428,10 @@ class EditorPanel:
         """The chosen options, read from the card."""
         o = self.collect_opts
         o.mode = collect.MODES[list(self.f_mode.options).index(self.f_mode.value)] if self.f_mode.value in self.f_mode.options else o.mode
-        o.tag, o.episodes = self.f_tag.value.strip(), int(self.f_episodes.value)
+        count = self.f_episodes.value.strip()
+        if count and not count.isdigit():
+            raise collect.CollectError(f"col.err.episodes|{count}")
+        o.tag, o.episodes = self.f_tag.value.strip(), int(count or 0)
         o.episode_time_s, o.pose_set = int(self.f_time.value), self.f_poseset.value.strip()
         o.play_sounds, o.bilateral, o.save_on_episode_end = bool(self.c_sounds.value), bool(self.c_bilateral.value), bool(self.c_saveend.value)
         o.start_pose_hold, o.start_countdown_s = bool(self.c_hold.value), int(self.f_countdown.value)
@@ -424,12 +442,18 @@ class EditorPanel:
         key, _, detail = str(exc).partition("|")
         return self.lang.t(key, what=detail, path=detail)
 
-    def collect_start_clicked(self) -> None:
-        """Collect tab, Start: runs the script. Releases this page's cameras first (the script needs them) and says so."""
+    def collect_start_clicked(self, opts: collect.Options | None = None) -> None:
+        """Collect tab, Start: runs the script. Releases this page's cameras first (the script needs them) and says so.
+
+        @param opts What to run (None: the options on the card)."""
         note = ""
         if self.cams is not None and any(w.running for w in self.cams.workers.values()):
             note = " " + self.lang.t("col.camsoff")
-        opts = self._collect_options()
+        try:
+            opts = opts or self._collect_options()
+        except collect.CollectError as exc:
+            self.out_msg.content = self._error_text(exc)
+            return
         if opts.pose_set and not (startpose.pose_sets_dir() / opts.pose_set).is_dir():  # say so here, before the cameras are released and the script runs
             self.out_msg.content = self.lang.t("start.err.base", what=opts.pose_set)
             return
@@ -437,10 +461,28 @@ class EditorPanel:
             if self.cams is not None:
                 self.cams.close()
             self.collector.start(opts)
-            self.out_msg.content = self.lang.t("col.state.starting") + note
+            self.out_msg.content = self.lang.t("col.state.starting") + " " + self.lang.t("col.count", mode=opts.mode, n=self.collector.target) + note
         except collect.CollectError as exc:
             self.out_msg.content = self._error_text(exc)
         self.collect_tick(force=True)
+
+    def collect_resume_clicked(self) -> None:
+        """Collect tab, Resume: records only the episodes the stopped set still needs, into the same dataset, with the card's other options."""
+        try:
+            opts = self.collector.resume_options(self._collect_options())
+        except collect.CollectError as exc:
+            self.out_msg.content = self._error_text(exc)
+            return
+        self.collect_start_clicked(opts)
+
+    def _resume_text(self) -> None:
+        """The line above Resume: which set stopped short and how many it still needs (empty when none did)."""
+        todo = self.collector.pending()
+        if todo is None:
+            self.resume_info.content = ""
+            return
+        name = todo["mode"] + (f" {todo['tag']}" if todo.get("tag") else "")
+        self.resume_info.content = self.lang.t("col.resume.info", name=name, have=todo["have"], total=todo["target"], left=todo["left"])
 
     def collect_key(self, name: str) -> None:
         """Collect tab: types one control key (next, rerecord, align, stop) into the run."""
@@ -465,16 +507,52 @@ class EditorPanel:
             b.disabled = not running
         self.b_crerecord.disabled = not running or (bool(self.c_saveend.value) and not bool(self.c_return.value))  # with the automatic return, ← discards and returns
         self.b_cstart.disabled = running
+        self.b_cresume.disabled = running or self.collector.pending() is None
+        self._resume_text()
 
     def collect_tick(self, force: bool = False) -> None:
         """Refreshes the Collect card and its buttons when the run changed (called a few times a second)."""
         snap = self.collector.snapshot()
-        seen = (snap["phase"], snap["episode"], snap["started"], snap["rc"], tuple(snap["lines"][-3:]), self.lang.code, bool(self.c_saveend.value), bool(self.c_return.value), snap["saved"])
+        seen = (snap["phase"], snap["episode"], snap["started"], snap["rc"], tuple(snap["lines"][-3:]), self.lang.code, bool(self.c_saveend.value), bool(self.c_return.value), snap["saved"], snap["done"])
         if seen == self._collect_seen and not force:
             return
         self._collect_seen = seen
         self.collect_card.content = cards.collect_card(snap, self.lang)
         self._collect_buttons()
+
+    def _build_move_folder(self, g) -> None:
+        """Go to home / Park for the real arms, above the tabs so Park is in reach from every tab."""
+        import homemove
+
+        self.mover = homemove.HomeMover(STATION)
+        folder = g.add_folder("")
+        self._tx(folder, "label", "move.folder")
+        with folder:
+            self._tx(g.add_markdown(""), "content", "move.help")
+            self.b_go_home = g.add_button("", color="orange")
+            self._tx(self.b_go_home, "label", "move.go")
+            self.b_go_home.on_click(lambda _e: self.go_home_clicked())
+            self.b_park = g.add_button("", color="red")
+            self._tx(self.b_park, "label", "move.park")
+            self.b_park.on_click(lambda _e: self.mover.park())
+            self.move_info = g.add_markdown("")
+        self._move_shown = ""
+
+    def go_home_clicked(self) -> None:
+        """Go to home: raises both arms (the lock decides which may move) and holds them until Park."""
+        if not self.mover.go(list(ed.SIDES)):
+            self.out_msg.content = self.lang.t("move.busy")
+
+    def move_tick(self) -> None:
+        """Shows the move's state and report lines when they change (called from the page loop)."""
+        text = f"**{self.mover.state}**" + ("\n\n```\n" + self.mover.text() + "\n```" if self.mover.messages else "")
+        if text != self._move_shown:
+            self.move_info.content = self._move_shown = text
+
+    def show_cameras(self, on: bool) -> None:
+        """Shows or hides the camera strip at the top. Hiding keeps the cameras open (the Home tab's checkboxes release them); the 3D view gets its full height back."""
+        for tile in self.cam_tiles.values():
+            tile.visible = on
 
     def set_language(self, name: str) -> None:
         """The language buttons: every label, card and message switches. The page is shared, so everyone watching sees the same language."""
@@ -779,7 +857,9 @@ class EditorPanel:
         arm.home_source = "teach"
         if path is None:
             arm.home_path = None
-        self.out_msg.content = self.lang.t("msg.homeset", side=side) + self.lang.t("msg.homepath" if arm.home_path else "msg.homenopath")
+        moved = self.state.fit_home_to_dream(side)  # the home and its path's end, together, inside Dream's range (log-031)
+        fit = "".join(self.lang.t("msg.homefit", joint=joint, deg=deg) for joint, deg in moved)
+        self.out_msg.content = self.lang.t("msg.homeset", side=side) + self.lang.t("msg.homepath" if arm.home_path else "msg.homenopath") + fit
         self.redraw()
 
     def set_home_clicked(self, side: str) -> None:
@@ -992,6 +1072,7 @@ def serve_designer(state: ed.EditorState, out_dir: pathlib.Path, operator: str, 
     try:
         while True:
             panel.collect_tick()
+            panel.move_tick()
             if read_q is not None:
                 live, fresh = {}, {}
                 for side in ed.SIDES:
@@ -1013,6 +1094,7 @@ def serve_designer(state: ed.EditorState, out_dir: pathlib.Path, operator: str, 
     except KeyboardInterrupt:
         pass
     finally:
+        panel.mover.close()  # an arm held at the home parks and switches off before the page goes
         if panel.cams is not None:
             panel.cams.close()
         if panel.collector.active:  # closing the page server must not leave a run holding the arms unseen
