@@ -118,6 +118,8 @@ LIMIT_SLACK_DEG = 30.0
 ## write() refuses a joint target this far from where the arm is, degrees: the loop rate-caps its targets, so a
 ## jump this big means a wrong angle mapping, not a command.
 MAX_STEP_DEG = 20.0
+## On a smooth arm, a jump between Dream's own requests during a run up to this is logged, not refused (log-044); beyond it, refused.
+MAX_RUN_JUMP_DEG = 40.0
 ## The gripper is the exception: Dream opens and closes it in big steps (a 30 deg jump between two targets ended the first live run on 10-24), and its angle is measured, so a jump is no sign of a wrong
 ## mapping. A target further than this from the last one is approached in steps of this size; the tracker (80 deg/s) sets the real speed.
 GRIPPER_MAX_STEP_DEG = 20.0
@@ -538,11 +540,22 @@ class Arm(ReadOnlyArm):
         requested = np.degrees(self._sign * (np.asarray(positions_rad, dtype=np.float64) - self._zero))
         now = self._time()
         fresh = self._last_request is not None and now - self._last_request_time <= SAFE_Q_FRESH_S
-        reference, what = (dict(zip(JOINTS, self._last_request.tolist(), strict=True)), "last request") if fresh else \
-            (before, "last target" if before is not here else "arm")
+        if fresh:
+            reference, what = dict(zip(JOINTS, self._last_request.tolist(), strict=True)), "last request"
+        elif self._smooth:
+            reference, what = here, "arm"   # the first request of a run or after a pause, against where the arm really is (log-044)
+        else:
+            reference, what = before, "last target" if before is not here else "arm"
         for name, value in zip(JOINTS, requested.tolist(), strict=True):
             low, high = LIMITS_DEG[self.side][name]
-            self._refuse_a_jump(name, min(max(value, low), high), reference, what)
+            value = min(max(value, low), high)
+            if self._smooth and fresh and MAX_STEP_DEG < abs(value - reference[name]) <= MAX_RUN_JUMP_DEG:
+                # a jump between Dream's own requests during a run (its IK switching solutions, log-043 run 4): the tracker carries it out at its gentle
+                # speed and the guard checks the way, so it is logged, not refused (log-044)
+                self._warn_now("jump", now, "arm %s %s: Dream's request jumped %.1f deg from its last one (%.1f to %.1f); carried out at the tracker's speed",
+                               self.side, name, abs(value - reference[name]), reference[name], value)
+                continue
+            self._refuse_a_jump(name, value, reference, what, MAX_RUN_JUMP_DEG if self._smooth and fresh else MAX_STEP_DEG)
         self._last_request, self._last_request_time = requested.copy(), now
         positions_rad = self._limited(positions_rad, here, float(np.clip(gripper, 0.0, 1.0)))
         if self._grip_cap is not None:
@@ -584,12 +597,12 @@ class Arm(ReadOnlyArm):
             _log.info("arm %s: the gripper was asked %.0f deg in one step (%.1f to %.1f deg): approached in steps of %.0f deg, the tracker sets the speed", self.side,
                       abs(target - last), last, target, GRIPPER_MAX_STEP_DEG)
 
-    def _refuse_a_jump(self, name: str, target: float, before: dict[str, float], what: str) -> None:
-        """Refuses a joint target more than #MAX_STEP_DEG from `before` (`what`: the last request, the last target or the arm): a wrong angle mapping looks like this.
+    def _refuse_a_jump(self, name: str, target: float, before: dict[str, float], what: str, limit_deg: float = MAX_STEP_DEG) -> None:
+        """Refuses a joint target more than `limit_deg` from `before` (`what`: the last request, the last target or the arm): a wrong angle mapping looks like this.
 
         @throws ArmError
         """
-        if abs(target - before[name]) > MAX_STEP_DEG:
+        if abs(target - before[name]) > limit_deg:
             raise errors.ArmError(
                 f"arm {self.side} {name}: target {target:.1f} deg is {abs(target - before[name]):.1f} deg from the "
                 f"{what} ({before[name]:.1f} deg); nothing was sent. A wrong angle mapping looks like this"
