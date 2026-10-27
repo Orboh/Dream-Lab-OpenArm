@@ -107,20 +107,44 @@ def test_a_motor_fault_raises_an_alarm_with_dreams_text(make_arm):
     assert "joint_3" in arm.alarm() and "overcurrent" in arm.alarm()
 
 
-def test_a_gripper_that_squeezes_against_something_is_relaxed_and_reported(make_arm):
+def squeeze(make_arm, seconds):
+    """A gripper told to shut toward -13 deg while it cannot move from -32.5 (it holds an object), run for `seconds`."""
     arm, bus = make_arm(drv.Arm, smooth=True, follow=True, frozen=("gripper",), ends=(0.0, -65.0))
     bus.history.clear()
-    target = np.radians([LOGICAL[n] for n in drv.JOINTS])
-    arm.write(target, 0.2)                         # shut the gripper toward -13 deg while it cannot move from -32.5
-    for _ in range(400):                           # 4 seconds
+    arm.write(np.radians([LOGICAL[n] for n in drv.JOINTS]), 0.2)
+    for _ in range(int(seconds / 0.01)):
         arm._tick(0.01)
-    grip = targets_of(bus, "gripper")
-    assert "gripper" in (arm.alarm() or "")
-    assert abs(grip[-1] - LOGICAL["gripper"]) < GRIPPER_RELAXED_TOL                      # relaxed to where it is
-    assert np.abs(grip - LOGICAL["gripper"]).max() <= motion.GRIPPER_LEAD_DEG + 0.05    # and never led it by more than the squeeze limit
+    return arm, bus
 
 
-GRIPPER_RELAXED_TOL = 0.5
+def test_a_gripper_holding_an_object_keeps_a_lighter_grip_and_does_not_end_the_run(make_arm, caplog):
+    """log-028 run 2 / goal Gate 2: a normal grasp leads the gripper's angle; after 2 s it used to be let go and a sticky alarm ended the run."""
+    arm, bus = squeeze(make_arm, 4.0)
+    grip = targets_of(bus, "gripper") - LOGICAL["gripper"]
+    assert arm.alarm() is None                                                   # no alarm: Dream's run goes on
+    assert grip.max() <= motion.GRIPPER_LEAD_DEG + 0.05                          # never more than the squeeze limit
+    assert grip[-1] == pytest.approx(drv.GRIPPER_HOLD_LEAD_DEG, abs=0.05)         # still gripping, with the lighter hold
+    assert sum("holds" in r.message and "gripper" in r.message for r in caplog.records) == 1  # one warning per hold, not one per tick
+
+
+def test_opening_the_gripper_ends_the_hold(make_arm):
+    arm, bus = squeeze(make_arm, 3.0)
+    bus.history.clear()
+    target = np.radians([LOGICAL[n] for n in drv.JOINTS])
+    for _ in range(20):                            # Dream opens the gripper (toward -65 deg), one target per chunk (write() takes big gripper jumps in steps)
+        arm.write(target, 1.0)
+        for _ in range(10):
+            arm._tick(0.01)
+    grip = targets_of(bus, "gripper") - LOGICAL["gripper"]
+    assert grip.min() == pytest.approx(-motion.GRIPPER_LEAD_DEG, abs=0.05)       # opens with the full lead again: the hold is over
+    assert arm.alarm() is None
+
+
+def test_a_hot_gripper_still_stops_the_run(make_arm):
+    arm, bus = squeeze(make_arm, 3.0)
+    bus.temps["gripper"] = int(drv.TEMP_STOP_C)
+    arm._tick(0.01)
+    assert "gripper" in (arm.alarm() or "") and "C" in arm.alarm()                # heat, not the squeeze, ends the run
 
 
 def test_the_raise_to_the_taught_home_is_smooth_and_the_park_returns_the_same_way(make_arm, monkeypatch, tmp_path):

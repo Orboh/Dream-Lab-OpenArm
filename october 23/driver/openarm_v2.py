@@ -155,8 +155,11 @@ LIMITS = motion.build_limits(KP, MODELS)
 CONTROL_PERIOD = 0.01   # the control thread's tick, seconds (100 Hz)
 ## A motor this hot, degrees C, is logged; at the stop temperature the arm holds and `alarm()` says why (so Dream ends the run); below RESUME it may move again.
 TEMP_WARN_C, TEMP_STOP_C, TEMP_RESUME_C = 60.0, 70.0, 65.0
-## A gripper that leads its measured angle by more than this, degrees, for this long, seconds, is blocked or squeezing: its target is relaxed and `alarm()` says so.
+## A gripper that leads its measured angle by more than this, degrees, for this long, seconds, is blocked or squeezing (a normal grasp): it then holds with
+## #GRIPPER_HOLD_LEAD_DEG instead of the full squeeze, which halves the coil current (the 2026-09-21 over-temperature), and the run goes on: no alarm
+## (it used to let go and raise a sticky alarm that ended every grasp, log-028 run 2; log-031). Opening the gripper ends the hold; heat still stops the run.
 GRIPPER_STALL_DEG, GRIPPER_STALL_S = 4.0, 2.0
+GRIPPER_HOLD_LEAD_DEG = 4.0
 ## Soft start: the gains start at this share and reach full over this many seconds.
 SOFT_START_GAIN0, SOFT_START_S = 0.4, 0.5
 ## Soft limits: a target stays this far inside a joint's limits, degrees (the gripper's margin is smaller).
@@ -399,6 +402,7 @@ class Arm(ReadOnlyArm):
         self._alarms: dict[str, str] = {}                  # heat, fault, gripper
         self._hot = False
         self._stall_since: float | None = None
+        self._grip_hold = 0.0   # +1 or -1 while the gripper holds an object (the way it squeezes), 0 otherwise
         self._soft_t0: float | None = None
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
@@ -692,6 +696,9 @@ class Arm(ReadOnlyArm):
         """
         measured = self._vector()
         lead = LIMITS.lead_deg
+        if self._grip_hold:  # holding an object: the lighter grip
+            lead = lead.copy()
+            lead[-1] = GRIPPER_HOLD_LEAD_DEG
         over = np.abs(setpoint - measured) > lead
         sent = measured + np.clip(setpoint - measured, -lead, lead)
         for i, name in enumerate(MOTORS):
@@ -739,16 +746,16 @@ class Arm(ReadOnlyArm):
             self._hot = False
             self._alarms.pop("heat", None)
         if self._target is not None and self._tracker is not None:
-            lead = abs(float(self._target[-1]) - self._deg[GRIPPER])
-            if lead > GRIPPER_STALL_DEG:
+            lead = float(self._target[-1]) - self._deg[GRIPPER]   # signed: the way the gripper is told to move
+            if self._grip_hold and (abs(lead) <= GRIPPER_HOLD_LEAD_DEG or np.sign(lead) != self._grip_hold):
+                self._grip_hold = 0.0  # told to open (or the object is gone): the full lead again
+                self._stall_since = None
+            elif not self._grip_hold and abs(lead) > GRIPPER_STALL_DEG:
                 self._stall_since = self._stall_since or now
                 if now - self._stall_since > GRIPPER_STALL_S:
-                    with self._cl:
-                        self._target[-1] = self._deg[GRIPPER]
-                        self._tracker.x[-1], self._tracker.v[-1] = self._deg[GRIPPER], 0.0
-                    self._alarms["gripper"] = f"arm {self.side} gripper is blocked or squeezing (it led its angle by {lead:.0f} deg for {GRIPPER_STALL_S:g} s): relaxed to where it is"
-                    self._stall_since = None
-            else:
+                    self._grip_hold = float(np.sign(lead))
+                    _log.warning("arm %s gripper holds an object (it led its angle by %.0f deg for %g s): lighter grip, %g deg lead", self.side, abs(lead), GRIPPER_STALL_S, GRIPPER_HOLD_LEAD_DEG)
+            elif not self._grip_hold:
                 self._stall_since = None
 
     def _dead_reason(self) -> str | None:
@@ -768,7 +775,7 @@ class Arm(ReadOnlyArm):
         return self._dead_reason() or ""
 
     def alarm(self) -> str | None:
-        """Why the run must stop although the arm answers (a hot motor, a fault, a blocked gripper, a dead control thread), or None."""
+        """Why the run must stop although the arm answers (a hot motor, a fault, a dead control thread; a gripper holding an object is not one: it keeps a lighter grip), or None."""
         return next(iter(self._alarms.values()), None) if self._alarms else None
 
     def settle(self, max_s: float = 10.0, dt: float = CONTROL_PERIOD) -> bool:
