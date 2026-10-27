@@ -320,7 +320,7 @@ def test_arm_goes_to_ready_at_start_when_it_rests_and_home_is_ready(make_arm, mo
     arm, bus = make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True,
                         home=poses.ready_rad("left"))
     assert joints_of(bus) == pytest.approx(poses.READY_DEG["left"], abs=0.2)
-    assert bus.native["gripper"] - OFFSETS["gripper"] == pytest.approx(LOGICAL["gripper"], abs=0.05)  # gripper untouched
+    assert bus.native["gripper"] - OFFSETS["gripper"] == pytest.approx(0.0, abs=0.05)  # closed for the raise, as the preflight checks the path (log-040)
     assert all(bus.enabled.values())
 
 
@@ -352,12 +352,27 @@ def test_torque_off_parks_at_rest_along_the_path_then_switches_off(make_arm, mon
     assert not any(bus.enabled.values()) and bus.closed
 
 
-def test_torque_off_away_from_the_path_only_switches_off(make_arm, monkeypatch):
+def test_torque_off_away_from_the_path_goes_back_along_a_checked_line_and_parks(make_arm, monkeypatch):
+    """log-040: Dream's driver contract (`drops_when_limp`): torque_off() must park the arm first or it drops on every reset.
+    Far from its path it used to switch off where it was, and the arm fell (log-036, log-037)."""
     monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
     far = {**as_logical(poses.REST_DEG["left"]), "joint_1": 40.0, "joint_4": 60.0}
     arm, bus = make_arm(drv.Arm, logical=far, follow=True)
     arm.torque_off()
-    assert bus.native["joint_1"] - OFFSETS["joint_1"] == pytest.approx(40.0, abs=0.05)  # no parking move
+    assert joints_of(bus) == pytest.approx(poses.REST_DEG["left"], abs=0.2)             # parked at rest, not dropped where it was
+    assert not any(bus.enabled.values()) and bus.closed
+
+
+def test_torque_off_with_no_clear_way_back_lets_go_slowly(make_arm, monkeypatch):
+    monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
+    far = {**as_logical(poses.REST_DEG["left"]), "joint_1": 40.0, "joint_4": 60.0}
+    arm, bus = make_arm(drv.Arm, logical=far, follow=True)
+    monkeypatch.setattr(arm, "_line_clear", lambda here, there: False)                   # every way back blocked
+    bus.history.clear()
+    arm.torque_off()
+    gains = [kp for name, _, kp in bus.history if name == "joint_1"]
+    assert len(gains) >= 20 and gains[0] > gains[len(gains) // 2] > gains[-1] >= 0.0      # the stiffness goes down step by step
+    assert gains[-1] < 0.1 * drv.KP["joint_1"]
     assert not any(bus.enabled.values())
 
 
@@ -434,3 +449,20 @@ def test_a_move_that_takes_longer_than_a_stop_waits_is_warned_about(make_arm, mo
     caplog.set_level(logging.INFO)
     arm.torque_off()
     assert "dreamcli robot down" in caplog.text and "takes" in caplog.text
+
+
+def test_a_park_that_fails_part_way_lets_go_slowly_instead_of_dropping(make_arm, monkeypatch):
+    """log-042, 14:04:44: the way back stopped ("joint_6 is 8.1 deg behind its path") and the arm was switched off where it was: it dropped."""
+    monkeypatch.setattr(drv, "CONTROL_PERIOD_S", 0.0)
+    far = {**as_logical(poses.REST_DEG["left"]), "joint_1": 40.0, "joint_4": 60.0}
+    arm, bus = make_arm(drv.Arm, logical=far, follow=True)
+
+    def blocked(points, grip_deg=None):
+        raise errors.ArmError("arm left joint_6 is 8.1 deg behind its path: stopped (blocked, or a wrong angle mapping)")
+
+    monkeypatch.setattr(arm, "_follow", blocked)
+    bus.history.clear()
+    arm.torque_off()
+    gains = [kp for name, _, kp in bus.history if name == "joint_1"]
+    assert len(gains) >= 20 and gains[0] > gains[-1] and gains[-1] < 0.1 * drv.KP["joint_1"]   # let go step by step
+    assert not any(bus.enabled.values())

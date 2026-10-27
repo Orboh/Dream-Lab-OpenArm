@@ -195,3 +195,46 @@ def test_torque_off_with_the_control_thread_parks_stops_the_thread_and_switches_
     frames = len(bus.history)
     time.sleep(0.2)
     assert len(bus.history) == frames
+
+
+def test_a_gripper_that_closes_slowly_is_not_taken_for_one_holding_an_object(make_arm, caplog):
+    """log-043: every 'holds an object' of 2026-10-27 came while the gripper travelled far (park, Home, a run) with no object in it: with its low gain
+    it moves slowly, and the rule looked only at the lead, not at whether the gripper still moved."""
+    arm, bus = make_arm(drv.Arm, smooth=True, follow=True, frozen=("gripper",), ends=(0.0, -65.0))
+    arm.write(np.radians([LOGICAL[n] for n in drv.JOINTS]), 0.0)   # close from -32.5 toward 0
+    for _ in range(400):                                             # 4 s: the gripper creeps closed at 5 deg/s, moving all the time
+        bus.native["gripper"] = min(bus.native["gripper"] + 0.05, OFFSETS["gripper"] + 0.0)
+        arm._tick(0.01)
+    assert not any("holds an object" in r.message for r in caplog.records)
+    assert arm._grip_hold == 0.0
+
+
+# -- the 20 deg check on a smooth arm (log-044): the first request against the measured arm; Dream's own jumps during a run warn up to 40 deg ----
+
+def test_a_jump_between_dreams_own_requests_during_a_run_warns_and_goes_on(make_arm, caplog):
+    """log-043, run 4 (14:16:55): Dream's own J5 request jumped 22.5 deg (its IK switching solutions) and the 20 deg check ended the run."""
+    arm, bus = smooth_arm(make_arm)
+    q = np.radians([LOGICAL[n] for n in drv.JOINTS])
+    arm.write(q, 0.5)
+    arm.write(q + np.radians([0, 0, 0, 0, 22.5, 0, 0]), 0.5)            # the next request, 22.5 deg on: no error
+    assert any("jumped" in r.message and "joint_5" in r.message for r in caplog.records)
+
+
+def test_a_jump_of_more_than_40_deg_between_requests_is_still_refused(make_arm):
+    arm, bus = smooth_arm(make_arm)
+    q = np.radians([LOGICAL[n] for n in drv.JOINTS])
+    arm.write(q, 0.5)
+    with pytest.raises(errors.ArmError, match="nothing was sent"):
+        arm.write(q + np.radians([0, 0, 0, 0, 45.0, 0, 0]), 0.5)
+
+
+def test_after_a_pause_the_first_request_is_judged_against_the_measured_arm(make_arm):
+    """log-043, 14:17:00: Dream's Home starts from the measured arm (J5 about 55 deg) and was refused against a target (78.5 deg) never reached."""
+    arm, bus = smooth_arm(make_arm)
+    q = np.radians([LOGICAL[n] for n in drv.JOINTS])
+    arm._target = np.array([LOGICAL[n] for n in drv.MOTORS], dtype=float)
+    arm._target[4] += 23.0                                               # a target the wrist never reached
+    arm.write(q + np.radians([0, 0, 0, 0, 0.5, 0, 0]), 0.5)              # the first request, next to where the arm is: no error
+    arm._sim_t += 1.0                                                    # a pause
+    with pytest.raises(errors.ArmError, match="from the arm"):
+        arm.write(q + np.radians([0, 0, 0, 0, 30.0, 0, 0]), 0.5)        # 30 deg from the measured arm after a pause: a wrong mapping looks like this

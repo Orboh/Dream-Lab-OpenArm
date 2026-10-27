@@ -1052,3 +1052,13 @@ def test_an_emptied_episode_count_means_the_default_and_a_bad_one_is_refused(col
     p.f_episodes.value = "1o"
     p.collect_start_clicked()
     assert "1o" in p.out_msg.content and not p.collector.active
+
+
+def test_the_station_file_gives_dreams_ik_the_robots_column_for_both_arms():
+    """log-040: Dream's own IK plans around the robot's centre column (`keep_out`), next to the table."""
+    import openarm_body as body
+
+    raw = zb.build_zones(capture_fixture(), source="editor", operator="k", now=NOW)
+    fragment = zb.station_fragment(raw, {"left": (0.0, 0.1), "right": (0.0, -0.1)})
+    for side in ("left", "right"):
+        assert body.dream_keep_out(side)[0] in fragment[side]["keep_out"]

@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 import yaml
 
+import openarm_body as body
 import openarm_gripper as gripper
 import openarm_mapping as mapping
 
@@ -99,7 +100,7 @@ class ArmKinematics:
             self._origins.append(frame)
             self._axes.append(np.array([float(v) for v in joint.find("axis").get("xyz").split()]))
         self._tcp = np.array(TCP_IN_EE[side])
-        self._grip = gripper.points_in_tcp_frame(side, gripper.FINGER_OPEN_M)   # the gripper counted fully open: its widest (log-036)
+        self._grip: dict[float, dict[str, np.ndarray]] = {}   # the gripper's corners per finger opening (mm steps), log-040
 
     def chain(self, q_rad: np.ndarray) -> list[np.ndarray]:
         """The seven joint origins and the tcp, in the arm's base frame, metres (for the arm-to-arm check, `openarm_pair`).
@@ -117,10 +118,17 @@ class ArmKinematics:
         out.append((frame @ np.append(self._tcp, 1.0))[:3])
         return out
 
-    def points(self, q_rad: np.ndarray) -> dict[str, np.ndarray]:
+    def _grip_at(self, opening_m: float) -> dict[str, np.ndarray]:
+        key = round(float(np.clip(opening_m, 0.0, gripper.FINGER_OPEN_M)), 3)
+        if key not in self._grip:
+            self._grip[key] = gripper.points_in_tcp_frame(self.side, key)
+        return self._grip[key]
+
+    def points(self, q_rad: np.ndarray, opening_m: float = gripper.FINGER_OPEN_M) -> dict[str, np.ndarray]:
         """The arm's named points in its base frame.
 
         @param q_rad Seven joint angles, radians, in Dream's model (or logical when built with `logical=True`).
+        @param opening_m Each finger's travel, metres: fully open (the widest, the cautious default) to 0 closed (log-040).
         @return `elbow`, `wrist_pitch`, `wrist`, `forearm`, `hand`, `tcp` and the gripper's 24 box corners `grip:<part>:<n>` (log-036), each `[3]` metres.
         """
         if self._logical:
@@ -141,7 +149,7 @@ class ArmKinematics:
             "hand": frame[:3, 3].copy(),
             "tcp": tool[:3, 3].copy(),
         }
-        for name, local in self._grip.items():
+        for name, local in self._grip_at(opening_m).items():
             out[name] = (tool @ np.append(local, 1.0))[:3]
         return out
 
@@ -215,12 +223,13 @@ class Zones:
         @return The violations: a point inside or too close to a keep-out zone, or the grasp point off the painted area.
         """
         zones = self.arms[side]
+        keep_out = list(zones.keep_out) + body.keep_out(side)   # the robot's own body, always (log-039)
         out: list[str] = []
         for name, point in points.items():
             surface = name == "tcp" or name.startswith("grip:")   # a point on the surface (the grasp point, a gripper box corner), not a link's centre
             may_touch = name == "tcp" or name.startswith("grip:finger")   # rule C (user, 2026-10-27, log-036): the fingers may touch the table like the grasp point
             radius = 0.0 if surface else LINK_RADIUS_M
-            for zone in zones.keep_out:
+            for zone in keep_out:
                 center = np.asarray(zone["center"], dtype=float)
                 reach = radius + CLEARANCE_M
                 if may_touch and zone.get("allow_tcp_touch"):

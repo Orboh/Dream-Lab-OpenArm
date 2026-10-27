@@ -13,6 +13,8 @@ from typing import Any
 import numpy as np
 import yaml
 
+import openarm_body as body
+import openarm_gripper as gripper
 import openarm_mapping as mapping
 import openarm_poses as poses
 import openarm_zones as zones
@@ -138,7 +140,7 @@ def _keep_out_of(raw: dict[str, Any], side: str) -> list[dict[str, Any]]:
             keep_out.append({"kind": "box", "center": list(zone["center"]), "size": list(zone["size"])})
         else:
             keep_out.append({"kind": "capsule", "center": list(zone["center"]), "radius": zone["radius"], "height": zone["height"]})
-    return keep_out
+    return keep_out + body.dream_keep_out(side)   # the robot's centre column, for Dream's own IK (log-040)
 
 
 def station_fragment(raw: dict[str, Any], homes: dict[str, tuple[float, float]], danger_only: bool | None = None) -> dict[str, dict[str, Any]]:
@@ -180,7 +182,9 @@ def pose_violations(parsed: zones.Zones, side: str, named_poses: dict[str, list[
     for name, pose in named_poses.items():
         # the allowed region holds the work poses (home, live); rest and the raise/park path hang below the table and are exempt from it
         in_region = name == "home" or name.startswith("live")
-        for text in parsed.violations(side, kin.points(np.radians(pose)), check_reach=False, check_region=in_region):
+        # the gripper as it is there (log-040): open at home and live (Dream homes with it open), closed at rest and along the driver's raise/park
+        opening = gripper.FINGER_OPEN_M if in_region else 0.0
+        for text in parsed.violations(side, kin.points(np.radians(pose), opening), check_reach=False, check_region=in_region):
             out.append(f"{name}: {text}")
     return out
 
@@ -304,11 +308,12 @@ def taught_path_slack_cm(raw: dict[str, Any], side: str, path_deg: list[list[flo
     kin = zones.ArmKinematics(side, logical=True)
     samples, _ = planned_path(path_deg)
     slack = 1e3
-    for zone in strict["arms"][side]["keep_out"]:
+    for zone in list(strict["arms"][side]["keep_out"]) + body.keep_out(side):   # the robot's body too (log-039)
         center = np.asarray(zone["center"], dtype=float)
         for q in samples:
-            for name, point in kin.points(np.radians(q)).items():
-                required = zones.CLEARANCE_M + (0.0 if name == "tcp" else zones.LINK_RADIUS_M)
+            for name, point in kin.points(np.radians(q), 0.0).items():   # the driver closes the gripper for its raise and park (log-040)
+                surface = name == "tcp" or name.startswith("grip:")
+                required = zones.CLEARANCE_M + (0.0 if surface else zones.LINK_RADIUS_M)
                 if zone["kind"] == "box":
                     distance = zones.distance_to_box(point, center, np.asarray(zone["size"], dtype=float))
                 else:
@@ -337,9 +342,9 @@ def arm_pair_problems(raw: dict[str, Any], limit: int = 3) -> list[str]:
     rest = {s: np.asarray(paths[s][0] if paths.get(s) else poses.REST_DEG[s], dtype=float) for s in SIDES}
     out: list[str] = []
 
-    def first_problem(label: str, pairs) -> None:
+    def first_problem(label: str, pairs, opening_m: float) -> None:
         for when, (q_left, q_right) in pairs:
-            found = pair.problem(np.radians(q_left), np.radians(q_right))
+            found = pair.problem(np.radians(q_left), np.radians(q_right), opening_left_m=opening_m, opening_right_m=opening_m)
             if found:
                 out.append(f"{label}, {when}: {found}")
                 return
@@ -350,10 +355,12 @@ def arm_pair_problems(raw: dict[str, Any], limit: int = 3) -> list[str]:
         samples = planned_path(paths[side])[0]
         for held_name, held in (("at rest", rest[other]), ("holding its home", homes[other])):
             first_problem(f"{side} raise/park with the {other} arm {held_name}",
-                          ((f"{k * PATH_SAMPLE_S:.1f} s", (q, held) if side == "left" else (held, q)) for k, q in enumerate(samples)))
+                          ((f"{k * PATH_SAMPLE_S:.1f} s", (q, held) if side == "left" else (held, q)) for k, q in enumerate(samples)),
+                          0.0)   # the driver closes the gripper for its raise and park; the other arm rests, or holds home after its own (log-040)
     first_problem("Dream's Home (both arms from rest at once)",
                   ((f"{t * 100:.0f}%", (rest["left"] + t * (homes["left"] - rest["left"]), rest["right"] + t * (homes["right"] - rest["right"])))
-                   for t in np.linspace(0.0, 1.0, DREAM_HOME_SAMPLES)))
+                   for t in np.linspace(0.0, 1.0, DREAM_HOME_SAMPLES)),
+                  gripper.FINGER_OPEN_M)   # Dream homes with the grippers open
     return out[:limit]
 
 
@@ -381,7 +388,7 @@ def taught_path_problems(raw: dict[str, Any], side: str, path_deg: list[list[flo
     samples, _ = planned_path(path)
     out: list[str] = []
     for index, q in enumerate(samples):
-        found = parsed.violations(side, kin.points(np.radians(q)), check_reach=False, check_region=False)
+        found = parsed.violations(side, kin.points(np.radians(q), 0.0), check_reach=False, check_region=False)   # gripper closed (log-040)
         if found:
             out.append(f"{side} taught path, {index * PATH_SAMPLE_S:.1f} s into the move: {found[0]}")
             if len(out) >= limit:

@@ -47,3 +47,24 @@ def points_in_tcp_frame(side: str, opening_m: float = FINGER_OPEN_M) -> dict[str
         for n, corner in enumerate(_corners(lo, hi)):
             out[f"grip:{part}:{n}"] = (rel @ np.append(corner, 1.0))[:3]
     return out
+
+
+## Surface samples of the three boxes for the arm-to-arm check (log-039): this far apart, metres, each counted as a ball of #SAMPLE_RADIUS_M so that
+## no point of a box surface is further than that from a sample (half the diagonal of a sample square).
+SAMPLE_SPACING_M = 0.02
+SAMPLE_RADIUS_M = SAMPLE_SPACING_M * np.sqrt(2.0) / 2.0 + 0.001
+
+
+def surface_points(side: str, opening_m: float = FINGER_OPEN_M, spacing_m: float = SAMPLE_SPACING_M) -> np.ndarray:
+    """Points on the surfaces of the hand housing and both fingers, `[n, 3]` metres in Dream's grasp-point frame of `side` (every `spacing_m`)."""
+    rel = OFFICIAL_TCP_IN_DREAM_TCP[side]
+    out = []
+    for lo, hi in boxes(opening_m).values():
+        axes = [np.linspace(lo[i], hi[i], max(2, int(np.ceil((hi[i] - lo[i]) / spacing_m)) + 1)) for i in range(3)]
+        grid = np.stack(np.meshgrid(*axes, indexing="ij"), axis=-1).reshape(-1, 3)
+        on_face = np.zeros(len(grid), dtype=bool)
+        for i in range(3):
+            on_face |= np.isclose(grid[:, i], lo[i]) | np.isclose(grid[:, i], hi[i])
+        out.append(grid[on_face])
+    pts = np.vstack(out)
+    return pts @ rel[:3, :3].T + rel[:3, 3]

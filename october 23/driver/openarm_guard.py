@@ -17,6 +17,7 @@ from collections.abc import Callable
 
 import numpy as np
 
+import openarm_gripper as gripper
 import openarm_zones as zones
 from robots import errors
 
@@ -91,8 +92,9 @@ class Guard:
         return loaded, self._kinematics
 
     @staticmethod
-    def _violations(loaded: zones.Zones, kinematics: zones.ArmKinematics, side: str, q_rad: np.ndarray) -> list[str]:
-        return loaded.violations(side, kinematics.points(np.asarray(q_rad, dtype=float)), check_reach=False)
+    def _violations(loaded: zones.Zones, kinematics: zones.ArmKinematics, side: str, q_rad: np.ndarray,
+                    opening_m: float = gripper.FINGER_OPEN_M) -> list[str]:
+        return loaded.violations(side, kinematics.points(np.asarray(q_rad, dtype=float), opening_m), check_reach=False)
 
     def check(self, q_rad: np.ndarray) -> None:
         """Refuses a target pose.
@@ -107,7 +109,27 @@ class Guard:
         if found:
             raise errors.ArmError("safety zone: " + "; ".join(found[:3]) + " — nothing was sent")
 
-    def limit(self, prev_rad: np.ndarray, q_rad: np.ndarray) -> tuple[np.ndarray, list[str]]:
+    def way_problem(self, prev_rad: np.ndarray, q_rad: np.ndarray, opening_m: float = gripper.FINGER_OPEN_M) -> str | None:
+        """The first zone the straight joint line from `prev_rad` to `q_rad` runs into, checked every #SWEEP_STEP_DEG, or None when it is clear.
+
+        A line that starts inside a zone (an arm held a little past an edge) counts as clear as long as it leaves the zone and then stays out;
+        one that never leaves it is not. For the driver's own way back to its path before parking (log-040).
+        """
+        ready = self._ready()
+        if ready is None:
+            return None
+        prev_rad, q_rad = np.asarray(prev_rad, dtype=float), np.asarray(q_rad, dtype=float)
+        steps = sweep_steps(prev_rad, q_rad)
+        leaving = True
+        for k in range(steps + 1):
+            found = self._violations(*ready, self.side, prev_rad + (k / steps) * (q_rad - prev_rad), opening_m)
+            if found and not leaving:
+                return found[0]
+            if not found:
+                leaving = False
+        return "the way back never leaves the zone it starts in" if leaving else None
+
+    def limit(self, prev_rad: np.ndarray, q_rad: np.ndarray, opening_m: float = gripper.FINGER_OPEN_M) -> tuple[np.ndarray, list[str]]:
         """Cuts a target back to the edge of the allowed space instead of refusing it.
 
         The arm moves along the straight joint-space line from `prev_rad` towards `q_rad` and stops at the last point that is still allowed. The whole line is
@@ -123,13 +145,13 @@ class Guard:
         q_rad = np.asarray(q_rad, dtype=float)
         if ready is None:
             return q_rad, []
-        found = self._violations(*ready, self.side, q_rad)
+        found = self._violations(*ready, self.side, q_rad, opening_m)
         prev_rad = np.asarray(prev_rad, dtype=float)
-        if self._violations(*ready, self.side, prev_rad):
+        if self._violations(*ready, self.side, prev_rad, opening_m):
             # an arm a little outside (it lags its target at an edge): as before, a target back inside passes and only the end is cut
             if not found:
                 return q_rad, []
-            already = ready[0].violations(self.side, ready[1].points(prev_rad), check_reach=False, region_slack=MEASURED_SLACK_M)
+            already = ready[0].violations(self.side, ready[1].points(prev_rad, opening_m), check_reach=False, region_slack=MEASURED_SLACK_M)
             if already:
                 raise errors.ArmError("safety zone: " + "; ".join(already[:3]) + " — the arm is already there, nothing was sent")
             low, high = 0.0, 1.0   # `low` is allowed, `high` is not
@@ -138,7 +160,7 @@ class Guard:
             steps = sweep_steps(prev_rad, q_rad)
             hit, on_the_way = None, []
             for k in range(1, steps + 1):
-                on_the_way = found if k == steps else self._violations(*ready, self.side, prev_rad + (k / steps) * (q_rad - prev_rad))
+                on_the_way = found if k == steps else self._violations(*ready, self.side, prev_rad + (k / steps) * (q_rad - prev_rad), opening_m)
                 if on_the_way:
                     hit = k
                     break
@@ -149,7 +171,7 @@ class Guard:
             low, high = (hit - 1) / steps, hit / steps
         for _ in range(CUT_STEPS):
             mid = (low + high) / 2
-            if self._violations(*ready, self.side, prev_rad + mid * (q_rad - prev_rad)):
+            if self._violations(*ready, self.side, prev_rad + mid * (q_rad - prev_rad), opening_m):
                 high = mid
             else:
                 low = mid

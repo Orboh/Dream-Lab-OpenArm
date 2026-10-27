@@ -78,18 +78,19 @@ def test_violations_name_the_point_and_the_zone():
 
 
 def test_grasp_point_may_touch_an_allow_touch_zone_but_links_may_not():
-    table = {"name": "table", "kind": "box", "center": [0, 0, -0.05], "size": [1, 1, 0.1], "allow_tcp_touch": True}
+    # 50 cm in front of the shoulder: the robot's body is a zone too (log-039), so the points stay clear of it
+    table = {"name": "table", "kind": "box", "center": [0.5, 0, -0.05], "size": [0.4, 0.4, 0.1], "allow_tcp_touch": True}
     z = zones.parse_zones(zones_dict(left_keep=[table]))
-    assert z.violations("left", {"tcp": np.array([0.0, 0.0, 0.003])}) == []        # 3 mm above the top: touching
-    assert z.violations("left", {"tcp": np.array([0.0, 0.0, -0.02])})               # 2 cm into the table
-    assert z.violations("left", {"wrist": np.array([0.0, 0.0, 0.05])})              # a link sphere (4 cm + 2 cm) too close
-    assert z.violations("left", {"wrist": np.array([0.0, 0.0, 0.09])}) == []
+    assert z.violations("left", {"tcp": np.array([0.5, 0.0, 0.003])}) == []        # 3 mm above the top: touching
+    assert z.violations("left", {"tcp": np.array([0.5, 0.0, -0.02])})               # 2 cm into the table
+    assert z.violations("left", {"wrist": np.array([0.5, 0.0, 0.05])})              # a link sphere (4 cm + 2 cm) too close
+    assert z.violations("left", {"wrist": np.array([0.5, 0.0, 0.09])}) == []
 
 
 def test_hand_outside_the_painted_area_is_a_violation():
-    z = zones.parse_zones(zones_dict(left_reach=[[0.0, 0.0], [0.04, 0.0]]))
-    assert z.violations("left", {"tcp": np.array([0.05, 0.02, 0.0])}) == []
-    assert z.violations("left", {"tcp": np.array([0.30, 0.0, 0.0])})
+    z = zones.parse_zones(zones_dict(left_reach=[[0.5, 0.0], [0.54, 0.0]]))      # 50 cm in front: clear of the body zone (log-039)
+    assert z.violations("left", {"tcp": np.array([0.55, 0.02, 0.0])}) == []
+    assert z.violations("left", {"tcp": np.array([0.80, 0.0, 0.0])})
 
 
 def test_age_hours():
@@ -510,8 +511,8 @@ def test_an_arm_sagging_just_past_the_edge_after_a_pause_is_held_not_stopped(mak
     measured pose as the start, found it "already there" and ended the run. It now keeps the last safe target while the arm is still near it."""
     monkeypatch.setenv("OPENARM_ZONES_REQUIRED", "1")
     k = zones.ArmKinematics("left")
-    top = min(p[2] for n, p in k.points(np.radians([-20, 0, 0, 90, 0, 0, 0])).items() if n.startswith("grip:"))   # the gripper's lowest corner at J1 = -20
-    table = {"name": "table", "kind": "box", "allow_tcp_touch": True, "center": [0.4, 0.1, top - 0.15], "size": [1.2, 1.2, 0.3]}
+    top = float(min(p[2] for n, p in k.points(np.radians([-20, 0, 0, 90, 0, 0, 0])).items() if n.startswith("grip:")))   # the gripper's lowest corner at J1 = -20
+    table = {"name": "table", "kind": "box", "allow_tcp_touch": True, "center": [0.42, 0.12, top - 0.15], "size": [0.3, 0.3, 0.3]}   # under the hand only, clear of the elbow
     path = write_zones(tmp_path / "zones.yaml", captured=dt.datetime.now(dt.timezone.utc), left_keep=[table])
     monkeypatch.setenv("OPENARM_ZONES", str(path))
     start = np.radians([-40, 0, 0, 90, 0, 0, 0])

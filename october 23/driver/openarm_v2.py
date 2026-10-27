@@ -41,6 +41,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
+import openarm_gripper as gripper
 import openarm_guard
 import openarm_mapping as mapping
 import openarm_motion as motion
@@ -146,8 +147,10 @@ FOLLOW_MAX_DPS = 25.0
 FOLLOW_LAG_DEG = 8.0
 ## At start the arm goes to the ready pose only if it is within this of the rest pose, degrees.
 REST_TOLERANCE_DEG = 12.0
-## On torque_off the arm is parked only if it is within this of the rest-to-ready path, degrees.
+## Within this of the rest-to-ready path, degrees, torque_off parks along the path; farther away it first goes back to the path along a checked line (log-040).
 PARK_TOLERANCE_DEG = 20.0
+## Far from its path with no clear way back, the arm lets go over this long, seconds, in at least this many steps (log-040).
+RELEASE_S, RELEASE_STEPS = 2.0, 40
 ## The config's home counts as the ready pose within this, degrees.
 READY_HOME_TOLERANCE_DEG = mapping.HOME_MATCH_DEG
 
@@ -161,10 +164,16 @@ TEMP_WARN_C, TEMP_STOP_C, TEMP_RESUME_C = 60.0, 70.0, 65.0
 ## (it used to let go and raise a sticky alarm that ended every grasp, log-028 run 2; log-031). Opening the gripper ends the hold; heat still stops the run.
 GRIPPER_STALL_DEG, GRIPPER_STALL_S = 4.0, 2.0
 GRIPPER_HOLD_LEAD_DEG = 4.0
+## ...and it holds an object only if it also moved less than this in those seconds, degrees: a slow gripper still on its way is no grasp (log-043).
+GRIPPER_STALL_MOVE_DEG = 1.0
 ## Soft start: the gains start at this share and reach full over this many seconds.
 SOFT_START_GAIN0, SOFT_START_S = 0.4, 0.5
 ## Soft limits: a target stays this far inside a joint's limits, degrees (the gripper's margin is smaller).
 SAFE_Q_FRESH_S = 0.5  # how long the last target sent serves as the starting point for cutting the next one back
+## ...and after that, while the measured arm is still within this of it, degrees (an arm sags or lags a little below its target under gravity; log-037).
+SAFE_Q_NEAR_DEG = 5.0
+## A guard warning of one kind is logged at most once in this many seconds (log-040).
+WARN_EVERY_S = 2.0
 GRIPPER_LIMIT_MARGIN_DEG = 1.0
 
 ## Tries to confirm a motor switched off: leaving one energized is not acceptable.
@@ -405,7 +414,11 @@ class Arm(ReadOnlyArm):
         self._stall_since: float | None = None
         self._last_request: np.ndarray | None = None   # Dream's previous request (logical degrees) and when, for the jump check (log-036)
         self._last_request_time = 0.0
+        self._ok_opening: float | None = None   # the finger opening the guard last accepted, metres (log-042)
+        self._grip_cap: float | None = None     # the gripper share it may not exceed while held at an edge, or None
+        self._warn_last: dict[str, tuple[float, int]] = {}   # per kind of warning: when it was last logged and how many were held back since
         self._at_pair_edge = False   # True while a target is cut short by the other arm (one warning per stretch)
+        self._stall_from = 0.0   # the gripper's angle when the current stall count began (log-043)
         self._grip_hold = 0.0   # +1 or -1 while the gripper holds an object (the way it squeezes), 0 otherwise
         self._soft_t0: float | None = None
         self._thread: threading.Thread | None = None
@@ -531,7 +544,9 @@ class Arm(ReadOnlyArm):
             low, high = LIMITS_DEG[self.side][name]
             self._refuse_a_jump(name, min(max(value, low), high), reference, what)
         self._last_request, self._last_request_time = requested.copy(), now
-        positions_rad = self._limited(positions_rad, here)
+        positions_rad = self._limited(positions_rad, here, float(np.clip(gripper, 0.0, 1.0)))
+        if self._grip_cap is not None:
+            gripper = min(float(gripper), self._grip_cap)   # held at an edge: not wider than the guard accepted (log-042)
         logical = np.degrees(self._sign * (np.asarray(positions_rad, dtype=np.float64) - self._zero))
         targets = dict(zip(JOINTS, logical.tolist(), strict=True))
         targets[GRIPPER] = closed + float(np.clip(gripper, 0.0, 1.0)) * (opened - closed)
@@ -542,7 +557,9 @@ class Arm(ReadOnlyArm):
             if name == GRIPPER and abs(target - before[name]) > GRIPPER_MAX_STEP_DEG:
                 self._note_gripper_step(target, before[name])
                 target = before[name] + math.copysign(GRIPPER_MAX_STEP_DEG, target - before[name])
-            else:
+            elif not self._smooth:
+                # without smoothing a target is sent as it is, so its step from the last one is checked too; with smoothing the tracker limits the speed,
+                # and after a hold the first clear target may lie far from the held one (log-040; Dream's own steps are checked above, before any cut)
                 self._refuse_a_jump(name, target, before, "last target" if before is not here else "arm")
             commands[name] = (KP[name], KD[name], self._native_of(name, target), 0.0, 0.0)
         if self._smooth:
@@ -584,29 +601,61 @@ class Arm(ReadOnlyArm):
             _log.info("arm %s: Dream %s: %.0f deg from where this run began (joint %d), %.0f deg of joint travel in all%s", self.side, kind, net,
                       joint + 1, path, "; this arm is LOCKED, so it holds still" if not self._lock.is_active() else "")
 
-    def _limited(self, positions_rad: np.ndarray, here: dict[str, float]) -> np.ndarray:
+    def _opening_m(self, asked_share: float | None = None) -> float:
+        """The fingers' travel the checks count, metres: the measured opening, or the one asked for if wider (log-040)."""
+        closed, opened = self._gripper_ends()
+        measured = (self._deg[GRIPPER] - closed) / (opened - closed) if self._deg is not None and opened != closed else 1.0
+        share = max(float(measured), asked_share if asked_share is not None else 0.0)
+        return float(np.clip(share, 0.0, 1.0)) * gripper.FINGER_OPEN_M
+
+    def _warn_now(self, kind: str, now: float, message: str, *args) -> None:
+        """Logs a warning of `kind` at most once every #WARN_EVERY_S, with how many were held back since (an arm going in and out of a hold, log-040)."""
+        last, held = self._warn_last.get(kind, (-1e9, 0))
+        if now - last >= WARN_EVERY_S:
+            _log.warning(message + (f" ({held} more since the last one)" if held else ""), *args)
+            self._warn_last[kind] = (now, 0)
+        else:
+            self._warn_last[kind] = (last, held + 1)
+
+    def _limited(self, positions_rad: np.ndarray, here: dict[str, float], asked_gripper: float | None = None) -> np.ndarray:
         """Cuts a target back to the edge of the allowed space (the guard) instead of refusing it, and says so once per stretch outside.
 
         The reference is the last target sent a moment ago, else the measured pose (an arm already outside is still refused).
         """
         now = self._time()
-        if self._safe_q is not None and now - self._safe_time <= SAFE_Q_FRESH_S:
-            prev = self._safe_q
+        measured = self._zero + self._sign * np.radians([here[n] for n in JOINTS])
+        near = self._safe_q is not None and float(np.max(np.abs(np.degrees(self._sign * (np.asarray(self._safe_q) - measured))))) <= SAFE_Q_NEAR_DEG
+        if self._safe_q is not None and (now - self._safe_time <= SAFE_Q_FRESH_S or near):
+            prev = self._safe_q   # also after a pause while the arm is still near it: an arm sagging just past an edge is held, not stopped (log-037)
         else:
-            prev = self._zero + self._sign * np.radians([here[n] for n in JOINTS])
-        limited, found = self._guard.limit(prev, positions_rad)
+            prev = measured
+        opening = self._opening_m(asked_gripper)
+        self._grip_cap = None
+        try:
+            limited, found = self._guard.limit(prev, positions_rad, opening)
+        except errors.ArmError:
+            # held at an edge, a wider gripper can put the held pose itself past it (log-042): keep the opening the guard accepted last, and the gripper
+            # does not open further than that, while the joints stay held; if that opening is not clear either, the arm really is inside and it stops
+            if self._ok_opening is None or self._ok_opening >= opening:
+                raise
+            opening = self._ok_opening
+            limited, found = self._guard.limit(prev, positions_rad, opening)
+            self._grip_cap = opening / gripper.FINGER_OPEN_M
+            self._warn_now("grip", now, "arm %s: held at an edge, the gripper keeps its opening (it would reach past the edge if it opened further)", self.side)
+        self._ok_opening = opening
         # the other arm (log-034): cut where the two arms would come within pair.MIN_GAP_M of each other
-        kept, crossing = pair.cut(self.side, self._sign * (np.asarray(prev) - self._zero), self._sign * (np.asarray(limited) - self._zero), pair.others(self.side))
+        kept, crossing = pair.cut(self.side, self._sign * (np.asarray(prev) - self._zero), self._sign * (np.asarray(limited) - self._zero), pair.others(self.side),
+                                  opening_m=opening)
         if crossing is not None:
             limited = self._zero + self._sign * kept
-            if not self._at_pair_edge:
-                _log.warning("arm %s: stopped where it keeps %.0f cm from the other arm (%s); the target stays out of reach while the other arm is there",
-                             self.side, pair.MIN_GAP_M * 100, crossing)
+            self._warn_now("pair", now, "arm %s: stopped where it keeps %.0f cm from the other arm (Dream asked for a pose with: %s); the target stays out of reach "
+                           "while the other arm is there", self.side, pair.MIN_GAP_M * 100, crossing)   # the numbers are the request's, not the arm's (log-041)
         self._at_pair_edge = crossing is not None
-        pair.publish(self.side, "target", self._sign * (np.asarray(limited) - self._zero))
+        pair.publish(self.side, "target", self._sign * (np.asarray(limited) - self._zero), opening)
         self._safe_q, self._safe_time = limited, now
-        if found and not self._at_edge:
-            _log.warning("arm %s: stopped at the edge of the allowed space (%s); the target stays out of reach until it comes back inside", self.side, found[0])
+        if found:
+            self._warn_now("edge", now, "arm %s: stopped at the edge of the allowed space (Dream asked for a pose with: %s); the target stays out of reach until it "
+                           "comes back inside", self.side, found[0])   # the numbers are the request's, not the arm's (log-041)
         self._at_edge = bool(found)
         return limited
 
@@ -749,7 +798,7 @@ class Arm(ReadOnlyArm):
             if state is not None:
                 self._deg[name] = state.position_deg - self._offsets[name]
         self._deg_time = self._time()
-        pair.publish(self.side, "measured", np.radians([self._deg[n] for n in JOINTS]))
+        pair.publish(self.side, "measured", np.radians([self._deg[n] for n in JOINTS]), self._opening_m())
         self._monitor()
 
     def _monitor(self) -> None:
@@ -784,8 +833,10 @@ class Arm(ReadOnlyArm):
                 self._grip_hold = 0.0  # told to open (or the object is gone): the full lead again
                 self._stall_since = None
             elif not self._grip_hold and abs(lead) > GRIPPER_STALL_DEG:
-                self._stall_since = self._stall_since or now
-                if now - self._stall_since > GRIPPER_STALL_S:
+                if self._stall_since is None or abs(self._deg[GRIPPER] - self._stall_from) > GRIPPER_STALL_MOVE_DEG:
+                    # still moving: a slow gripper on its way, not one held by an object (log-043); the 2 s count from here
+                    self._stall_since, self._stall_from = now, self._deg[GRIPPER]
+                elif now - self._stall_since > GRIPPER_STALL_S:
                     self._grip_hold = float(np.sign(lead))
                     _log.warning("arm %s gripper holds an object (it led its angle by %.0f deg for %g s): lighter grip, %g deg lead", self.side, abs(lead), GRIPPER_STALL_S, GRIPPER_HOLD_LEAD_DEG)
             elif not self._grip_hold:
@@ -833,8 +884,8 @@ class Arm(ReadOnlyArm):
         if self._sync:
             self._tick(self._sync_dt)
 
-    def _follow_smooth(self, points: list[list[float]]) -> None:
-        """Moves the joints along `points` (degrees, the first is where the arm is) on a smooth path within the limits, the gripper held.
+    def _follow_smooth(self, points: list[list[float]], grip_deg: float | None = None) -> None:
+        """Moves the joints along `points` (degrees, the first is where the arm is) on a smooth path within the limits, the gripper held (or moved to `grip_deg`).
 
         The control thread, if it runs, is stopped for the move and restarted afterwards from the end pose.
 
@@ -842,7 +893,7 @@ class Arm(ReadOnlyArm):
         """
         was_running = self._thread is not None
         self._stop_thread()
-        grip = self._deg[GRIPPER]
+        grip = self._deg[GRIPPER] if grip_deg is None else grip_deg
         path = motion.smooth_path(np.array(points, dtype=float), LIMITS, SAMPLE_DT_S)
         peak_v = float(np.max(np.abs(np.diff(path.samples, axis=0)) / SAMPLE_DT_S)) if len(path.samples) > 1 else 0.0
         _log.info("arm %s: smooth move of %.1f s, peak joint speed %.0f deg/s", self.side, path.duration, peak_v)
@@ -906,15 +957,24 @@ class Arm(ReadOnlyArm):
         index, distance = poses.nearest(path, self._joint_pose())
         return index == 0 and distance <= REST_TOLERANCE_DEG
 
-    def _follow(self, points: list[list[float]]) -> None:
-        """Moves the joints along `points` (degrees, the first is where the arm is) at #FOLLOW_MAX_DPS, the gripper held.
+    def _set_grip_target(self, grip_deg: float) -> None:
+        """Makes `grip_deg` the gripper's target for the stall monitor too, and ends any hold: the driver's own move closing the gripper is no grasp (log-041)."""
+        if self._target is not None:
+            with self._cl:
+                self._target[-1] = grip_deg
+        self._grip_hold, self._stall_since = 0.0, None
+
+    def _follow(self, points: list[list[float]], grip_deg: float | None = None) -> None:
+        """Moves the joints along `points` (degrees, the first is where the arm is) at #FOLLOW_MAX_DPS, the gripper held (or moved to `grip_deg`).
 
         @throws ArmError A motor leaves the enabled state, or a joint lags its target by more than #FOLLOW_LAG_DEG.
         """
+        if grip_deg is not None:
+            self._set_grip_target(grip_deg)
         if self._smooth:
-            self._follow_smooth(points)
+            self._follow_smooth(points, grip_deg)
             return
-        grip = self._deg[GRIPPER]
+        grip = self._deg[GRIPPER] if grip_deg is None else grip_deg
         for sample in poses.densify(points, FOLLOW_MAX_DPS, SAMPLE_DT_S):
             targets = {}
             for name, angle in zip(JOINTS, sample, strict=True):
@@ -942,12 +1002,13 @@ class Arm(ReadOnlyArm):
         """
         _log.info("arm %s: rest -> ready along %d waypoints", self.side, len(poses.WAYPOINTS_DEG[self.side]))
         path = self._home_path() or poses.path_to_ready(self.side)
-        self._follow([self._joint_pose(), *path[1:]])
+        self._follow([self._joint_pose(), *path[1:]], self._gripper_ends()[0])   # the gripper closed: the preflight checks this path that way (log-040)
 
     def _park(self) -> None:
         """Brings a raised arm back to the rest pose along the same path, so it does not fall when switched off.
 
-        Does nothing when the arm is limp, already at rest, or too far from the path to follow it.
+        Does nothing when the arm is limp or already at rest. Far from the path it first goes back to the nearest point a checked straight line reaches;
+        with no clear way back it lets go slowly (#_release_slowly) instead of dropping (log-040).
         """
         if self._limp or self._deg is None:
             return
@@ -956,17 +1017,55 @@ class Arm(ReadOnlyArm):
         here = self._joint_pose()
         index, distance = poses.nearest(path, here)
         if distance > PARK_TOLERANCE_DEG:
-            _log.warning("arm %s: %.0f deg from the rest-to-ready path, not parking", self.side, distance)
+            # far from its path (log-040): Dream's contract for an arm that drops when limp is to park it first, so go back along a checked line
+            back = self._way_back(path, here)
+            if back is None:
+                _log.warning("arm %s: %.0f deg from the rest-to-ready path and no clear way back to it: letting go slowly over %g s", self.side, distance, RELEASE_S)
+                self._release_slowly()
+                return
+            _log.warning("arm %s: %.0f deg from the rest-to-ready path: back to its point %d along a checked straight line, then parking", self.side, distance, back)
+            self._follow([here, *reversed(path[:back + 1])], self._gripper_ends()[0])
             return
         if index == 0:
             return
         _log.info("arm %s: parking at rest along the path before switching off", self.side)
-        self._follow([here, *reversed(path[:index])])
+        self._follow([here, *reversed(path[:index])], self._gripper_ends()[0])   # closed, as checked by the preflight (log-040)
+
+    def _line_clear(self, here_deg: list[float], there_deg: list[float]) -> bool:
+        """Whether the straight joint line from `here_deg` to `there_deg` (logical degrees) keeps clear of the zones, the body and the other arm."""
+        here_model = self._zero + self._sign * np.radians(here_deg)
+        there_model = self._zero + self._sign * np.radians(there_deg)
+        try:
+            if self._guard.way_problem(here_model, there_model, self._opening_m()) is not None:
+                return False
+        except errors.ArmError:   # no zones, or stale ones: no way back can be checked
+            return False
+        return pair.way_problem(self.side, np.radians(here_deg), np.radians(there_deg), pair.others(self.side), opening_m=self._opening_m()) is None
+
+    def _way_back(self, path: list[list[float]], here: list[float]) -> int | None:
+        """The index of the nearest point of `path` that a checked straight line reaches from `here`, or None."""
+        order = sorted(range(len(path)), key=lambda k: float(np.max(np.abs(np.asarray(path[k]) - np.asarray(here)))))
+        return next((k for k in order if self._line_clear(here, path[k])), None)
+
+    def _release_slowly(self) -> None:
+        """Lowers every motor's stiffness to nothing over #RELEASE_S while the damping stays, so the arm settles instead of falling; then the caller switches off."""
+        self._stop_thread()
+        steps = max(RELEASE_STEPS, int(RELEASE_S / CONTROL_PERIOD_S) if CONTROL_PERIOD_S > 0 else RELEASE_STEPS)
+        for i in range(steps):
+            share = 1.0 - (i + 1) / steps
+            batch = {}
+            for name in MOTORS:
+                state = self.bus.motors[name].state
+                where = state.position_deg - self._offsets[name] if state is not None else self._deg[name]
+                batch[name] = (KP[name] * share, KD[name], self._native_of(name, where), 0.0, 0.0)
+            self.bus.mit_batch(batch)
+            time.sleep(CONTROL_PERIOD_S)
 
     def torque_off(self) -> None:
         """Parks a raised arm at rest along the recorded path, then switches every motor off and closes the link.
 
-        A failed park is logged and the motors are switched off where the arm is: it then falls unless supported.
+        A failed park is logged and the arm lets go slowly (#_release_slowly) before the motors switch off, rather than falling at once (log-042).
+        Far from the path see #_park.
 
         @throws ArmError A motor did not confirm switching off (the link is closed either way).
         """
@@ -974,7 +1073,11 @@ class Arm(ReadOnlyArm):
             try:
                 self._park()
             except Exception as exc:
-                _log.warning("arm %s: parking failed (%s); switching off where it is", self.side, exc)
+                _log.warning("arm %s: parking failed (%s); letting go slowly over %g s, then switching off", self.side, exc, RELEASE_S)
+                try:
+                    self._release_slowly()   # an arm that drops when limp must not fall where the park stopped (log-042)
+                except Exception as release_exc:
+                    _log.warning("arm %s: the slow release failed too (%s); switching off where it is", self.side, release_exc)
             self._stop_thread()   # the control thread must not share the bus with the switch-off
             self._disable(list(MOTORS))
         finally:

@@ -245,4 +245,4 @@ def test_the_two_arms_are_checked_against_each_other_along_every_raise_park_and_
     for path in (zdir / "zones-20261023-1700.yaml", in_force):
         ws.save_raw(path, raw)
     bad = [c for c in run(setup) if c.label == pf.LABEL_ARMS][0]
-    assert bad.ok is False and "left hand" in bad.detail and "left raise/park" in bad.detail
+    assert bad.ok is False and "left gripper" in bad.detail and "left raise/park" in bad.detail   # the open gripper is what comes close (log-039)
