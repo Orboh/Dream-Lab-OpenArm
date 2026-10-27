@@ -1,9 +1,0 @@
-# The recordings are gigabytes: keep them out of git (dataset/source holds links into LeRobot's cache).
-dataset/source/*
-!dataset/source/SOURCES.md
-dataset/raw/*
-!dataset/raw/.gitkeep
-dataset/dream/*
-!dataset/dream/.gitkeep
-__pycache__/
-.pytest_cache/
