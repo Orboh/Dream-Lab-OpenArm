@@ -28,6 +28,7 @@ LABEL_MAPPING = "The station file was written under the joint mapping now in use
 LABEL_HOME = "The station's home equals the bundle's home (both arms)"
 LABEL_PATH = "A home path from rest is stored and ends at the home"
 LABEL_PATH_END = "The driver will follow each home path: it ends within 2 deg of the station's home (the driver's own rule)"
+LABEL_ARMS = "The two arms keep 2 cm apart: each raise and park (the other at rest or holding home) and Dream's Home of both at once"
 LABEL_PARK = "The raise and park along the home path take less than 45 s for each active arm"
 LABEL_PATH_CLEAR = "The raise and park path of each active arm keeps clear of the danger zones"
 LABEL_CLEAR = "The home, rest, ready poses and the path are clear of every zone and the home is inside the allowed region"
@@ -173,6 +174,9 @@ def run_preflight(station: pathlib.Path, in_force: pathlib.Path, zones_dir: path
             close_calls += zb.taught_path_problems(parsed.raw, side, limit=1)
         checks.append(Check(not long_ones, LABEL_PARK, f"too long: {', '.join(long_ones)} (limit {zb.PARK_MAX_S:.0f} s); save the bundle again with a shorter path" if long_ones else ""))
         checks.append(Check(not close_calls, LABEL_PATH_CLEAR, close_calls[0] if close_calls else ""))
+        # the two arms against each other (log-033): nothing else checks one arm against the other
+        pair_problems = zb.arm_pair_problems(parsed.raw, limit=1)
+        checks.append(Check(not pair_problems, LABEL_ARMS, pair_problems[0] if pair_problems else ""))
         # clear of zones
         problems = zb.free_pose_problems(parsed.raw)
         checks.append(Check(not problems, LABEL_CLEAR, problems[0] if problems else ""))

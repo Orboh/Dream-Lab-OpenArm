@@ -317,6 +317,46 @@ def taught_path_slack_cm(raw: dict[str, Any], side: str, path_deg: list[list[flo
     return float(slack)
 
 
+## Dream's Home moves every arm in a straight joint line from where it is to its home, all at once (robots/home.py); checked at this many points.
+DREAM_HOME_SAMPLES = 50
+
+
+def arm_pair_problems(raw: dict[str, Any], limit: int = 3) -> list[str]:
+    """The two arms against each other (`openarm_pair`) over what they really do together (log-033):
+    each arm's raise and park along its taught path while the other arm is at rest and while it holds its home (the order is not fixed),
+    and Dream's Home moving both arms from rest to home at once. Checked every #PATH_SAMPLE_S.
+
+    @return Up to `limit` sentences, the first problem of each move; empty when the arms keep clear.
+    """
+    import openarm_pair as pair
+
+    if not raw.get("home"):
+        return []
+    paths = raw.get("home_path") or {}
+    homes = {s: np.degrees(np.asarray(raw["home"][s], dtype=float)) for s in SIDES}
+    rest = {s: np.asarray(paths[s][0] if paths.get(s) else poses.REST_DEG[s], dtype=float) for s in SIDES}
+    out: list[str] = []
+
+    def first_problem(label: str, pairs) -> None:
+        for when, (q_left, q_right) in pairs:
+            found = pair.problem(np.radians(q_left), np.radians(q_right))
+            if found:
+                out.append(f"{label}, {when}: {found}")
+                return
+
+    for side, other in (("left", "right"), ("right", "left")):
+        if not paths.get(side):
+            continue
+        samples = planned_path(paths[side])[0]
+        for held_name, held in (("at rest", rest[other]), ("holding its home", homes[other])):
+            first_problem(f"{side} raise/park with the {other} arm {held_name}",
+                          ((f"{k * PATH_SAMPLE_S:.1f} s", (q, held) if side == "left" else (held, q)) for k, q in enumerate(samples)))
+    first_problem("Dream's Home (both arms from rest at once)",
+                  ((f"{t * 100:.0f}%", (rest["left"] + t * (homes["left"] - rest["left"]), rest["right"] + t * (homes["right"] - rest["right"])))
+                   for t in np.linspace(0.0, 1.0, DREAM_HOME_SAMPLES)))
+    return out[:limit]
+
+
 def taught_path_problems(raw: dict[str, Any], side: str, path_deg: list[list[float]] | None = None, limit: int = 3) -> list[str]:
     """Where the move along an arm's home path (the one the driver follows to raise it and to park it) comes too close to a danger zone.
 

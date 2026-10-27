@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 import yaml
 
+import openarm_gripper as gripper
 import openarm_mapping as mapping
 
 JOINTS = 7
@@ -98,12 +99,29 @@ class ArmKinematics:
             self._origins.append(frame)
             self._axes.append(np.array([float(v) for v in joint.find("axis").get("xyz").split()]))
         self._tcp = np.array(TCP_IN_EE[side])
+        self._grip = gripper.points_in_tcp_frame(side, gripper.FINGER_OPEN_M)   # the gripper counted fully open: its widest (log-036)
+
+    def chain(self, q_rad: np.ndarray) -> list[np.ndarray]:
+        """The seven joint origins and the tcp, in the arm's base frame, metres (for the arm-to-arm check, `openarm_pair`).
+
+        @param q_rad Seven joint angles, radians, as for #points.
+        """
+        if self._logical:
+            q_rad = mapping.to_model(self.side, q_rad)
+        frame = np.eye(4)
+        out: list[np.ndarray] = []
+        for i in range(JOINTS):
+            frame = frame @ self._origins[i]
+            out.append(frame[:3, 3].copy())
+            frame = frame @ _rotation_about(self._axes[i], float(q_rad[i]))
+        out.append((frame @ np.append(self._tcp, 1.0))[:3])
+        return out
 
     def points(self, q_rad: np.ndarray) -> dict[str, np.ndarray]:
         """The arm's named points in its base frame.
 
         @param q_rad Seven joint angles, radians, in Dream's model (or logical when built with `logical=True`).
-        @return `elbow`, `wrist_pitch`, `wrist`, `forearm`, `hand` and `tcp`, each `[3]` metres.
+        @return `elbow`, `wrist_pitch`, `wrist`, `forearm`, `hand`, `tcp` and the gripper's 24 box corners `grip:<part>:<n>` (log-036), each `[3]` metres.
         """
         if self._logical:
             q_rad = mapping.to_model(self.side, q_rad)
@@ -113,14 +131,19 @@ class ArmKinematics:
             frame = frame @ self._origins[i]
             origins.append(frame[:3, 3].copy())
             frame = frame @ _rotation_about(self._axes[i], float(q_rad[i]))
-        return {
+        tool = frame.copy()
+        tool[:3, 3] = (frame @ np.append(self._tcp, 1.0))[:3]
+        out = {
             "elbow": origins[3],
             "wrist_pitch": origins[5],
             "wrist": origins[6],
             "forearm": (origins[3] + origins[6]) / 2.0,
             "hand": frame[:3, 3].copy(),
-            "tcp": (frame @ np.append(self._tcp, 1.0))[:3],
+            "tcp": tool[:3, 3].copy(),
         }
+        for name, local in self._grip.items():
+            out[name] = (tool @ np.append(local, 1.0))[:3]
+        return out
 
     def tool_pose(self, q_rad: np.ndarray) -> np.ndarray:
         """The grasp point's 4x4 pose in the base frame (for cross-checks against Dream's own FK)."""
@@ -194,14 +217,14 @@ class Zones:
         zones = self.arms[side]
         out: list[str] = []
         for name, point in points.items():
-            radius = 0.0 if name == "tcp" else LINK_RADIUS_M
+            surface = name == "tcp" or name.startswith("grip:")   # a point on the surface (the grasp point, a gripper box corner), not a link's centre
+            may_touch = name == "tcp" or name.startswith("grip:finger")   # rule C (user, 2026-10-27, log-036): the fingers may touch the table like the grasp point
+            radius = 0.0 if surface else LINK_RADIUS_M
             for zone in zones.keep_out:
                 center = np.asarray(zone["center"], dtype=float)
                 reach = radius + CLEARANCE_M
-                if name == "tcp" and zone.get("allow_tcp_touch"):
+                if may_touch and zone.get("allow_tcp_touch"):
                     reach = -TOUCH_TOLERANCE_M
-                elif name == "tcp":
-                    reach = CLEARANCE_M
                 if zone["kind"] == "box":
                     distance = distance_to_box(point, center, np.asarray(zone["size"], dtype=float))
                 else:

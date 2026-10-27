@@ -44,6 +44,7 @@ import numpy.typing as npt
 import openarm_guard
 import openarm_mapping as mapping
 import openarm_motion as motion
+import openarm_pair as pair
 import openarm_lock
 import openarm_poses as poses
 import openarm_zones as zones_module
@@ -402,6 +403,9 @@ class Arm(ReadOnlyArm):
         self._alarms: dict[str, str] = {}                  # heat, fault, gripper
         self._hot = False
         self._stall_since: float | None = None
+        self._last_request: np.ndarray | None = None   # Dream's previous request (logical degrees) and when, for the jump check (log-036)
+        self._last_request_time = 0.0
+        self._at_pair_edge = False   # True while a target is cut short by the other arm (one warning per stretch)
         self._grip_hold = 0.0   # +1 or -1 while the gripper holds an object (the way it squeezes), 0 otherwise
         self._soft_t0: float | None = None
         self._thread: threading.Thread | None = None
@@ -513,25 +517,33 @@ class Arm(ReadOnlyArm):
             return  # this arm is locked (arms.py): it keeps its pose whatever it is asked
         self._held = None
         here = self._deg if self._deg is not None else self._logical()
+        before = here
+        if self._smooth and self._target is not None:
+            before = dict(zip(MOTORS, self._target.tolist(), strict=True))   # the tracker keeps the arm behind Dream's targets: the step is from the last target
+        # the wrong-mapping check looks at what Dream asked, before a safety cut shortens the step and hides it (log-035), and compares it with Dream's
+        # previous request while that is fresh, not with the target sent: an arm held at an edge while Dream goes on is no jump (log-036, run 1)
+        requested = np.degrees(self._sign * (np.asarray(positions_rad, dtype=np.float64) - self._zero))
+        now = self._time()
+        fresh = self._last_request is not None and now - self._last_request_time <= SAFE_Q_FRESH_S
+        reference, what = (dict(zip(JOINTS, self._last_request.tolist(), strict=True)), "last request") if fresh else \
+            (before, "last target" if before is not here else "arm")
+        for name, value in zip(JOINTS, requested.tolist(), strict=True):
+            low, high = LIMITS_DEG[self.side][name]
+            self._refuse_a_jump(name, min(max(value, low), high), reference, what)
+        self._last_request, self._last_request_time = requested.copy(), now
         positions_rad = self._limited(positions_rad, here)
         logical = np.degrees(self._sign * (np.asarray(positions_rad, dtype=np.float64) - self._zero))
         targets = dict(zip(JOINTS, logical.tolist(), strict=True))
         targets[GRIPPER] = closed + float(np.clip(gripper, 0.0, 1.0)) * (opened - closed)
         commands: dict[str, tuple[float, float, float, float, float]] = {}
-        before = here
-        if self._smooth and self._target is not None:
-            before = dict(zip(MOTORS, self._target.tolist(), strict=True))   # the tracker keeps the arm behind Dream's targets: the step is from the last target
         for name in MOTORS:
             low, high = LIMITS_DEG[self.side][name]
             target = min(max(targets[name], low), high)
             if name == GRIPPER and abs(target - before[name]) > GRIPPER_MAX_STEP_DEG:
                 self._note_gripper_step(target, before[name])
                 target = before[name] + math.copysign(GRIPPER_MAX_STEP_DEG, target - before[name])
-            elif abs(target - before[name]) > MAX_STEP_DEG:
-                raise errors.ArmError(
-                    f"arm {self.side} {name}: target {target:.1f} deg is {abs(target - before[name]):.1f} deg from the "
-                    f"{'last target' if before is not here else 'arm'} ({before[name]:.1f} deg); nothing was sent. A wrong angle mapping looks like this"
-                )
+            else:
+                self._refuse_a_jump(name, target, before, "last target" if before is not here else "arm")
             commands[name] = (KP[name], KD[name], self._native_of(name, target), 0.0, 0.0)
         if self._smooth:
             self._ensure_tracker()
@@ -555,6 +567,17 @@ class Arm(ReadOnlyArm):
             _log.info("arm %s: the gripper was asked %.0f deg in one step (%.1f to %.1f deg): approached in steps of %.0f deg, the tracker sets the speed", self.side,
                       abs(target - last), last, target, GRIPPER_MAX_STEP_DEG)
 
+    def _refuse_a_jump(self, name: str, target: float, before: dict[str, float], what: str) -> None:
+        """Refuses a joint target more than #MAX_STEP_DEG from `before` (`what`: the last request, the last target or the arm): a wrong angle mapping looks like this.
+
+        @throws ArmError
+        """
+        if abs(target - before[name]) > MAX_STEP_DEG:
+            raise errors.ArmError(
+                f"arm {self.side} {name}: target {target:.1f} deg is {abs(target - before[name]):.1f} deg from the "
+                f"{what} ({before[name]:.1f} deg); nothing was sent. A wrong angle mapping looks like this"
+            )
+
     def _note_request(self, positions_rad: np.ndarray) -> None:
         """Logs what Dream asks of this arm (net move of the run, joint, travel), and says when the arm is locked and so holds still."""
         for kind, net, joint, path in self._tally.update(np.degrees(np.asarray(positions_rad, dtype=float)), self._time()):
@@ -572,6 +595,15 @@ class Arm(ReadOnlyArm):
         else:
             prev = self._zero + self._sign * np.radians([here[n] for n in JOINTS])
         limited, found = self._guard.limit(prev, positions_rad)
+        # the other arm (log-034): cut where the two arms would come within pair.MIN_GAP_M of each other
+        kept, crossing = pair.cut(self.side, self._sign * (np.asarray(prev) - self._zero), self._sign * (np.asarray(limited) - self._zero), pair.others(self.side))
+        if crossing is not None:
+            limited = self._zero + self._sign * kept
+            if not self._at_pair_edge:
+                _log.warning("arm %s: stopped where it keeps %.0f cm from the other arm (%s); the target stays out of reach while the other arm is there",
+                             self.side, pair.MIN_GAP_M * 100, crossing)
+        self._at_pair_edge = crossing is not None
+        pair.publish(self.side, "target", self._sign * (np.asarray(limited) - self._zero))
         self._safe_q, self._safe_time = limited, now
         if found and not self._at_edge:
             _log.warning("arm %s: stopped at the edge of the allowed space (%s); the target stays out of reach until it comes back inside", self.side, found[0])
@@ -717,6 +749,7 @@ class Arm(ReadOnlyArm):
             if state is not None:
                 self._deg[name] = state.position_deg - self._offsets[name]
         self._deg_time = self._time()
+        pair.publish(self.side, "measured", np.radians([self._deg[n] for n in JOINTS]))
         self._monitor()
 
     def _monitor(self) -> None:

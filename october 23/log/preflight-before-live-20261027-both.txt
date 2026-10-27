@@ -1,0 +1,20 @@
+2026-10-27T13:11:06+09:00
+[PASS] Both follower CAN links up in FD mode and healthy
+[PASS] Nothing else holds the arms (teleop, station, setup wizard)
+[PASS] Dream accepts the station file
+[PASS] The station's cameras are plugged in
+[PASS] No other program has the cameras open
+[PASS] Safety zones in force exist and are less than 24 hours old  (1.5 hours old)
+[PASS] The zones in force are the newest saved bundle
+[PASS] The station's home equals the bundle's home (both arms)
+[PASS] A home path from rest is stored and ends at the home
+[PASS] The driver will follow each home path: it ends within 2 deg of the station's home (the driver's own rule)
+[PASS] The raise and park along the home path take less than 45 s for each active arm
+[FAIL] The raise and park path of each active arm keeps clear of the danger zones  (left taught path, 12.0 s into the move: left grip:finger_r:1 is 1.7 cm from keep-out zone 'table')
+[PASS] The two arms keep 2 cm apart: each raise and park (the other at rest or holding home) and Dream's Home of both at once
+[PASS] The home, rest, ready poses and the path are clear of every zone and the home is inside the allowed region
+[PASS] The station uses the Arm driver (not the read-only one)
+[PASS] The station file was written under the joint mapping now in use  (in use: official)
+[PASS] The hard guard is on
+[PASS] Active arms (one-arm lock)  (left, right)
+1 check(s) failed: fix them before `dreamcli robot up`.

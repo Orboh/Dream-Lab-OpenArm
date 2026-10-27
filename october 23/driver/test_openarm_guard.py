@@ -481,3 +481,50 @@ def test_a_home_that_matches_neither_path_leaves_the_arm_where_it_is(make_arm, m
     write_zones_with_path(tmp_path, monkeypatch)
     arm, bus = make_arm(drv.Arm, logical=as_logical(poses.REST_DEG["left"]), follow=True, home=[0.5] * 7)
     assert joints_of(bus) == pytest.approx(poses.REST_DEG["left"], abs=0.05)
+
+
+# -- the way to a target, not only its end (log-035) -------------------------------------------------------------------
+
+SWING_FROM, SWING_TO = np.radians([-40, 0, 0, 90, 0, 0, 0]), np.radians([40, 0, 0, 90, 0, 0, 0])   # elbow bent, joint 1 swings the hand through J1 = 0
+
+
+def test_limit_stops_before_a_zone_that_lies_between_two_allowed_poses(monkeypatch, tmp_path):
+    """Both ends of the move are allowed, the way between them goes through a box: the guard used to pass the target unchanged."""
+    middle = zones.ArmKinematics("left").points(np.radians([0, 0, 0, 90, 0, 0, 0]))["tcp"].tolist()
+    g, _ = make_guard(monkeypatch, tmp_path, left_keep=[{"name": "post", "kind": "box", "center": middle, "size": [0.06, 0.06, 0.06]}])
+    assert g.limit(SWING_FROM, SWING_FROM)[1] == [] and g.limit(SWING_TO, SWING_TO)[1] == []   # both ends are allowed
+    sent, found = g.limit(SWING_FROM, SWING_TO)
+    assert found and "post" in found[0] and "on the way" in found[0]
+    assert sent[0] < 0.0                                                                    # stopped before the hand reaches the box
+    assert g.limit(sent, sent)[1] == []                                                     # where it stopped is allowed
+    assert np.max(np.abs(np.degrees(sent - SWING_FROM))) > 5.0                             # and it did move: not refused outright
+
+
+def test_limit_still_passes_a_clear_move_unchanged(monkeypatch, tmp_path):
+    g, _ = make_guard(monkeypatch, tmp_path)
+    assert np.array_equal(g.limit(SWING_FROM, SWING_TO)[0], SWING_TO)
+
+
+def test_an_arm_sagging_just_past_the_edge_after_a_pause_is_held_not_stopped(make_arm, monkeypatch, tmp_path):
+    """log-037, 2026-10-27 13:13: held at the table edge, the real arm sat a little below its target; after a pause in Dream's targets the guard took the
+    measured pose as the start, found it "already there" and ended the run. It now keeps the last safe target while the arm is still near it."""
+    monkeypatch.setenv("OPENARM_ZONES_REQUIRED", "1")
+    k = zones.ArmKinematics("left")
+    top = min(p[2] for n, p in k.points(np.radians([-20, 0, 0, 90, 0, 0, 0])).items() if n.startswith("grip:"))   # the gripper's lowest corner at J1 = -20
+    table = {"name": "table", "kind": "box", "allow_tcp_touch": True, "center": [0.4, 0.1, top - 0.15], "size": [1.2, 1.2, 0.3]}
+    path = write_zones(tmp_path / "zones.yaml", captured=dt.datetime.now(dt.timezone.utc), left_keep=[table])
+    monkeypatch.setenv("OPENARM_ZONES", str(path))
+    start = np.radians([-40, 0, 0, 90, 0, 0, 0])
+    arm, bus = make_arm(drv.Arm, logical={f"joint_{i + 1}": float(v) for i, v in enumerate(np.degrees(start))})
+    for j1 in (-30, -20, -10):                                                     # Dream lowers the hand onto the table: the guard cuts at the edge
+        arm.write(np.radians([j1, 0, 0, 90, 0, 0, 0]), 0.5)
+    edge = np.array(arm._safe_q)
+    assert -30.0 < np.degrees(edge[0]) < -10.0                                      # held at the edge, not where Dream asked
+    sagged = np.degrees(edge) + np.array([1.5, 0, 0, 0, 0, 0, 0])                   # the real arm sits 1.5 deg further down, past the edge
+    for i, v in enumerate(sagged):
+        name = f"joint_{i + 1}"
+        arm._deg[name] = float(v)
+        bus.native[name] = float(v) + OFFSETS[name]
+    arm._sim_t += 1.0                                                               # a pause between Dream's chunks
+    arm.write(np.radians([-5, 0, 0, 90, 0, 0, 0]), 0.5)                            # Dream goes on asking for further down
+    assert np.degrees(arm._safe_q[0]) <= np.degrees(edge[0]) + 0.01                 # still held at the safe edge, not deeper, and no error

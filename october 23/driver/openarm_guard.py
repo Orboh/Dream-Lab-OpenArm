@@ -10,6 +10,7 @@ A refusal raises `ArmError`; the station then stops the run and the arms hold.
 """
 
 import datetime as dt
+import math
 import os
 import pathlib
 from collections.abc import Callable
@@ -22,6 +23,13 @@ from robots import errors
 DEFAULT_MAX_AGE_H = 24.0
 MEASURED_SLACK_M = 0.02  # an arm that stopped at the edge lags its target and sits a little outside the region: still where it may move back from
 CUT_STEPS = 16  # halvings of the way to the edge: the stop is within 1/65000 of the move short of it
+## The way to a target is checked at least every this many degrees of the joint that moves most (about 1 cm of hand at full reach), not only its end (log-035).
+SWEEP_STEP_DEG = 1.0
+
+
+def sweep_steps(prev_rad, q_rad, step_deg: float = SWEEP_STEP_DEG) -> int:
+    """How many equal steps the straight joint line from `prev_rad` to `q_rad` is checked in (at least 1: the target itself)."""
+    return max(1, math.ceil(float(np.max(np.abs(np.degrees(np.asarray(q_rad, dtype=float) - np.asarray(prev_rad, dtype=float))))) / step_deg))
 
 
 def zones_path() -> pathlib.Path:
@@ -102,7 +110,8 @@ class Guard:
     def limit(self, prev_rad: np.ndarray, q_rad: np.ndarray) -> tuple[np.ndarray, list[str]]:
         """Cuts a target back to the edge of the allowed space instead of refusing it.
 
-        The arm moves along the straight joint-space line from `prev_rad` towards `q_rad` and stops at the last point that is still allowed.
+        The arm moves along the straight joint-space line from `prev_rad` towards `q_rad` and stops at the last point that is still allowed. The whole line is
+        checked (every #SWEEP_STEP_DEG of the joint that moves most), not only the target: a target whose way passes through a zone is cut before it (log-035).
         The same stale or missing zones still raise, and so does an arm that is already well outside (more than 2 cm past the region, or in a keep-out zone); one a few millimetres out, because it lags its target at the edge, may still be moved back and never gets a target further out.
 
         @param prev_rad Where the arm is or was last sent: a pose that must itself be allowed.
@@ -115,13 +124,29 @@ class Guard:
         if ready is None:
             return q_rad, []
         found = self._violations(*ready, self.side, q_rad)
-        if not found:
-            return q_rad, []
         prev_rad = np.asarray(prev_rad, dtype=float)
-        already = ready[0].violations(self.side, ready[1].points(prev_rad), check_reach=False, region_slack=MEASURED_SLACK_M)
-        if already:
-            raise errors.ArmError("safety zone: " + "; ".join(already[:3]) + " — the arm is already there, nothing was sent")
-        low, high = 0.0, 1.0   # `low` is allowed, `high` is not
+        if self._violations(*ready, self.side, prev_rad):
+            # an arm a little outside (it lags its target at an edge): as before, a target back inside passes and only the end is cut
+            if not found:
+                return q_rad, []
+            already = ready[0].violations(self.side, ready[1].points(prev_rad), check_reach=False, region_slack=MEASURED_SLACK_M)
+            if already:
+                raise errors.ArmError("safety zone: " + "; ".join(already[:3]) + " — the arm is already there, nothing was sent")
+            low, high = 0.0, 1.0   # `low` is allowed, `high` is not
+        else:
+            # the way there (log-035): the first step of the straight joint line that breaks a zone, then the edge inside that step
+            steps = sweep_steps(prev_rad, q_rad)
+            hit, on_the_way = None, []
+            for k in range(1, steps + 1):
+                on_the_way = found if k == steps else self._violations(*ready, self.side, prev_rad + (k / steps) * (q_rad - prev_rad))
+                if on_the_way:
+                    hit = k
+                    break
+            if hit is None:
+                return q_rad, []
+            if not found:
+                found = [f"{v} (on the way to the target)" for v in on_the_way]
+            low, high = (hit - 1) / steps, hit / steps
         for _ in range(CUT_STEPS):
             mid = (low + high) / 2
             if self._violations(*ready, self.side, prev_rad + mid * (q_rad - prev_rad)):

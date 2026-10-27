@@ -234,3 +234,15 @@ def test_a_path_that_ends_further_than_the_drivers_2_degrees_from_the_station_ho
     for path in (zdir / "zones-20261023-1700.yaml", in_force):
         ws.save_raw(path, raw)
     assert pf.LABEL_PATH_END not in failed(run(setup))
+
+
+def test_the_two_arms_are_checked_against_each_other_along_every_raise_park_and_dreams_home(setup):
+    """Both reviews of goal.md (2026-10-27, log-033): nothing checked one arm against the other."""
+    station, in_force, zdir, raw = setup
+    assert pf.LABEL_ARMS not in failed(run(setup))                     # ready homes and the built-in paths: clear
+    across = [45.0, 0.0, 60.0, 120.0, 0.0, 0.0, 0.0]                   # the left hand swung over to the right arm's side
+    raw["home_path"]["left"] = [raw["home_path"]["left"][0], across, raw["home_path"]["left"][-1]]
+    for path in (zdir / "zones-20261023-1700.yaml", in_force):
+        ws.save_raw(path, raw)
+    bad = [c for c in run(setup) if c.label == pf.LABEL_ARMS][0]
+    assert bad.ok is False and "left hand" in bad.detail and "left raise/park" in bad.detail

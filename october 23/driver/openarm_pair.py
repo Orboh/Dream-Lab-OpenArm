@@ -1,0 +1,184 @@
+"""Arm-to-arm clearance: how close the left and right arm come to each other at a pair of poses. Nothing here talks to a motor.
+
+Each arm is three capsules (a segment with a radius) in the robot's body frame: upper arm (joint 2 to joint 4), forearm (joint 4 to joint 6) and hand
+(joint 6 to the grasp point). The arms' base frames sit at #BASE_OFFSET_M in the body frame (log-013; the same as the workspace editor's BASE_OFFSET).
+The joint chain is the one the guard uses (`openarm_zones.ArmKinematics`, logical angles through the joint mapping in use).
+
+The gap between the arms is the smallest distance between any left and any right capsule surface; #problem flags a pair of poses closer than #MIN_GAP_M.
+
+During a task (log-034) both arms run in the station's one process: each arm publishes its measured pose and its latest target here (#publish), and each
+arm's `_limited` cuts a new target with #cut against the other arm's fresh poses (#others), so a target that would bring the arms within #MIN_GAP_M stops
+at the last pose that keeps it. An arm not heard from within #FRESH_S counts as hanging at its rest pose.
+Known limits (log-033): the hand capsule is an estimate of the open gripper, not a measured shape; the robot's own body and head are not included.
+"""
+
+import dataclasses
+import threading
+import time
+
+import numpy as np
+
+import openarm_guard
+import openarm_poses as poses
+import openarm_zones as zones
+
+## Each arm's base frame in the robot's body frame, metres (x forward, y left, z up from the base plate).
+BASE_OFFSET_M = {"left": np.array([0.0, 0.031, 0.698]), "right": np.array([0.0, -0.031, 0.698])}
+## Upper arm and forearm radius: the link radius Dream's IK uses.
+LINK_RADIUS_M = zones.LINK_RADIUS_M
+## Hand radius (wrist to grasp point): an estimate of the open gripper (fingers 4.4 cm open each, plus the finger and housing), not measured.
+HAND_RADIUS_M = 0.06
+## The smallest allowed gap between the two arms' surfaces, metres (the 2 cm clearance Dream keeps from a zone).
+MIN_GAP_M = 0.02
+## A pose another arm published longer ago than this, seconds, is no longer used (the arm counts as hanging at rest).
+FRESH_S = 0.5
+## Halvings of the move when a target is cut back to the last pose that keeps #MIN_GAP_M.
+CUT_STEPS = 12
+
+
+@dataclasses.dataclass(frozen=True)
+class Capsule:
+    """A segment `a`-`b` (body frame, metres) with a radius."""
+
+    name: str
+    a: np.ndarray
+    b: np.ndarray
+    radius: float
+
+
+_KINEMATICS: dict[str, zones.ArmKinematics] = {}
+
+
+def _kin(side: str) -> zones.ArmKinematics:
+    if side not in _KINEMATICS:
+        _KINEMATICS[side] = zones.ArmKinematics(side, logical=True)
+    return _KINEMATICS[side]
+
+
+def capsules(side: str, q_logical_rad) -> list[Capsule]:
+    """One arm's capsules in the body frame. @param q_logical_rad Seven joint angles, radians, in our (logical) angles."""
+    pts = [p + BASE_OFFSET_M[side] for p in _kin(side).chain(np.asarray(q_logical_rad, dtype=float))]
+    return [Capsule("upper_arm", pts[1], pts[3], LINK_RADIUS_M),
+            Capsule("forearm", pts[3], pts[5], LINK_RADIUS_M),
+            Capsule("hand", pts[5], pts[7], HAND_RADIUS_M)]
+
+
+def segment_distance(p1: np.ndarray, q1: np.ndarray, p2: np.ndarray, q2: np.ndarray) -> float:
+    """The shortest distance between the segments p1-q1 and p2-q2 (either may be a single point)."""
+    d1, d2, r = q1 - p1, q2 - p2, p1 - p2
+    a, e, f = float(d1 @ d1), float(d2 @ d2), float(d2 @ r)
+    eps = 1e-12
+    if a <= eps and e <= eps:
+        return float(np.linalg.norm(r))
+    if a <= eps:
+        s, t = 0.0, min(max(f / e, 0.0), 1.0)
+    else:
+        c = float(d1 @ r)
+        if e <= eps:
+            s, t = min(max(-c / a, 0.0), 1.0), 0.0
+        else:
+            b = float(d1 @ d2)
+            denom = a * e - b * b
+            s = min(max((b * f - c * e) / denom, 0.0), 1.0) if denom > eps else 0.0
+            t = (b * s + f) / e
+            if t < 0.0:
+                s, t = min(max(-c / a, 0.0), 1.0), 0.0
+            elif t > 1.0:
+                s, t = min(max((b - c) / a, 0.0), 1.0), 1.0
+    return float(np.linalg.norm((p1 + d1 * s) - (p2 + d2 * t)))
+
+
+def _capsule_gap(left: list[Capsule], right: list[Capsule]) -> tuple[float, str, str]:
+    best = (np.inf, "", "")
+    for cl in left:
+        for cr in right:
+            gap = segment_distance(cl.a, cl.b, cr.a, cr.b) - cl.radius - cr.radius
+            if gap < best[0]:
+                best = (gap, cl.name, cr.name)
+    return best
+
+
+def gap_m(q_left, q_right) -> tuple[float, str, str]:
+    """The gap between the arms' surfaces, metres (negative: they overlap), and the left and right part where it is smallest."""
+    return _capsule_gap(capsules("left", q_left), capsules("right", q_right))
+
+
+def problem(q_left, q_right, min_gap_m: float = MIN_GAP_M) -> str | None:
+    """A sentence when the arms come closer than `min_gap_m`, else None."""
+    gap, left_part, right_part = gap_m(q_left, q_right)
+    if gap >= min_gap_m:
+        return None
+    where = f"{-gap * 100:.1f} cm into" if gap < 0 else f"{gap * 100:.1f} cm from"
+    return f"left {left_part} is {where} the right {right_part} (the arms must keep {min_gap_m * 100:.0f} cm)"
+
+
+# -- during a task: the two arms of one station process (log-034) -------------------------------------------------------------------
+
+_lock = threading.Lock()
+_latest: dict[str, dict[str, tuple[np.ndarray, float]]] = {}   # side -> {"measured" | "target": (logical radians, monotonic time)}
+
+
+def publish(side: str, kind: str, q_logical_rad) -> None:
+    """Records an arm's `"measured"` pose or its latest `"target"` (logical radians) for the other arm's check."""
+    with _lock:
+        _latest.setdefault(side, {})[kind] = (np.array(q_logical_rad, dtype=float), time.monotonic())
+
+
+def others(side: str) -> list[np.ndarray]:
+    """The other arm's fresh poses (measured and target, logical radians); its rest pose when nothing fresh was heard from it."""
+    other = "right" if side == "left" else "left"
+    now = time.monotonic()
+    with _lock:
+        fresh = [q.copy() for q, t in _latest.get(other, {}).values() if now - t <= FRESH_S]
+    return fresh or [np.radians(poses.REST_DEG[other])]
+
+
+def reset() -> None:
+    """Forgets every published pose (tests, and a station that restarts its arms)."""
+    with _lock:
+        _latest.clear()
+
+
+def _smallest_gap(side: str, q, others: list[list[Capsule]]) -> tuple[float, str]:
+    """`others`: the other arm's capsules, one list per pose (computed once per #cut: the other arm does not move during one check)."""
+    mine = capsules(side, q)
+    best, why = np.inf, ""
+    for other in others:
+        gap, left_part, right_part = _capsule_gap(mine, other) if side == "left" else _capsule_gap(other, mine)
+        if gap < best:
+            best, why = gap, f"{side} {left_part if side == 'left' else right_part} {gap * 100:.1f} cm from the other arm's {right_part if side == 'left' else left_part}"
+    return best, why
+
+
+def cut(side: str, prev_logical_rad, q_logical_rad, other_poses: list[np.ndarray], min_gap_m: float = MIN_GAP_M) -> tuple[np.ndarray, str | None]:
+    """A target cut back along the straight joint line from `prev` so the arm keeps `min_gap_m` from every pose in `other_poses`, on the whole way there
+    (checked every `openarm_guard.SWEEP_STEP_DEG`), not only at the target (log-035).
+
+    A target that keeps the gap comes back unchanged with None. When `prev` itself is already too close, only a target that opens the gap is allowed;
+    otherwise the arm stays at `prev`. @return `(pose to send, logical radians; a sentence why it was cut, or None)`.
+    """
+    prev, q = np.asarray(prev_logical_rad, dtype=float), np.asarray(q_logical_rad, dtype=float)
+    other_side = "right" if side == "left" else "left"
+    other_poses = [capsules(other_side, pose) for pose in other_poses]
+    gap_q, why = _smallest_gap(side, q, other_poses)
+    gap_prev, _ = _smallest_gap(side, prev, other_poses)
+    if gap_prev < min_gap_m:
+        return (q, None) if gap_q > gap_prev else (prev, why)
+    # the way there (log-035): the first step of the straight joint line that comes too close, then the edge inside that step
+    steps = openarm_guard.sweep_steps(prev, q)
+    hit = None
+    for k in range(1, steps + 1):
+        gap_k, why_k = (gap_q, why) if k == steps else _smallest_gap(side, prev + (k / steps) * (q - prev), other_poses)
+        if gap_k < min_gap_m:
+            hit, why = k, (why_k if k == steps else f"{why_k} on the way to the target")
+            break
+    if hit is None:
+        return q, None
+    low, high = (hit - 1) / steps, hit / steps   # `low` keeps the gap, `high` does not
+    for _ in range(CUT_STEPS):
+        mid = (low + high) / 2.0
+        if _smallest_gap(side, prev + mid * (q - prev), other_poses)[0] >= min_gap_m:
+            low = mid
+        else:
+            high = mid
+    return prev + low * (q - prev), why
