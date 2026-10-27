@@ -1,0 +1,63 @@
+# OpenArm start pose -- side=left, degrees (logical, follower). Written by Finetuning dreamlab/pipeline/make_start_pose.py.
+# Start pose = the station's home (the end of the taught path in zones.yaml, where the Live View starts). Waypoints = that path (the driver's raise).
+# The gripper at the calibration zero (the same rule as the earlier pose sets).
+align:
+  max_speed_dps: 40.0
+waypoints:
+- joint_1: -0.5
+  joint_2: -0.8
+  joint_3: -4.3
+  joint_4: 4.0
+  joint_5: 2.1
+  joint_6: -0.5
+  joint_7: 6.4
+- joint_1: 13.79
+  joint_2: -0.75
+  joint_3: -1.27
+  joint_4: 25.55
+  joint_5: 0.76
+  joint_6: 1.79
+  joint_7: 4.04
+- joint_1: 42.65
+  joint_2: -3.75
+  joint_3: -1.27
+  joint_4: 33.4
+  joint_5: 0.28
+  joint_6: 4.59
+  joint_7: -85.51
+- joint_1: 63.94
+  joint_2: -3.62
+  joint_3: -1.23
+  joint_4: 94.86
+  joint_5: 0.85
+  joint_6: 10.42
+  joint_7: -63.15
+- joint_1: 64.42
+  joint_2: -3.62
+  joint_3: -1.23
+  joint_4: 95.91
+  joint_5: -2.48
+  joint_6: 19.01
+  joint_7: 21.6
+- joint_1: 59.26
+  joint_2: -3.29
+  joint_3: -0.44
+  joint_4: 93.66
+  joint_5: -4.05
+  joint_6: -5.07
+  joint_7: -35.87
+- joint_1: 23.92
+  joint_2: -1.93
+  joint_3: 11.86
+  joint_4: 93.26
+  joint_5: 2.03
+  joint_6: -3.13
+  joint_7: -13.38
+joint_1: 10.19
+joint_2: -1.96
+joint_3: 11.91
+joint_4: 74.1
+joint_5: -0.5
+joint_6: -3.15
+joint_7: -16.49
+gripper: 0.0
