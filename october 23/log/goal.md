@@ -1,72 +1,49 @@
-# Goal — Diagnose and stabilize Dream-1 on OpenArm
+# Goal — Dream-1/OpenArm setup and measured pick (2026-10-27)
 
-## Context and intended outcome
-Continue logs 009–014 and the existing driver/ and workspace/ code. The robot already has taught Home poses, paths from rest, three camera feeds, a point-recording editor, zone bundles, and a one-arm lock. Keep these components and verify what they actually do.
-
-The goal is to answer two observed questions with evidence: why both arms move when one is requested, and why actions seem poorly oriented to the table. A successful pipeline must distinguish Dream-1's requested motion from station homing, driver motion, bad robot coordinates, restrictive workspace settings, and poor camera observations.
+## Outcome today
+Build a repeatable right-arm station setup and obtain one recorded pick attempt only if every gate passes. A failed gate is a valid outcome: record and fix its cause before another run. Treat old logs, including log-030, as history rather than proof of today's live setup.
 
 ## Instructions to the implementing agent
-Inspect the current live station.yaml, active zones.yaml, lock file, camera configuration, code, and recent logs before editing. Treat older logs as history. Expand the stages below into exact implementation steps, measurements, tests, acceptance thresholds, operator actions, and rollback. Add any missing process needed to make daily use repeatable. Record timestamps and versions of the files actually applied. Use offline and read-only checks first. Any real-arm motion requires the user present with a working stop mechanism. Do not proceed past a failed stage.
+Inspect the live station.yaml, active zones, arm lock, installed Dream/client versions, driver/model mapping, camera sources, and newest runtime logs before edits. Record effective paths, timestamps, hashes and backups. Add missing checks, instrumentation, tests, and rollback steps. Change one factor per trial. Start offline and read-only; real-arm motion requires the operator present, a clear workspace, and a working stop. Never copy credentials into logs.
 
-Dream Labs publicly describes image views plus robot state, but does not publish a required three-camera calibration procedure. Do not assume that common image content means stereo triangulation, or that the taught Home pose calibrates cameras to the robot.
+Dream-1's base model on a non-YAM arm masks robot state from the model, while its client still uses the real pose and IK to execute model output. Useful camera views and correct kinematics are separate requirements. Home does not calibrate cameras or create stereo triangulation.
 
-## Logging requirements
+## Gate 1 — Establish the running state
+**Why:** Saved bundles may differ from files in force; movement may come from startup, Home, task, Reset, or shutdown.
 
-Create a new numbered log for each stage, following the existing log-001.md to log-014.md style; never rewrite old observations as if they were new. In every stage log, record the date, goal, exact files/configuration in force, commands or operator actions, measurements, pass/fail result, unresolved questions, and next step. Include links or paths to captured frames, plots, bundles, test output, and backups without copying credentials. Record failed checks and aborted trials as carefully as successful ones. Update log.md after each stage with the new log and a one-line result. If a stage is repeated, add a new dated log or addendum showing what changed and why.
+**Check:** Confirm driver class, custom.ik, embodiment, checkpoint/action space, joint mapping, Home, gripper endpoints, camera roles/sources, speed limits, zone age, CAN and motor status, camera exclusivity, and right-only lock in every phase. Back up live configuration and run preflight.
 
-## Stage 1 — Establish the true running state
-**Why:** A saved editor bundle can differ from the station and zones in force. Movement may occur at station startup, during a task, on Reset, or during shutdown. Without a common timeline, these causes look alike.
+**Pass:** Effective files and hashes match the intended setup, preflight passes, and selected-arm and shutdown behavior are known. **Fail:** Fix the mismatch or lifecycle behavior before a policy run; record what moved and when.
 
-**Process:** Record versions or hashes of the live station, active zones, latest saved bundle, driver, robot model, camera roles/serials, and lock setting. Capture timestamps for camera frames, joint readings, Dream targets, driver commands, and measured motor positions. Label the phase of each movement.
+## Gate 2 — Driver, geometry, safety
+**Why:** The current gripper-stall alarm can stop a normal grasp. Endpoint-only zone checks may miss unsafe smoothed poses. Wrong TCP or joint mapping separates the modeled hand from real fingers.
 
-**Pass:** One session can be reconstructed and each movement assigned to its source and phase. Continue to view and geometry checks.
+**Check:** With fake motors, test joint units/signs, grip 0-closed/1-open, ordinary object contact versus faults, alarm clearing, heat/fault stops, lock during startup/task/Reset/park/torque-off. Check every executed setpoint and complete gripper/link envelope against zones, including raise and park. In several bent poses compare measured fingertips and orientation against FK, with numeric tolerances set before testing. Compare Dream's three-second Home report with actual settling time.
 
-**Fail:** Missing or inconsistent files, timestamps, or telemetry mean no model conclusion is valid yet. Fix instrumentation and identify the actual configuration before moving the robot.
+**Pass:** No unexplained pose error; contact does not become a fatal alarm; real faults stop safely; paths clear hazards; Home timing matches measurement. **Fail:** Fix driver, geometry, trajectory check or timing offline and repeat. Do not weaken a safety boundary to force a pick.
 
-## Stage 2 — Check what the cameras and robot model agree on
-**Why:** Home puts the cameras in a useful pose, but does not tell the robot where image pixels lie in 3D. The earlier straight-arm check could not fully resolve the wrist mapping; an inaccurate 3D gripper position makes all recorded workspace points suspect.
+## Gate 3 — Cameras and Home
+**Why:** The saved head view is low, the right-wrist block is near the edge, and the locked-left view shows hardware. The base model relies heavily on images on this custom robot.
 
-**Process:** At each taught Home, save synchronized head and wrist frames. Check that shared table landmarks and the grippers appear where expected; measure delivered frame rate and missing or stale frames. In several different bent arm poses, compare the real gripper tip and orientation with both the editor's 3D model and Dream's forward-kinematics result. Check joint signs/zeros, tool point, base-frame axes, and units. If useful, calibrate camera-to-robot transforms with a measured target as an independent diagnostic; do not assume Dream-1 consumes those transforms.
+**Home rule:** Choose a repeatable collision-free start pose from which the selected arm reaches the task and returns safely. The overhead camera should show the table, object, target area, and preferably the **active gripper** at Home. **Both arms do not need to appear in the top camera.** Do not sacrifice clearance, reach, or active wrist visibility to frame both. Park/lock the unused arm safely and make its camera input intentional; verify what the chosen model receives.
 
-**Pass:** The three feeds are timely and useful, and the modeled gripper agrees with the real one within an explicit measured tolerance over the work poses. Proceed to table capture.
+**Check:** Capture actual model-resolution frames at Home and near grasp with timestamps, frame rate, and staleness. Ensure object and active fingertips remain distinguishable through approach. Change camera aim or Home only after previewing full paths and updating the bundle. Seeing common table features in two cameras does not by itself provide calibrated 3D coordinates.
 
-**Fail:** A camera fault calls for fixing the feed, mount, or timing. A pose-dependent 3D mismatch calls for correcting kinematics or calibration before any new safe area is trusted.
+**Pass:** Timely images show the task clearly; Home and paths remain safe. **Fail:** Fix view, lighting, occlusion, role/source or stale frames, then recapture before policy trials.
 
-## Stage 3 — Capture the real table and allowed area
-**Why:** The inspected zones-20261023-1802.yaml is unverified: its recorded reach is behind a placeholder table. The robot can see a table yet be constrained to coordinates that never reach it. The editor's “Record this point” defines safe poses; it is not automatically a measurement of the tabletop.
+## Gate 4 — Table and active zones
+**Why:** The saved keep-out box extends 5 cm above the measured table, plus Dream IK clearance, potentially preventing a small tabletop grasp. Physical touch checks found pose-dependent error.
 
-**Process:** Physically measure at least three separated tabletop points, including the near edge, and use extra points to check the fitted surface. Capture each arm's safe hand points above that table and a path from rest to Home. Review table, Home, reach, region, keep-out zones, and complete arm links in top and side views. Prevent sparse points or a filled polygon from silently treating unvisited unsafe space as safe. Add a check that each reach area intersects the measured tabletop and that Home and the complete raise/park paths clear hazards.
+**Check:** Re-measure separated tabletop/reference points, near edge, object height, TCP-to-fingertip underside, and wrist orientation. Inspect the full arm and gripper over proposed grasp in top and side views. Verify freshness and Home/raise/park paths. Back up and apply only a verified bundle, then confirm live station and guard use it. Keep the left path blocked until its recorded clearance issue is resolved.
 
-**Pass:** The displayed table matches the physical one, each arm has a usable area over it, and all intended poses and paths pass collision checks. Save a verified bundle.
+**Pass:** The object is reachable within verified clearances and full-body paths are clear. **Fail:** Correct measurement, model, or zone design. Never simply lower the table box or disable the guard.
 
-**Fail:** No intersection means the points, table placement, or coordinate frame are wrong; recapture. A collision or uncertain area must be corrected before applying zones.
+## Gate 5 — Dry run, then one supervised trial
+**Why:** A dry run separates model choice and IK from physical execution; a live trial needs measured feedback.
 
-## Stage 4 — Apply the verified configuration
-**Why:** Editing and saving do not change the running station by themselves. A correct bundle cannot help if another station or stale zones file is active.
+**Check:** Dry-run the exact scene and prompt, saving model input frames, requested tool poses, IK targets, guard verdicts and both-arm requests. If coherent, run one short right-arm task with the operator at the stop. Synchronize frames, requested pose, IK joint target, driver setpoint, measured joints/hand/grip, clamps, timestamps and object result. Stop on unexpected motion/contact or stale data. Change one factor between trials.
 
-**Process:** Verify physical reference points; build the bundle; back up and apply it. Compare every applied Home, reach, region, keep-out zone, driver, speed setting, and camera role with the chosen bundle. Run preflight and a read-only dry run. Keep a known-good rollback copy.
+**Pass:** The pick succeeds repeatably under one verified setup, or a failure is classified with evidence as camera/perception, model, IK/geometry, station limit, driver, or physical grasp. **Fail:** Missing trace means improve instrumentation; a classified failure returns to its owning gate. NO_CAPACITY and timeouts are service failures, not evidence about spatial ability.
 
-**Pass:** The live station and active zones match the verified bundle and preflight passes. Only then begin supervised motion checks.
-
-**Fail:** Mismatched, stale, or rejected settings mean stop; restore the backup or recapture and reapply. Do not interpret a Dream-1 run made with unknown settings.
-
-## Stage 5 — Make one-arm selection a hard control rule
-**Why:** Dream-1 is a bimanual controller and may send targets for both arms despite a one-arm prompt. The current driver checks the lock on action writes but can raise an arm before that check. Task prompts cannot substitute for a physical lock.
-
-**Process:** Define the nonselected arm's behavior at startup, action writes, Reset, stop, and motor-off. Enforce the lock before automatic raising and every commanded move. Handle a raised locked arm safely at shutdown; neither an unexpected park nor an unsupported torque-off is acceptable. Test both selections with fake motors, then with short supervised checks. Log Dream targets, station outputs, driver commands, and measured motion for both arms.
-
-**Pass:** The selected arm behaves as commanded; the other follows the agreed hold/shutdown behavior in every phase. Any remaining two-arm request is visible as a model output rather than unexplained motor motion.
-
-**Fail:** If the driver moves an arm without a matching permitted command, fix the lifecycle or lock code. If Dream requests both but the lock works, investigate prompting or model behavior separately.
-
-## Stage 6 — Evaluate Dream-1
-**Why:** Only after camera, geometry, configuration, and lock checks pass can a task failure reasonably be attributed to Dream-1.
-
-**Process:** Run short, bounded one-arm tasks with clear objects and targets visible in the saved frames. Change one factor at a time. Log the prompt, synchronized images and robot state, requested targets, executed commands, and result. Classify failures as perception/model, camera quality, coordinate model, station constraints, driver/lock, or physical execution.
-
-**Pass:** Tasks succeed repeatably, or failures have a clear category and evidence for the next change.
-
-**Fail:** Unclassified failures indicate missing observations or a failed earlier gate. Return to the relevant stage; do not change several settings at once.
-
-## Done
-The real and modeled gripper agree in bent poses; measured table and allowed reach overlap; verified files are the files in force; one-arm behavior is deterministic; and any remaining Dream-1 shortcoming is supported by synchronized evidence.
+## Logging and finish line
+Create the next numbered log per gate or attempt; keep old logs intact and update log.md with one-line outcomes. Record date/time, objective, effective file hashes/versions, operator actions/commands, measurements, images/plots, pass/fail, cause, change, rollback, and next gate. Record cancelled runs too. Finish today with a verified station snapshot, reproducible start/stop instructions, known risks, and either a measured pick result or the exact failed gate and evidence needed to resume.
