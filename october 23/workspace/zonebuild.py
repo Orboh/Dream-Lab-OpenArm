@@ -27,7 +27,7 @@ HAZARD_MARGIN_M = 0.03
 VERIFY_TOLERANCE_M = 0.015
 SIDES = ("left", "right")
 ## The gentle station settings `apply` writes: a slower start-up ramp and the slow hand speed cap (Dream's own ramp and cap, not the driver's).
-GENTLE_STATION = {"ramp_s": 3.0, "ramp_max_rad_s": 0.3, "max_ee_speed_m_s": 0.15}
+GENTLE_STATION = {"ramp_s": 3.0, "ramp_max_rad_s": 0.3, "max_ee_speed_m_s": 0.6}  # 0.6 = Dream's default speed cap (robots/kinematics.py; log-029, user 2026-10-27: no slow-down)
 ## Written into every bundle so the numbers can be read without this code.
 FRAME_NOTE = ("each arm's base frame = the robot body frame shifted by (0, +0.031, 0.698) m for the left arm and (0, -0.031, 0.698) m for the right, "
               "no rotation; x forward, y left, z up; metres")

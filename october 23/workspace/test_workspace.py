@@ -826,7 +826,7 @@ def test_apply_writes_the_gentle_station_settings_and_the_arm_driver(tmp_path):
     raw = zb.build_zones(capture_fixture(), source="editor", operator="k", now=NOW)
     zb.apply_to_station(station, zb.station_fragment(raw, homes={"left": (0.0, 0.1), "right": (0.0, -0.1)}), tuning=zb.GENTLE_STATION)
     new = yaml.safe_load(station.read_text())
-    assert new["ramp_s"] == 3.0 and new["ramp_max_rad_s"] == 0.3 and new["max_ee_speed_m_s"] == 0.15
+    assert new["ramp_s"] == 3.0 and new["ramp_max_rad_s"] == 0.3 and new["max_ee_speed_m_s"] == 0.6
     assert new["custom"]["driver"].endswith("openarm_v2.py:Arm") and new["custom"]["ik"] == "openarm2_faas"
 
 

@@ -462,7 +462,7 @@ def main(argv: list[str] | None = None, probes=None, runner=None, opener=None) -
             p.add_argument("--station", default=str(STATION))
         if name == "apply":
             p.add_argument("--no-verify", action="store_true")
-            p.add_argument("--no-tuning", action="store_true", help="do not write the gentle ramp and speed settings (ramp_s 3, ramp_max_rad_s 0.3, max_ee_speed_m_s 0.15) and the Arm driver")
+            p.add_argument("--no-tuning", action="store_true", help="do not write the gentle ramp and speed settings (ramp_s 3, ramp_max_rad_s 0.3, max_ee_speed_m_s 0.6, Dream's default) and the Arm driver")
         if name == "view":
             p.add_argument("--port", type=int, default=8080)
             p.add_argument("--live", choices=["none", "follower", "leader"], default="none")
