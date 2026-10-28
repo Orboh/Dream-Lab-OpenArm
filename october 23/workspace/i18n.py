@@ -167,6 +167,8 @@ STRINGS: dict[str, tuple[str, str]] = {
     "col.env": ("task (settings file in openarm-orboh/config)", "タスク（openarm-orboh/config の設定ファイル）"),
     "col.env.info": ("task: **{task}**  \nscene: `{scene}` · start pose set: `{pose}` · episode time limit: {time} s",
                      "タスク: **{task}**  \nシーン: `{scene}` · 開始姿勢セット: `{pose}` · エピソード上限: {time} 秒"),
+    "col.pose.differs": ("The start pose set <b>{page}</b> is not the task file's <b>{file}</b>. Check with the reviewer which one to use; empty the field to use the file's.",
+                         "開始姿勢セット <b>{page}</b> はタスク設定ファイルの <b>{file}</b> と違います。どちらを使うか確認してください（空欄にすると設定ファイルの値を使います）。"),
     "col.tag": ("session tag (e.g. s2)", "セッションタグ（例 s2）"),
     "col.episodes": ("episodes this run (empty = default: dry 2, gate 10, session 10)", "今回の本数（空欄＝既定: dry 2本・gate 10本・session 10本）"),
     "col.count": ("{mode}: {n} episodes this run.", "{mode} を {n} 本で開始します。"),
