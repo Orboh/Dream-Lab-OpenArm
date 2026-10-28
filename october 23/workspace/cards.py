@@ -34,6 +34,11 @@ def _dot(color: str) -> str:
     return f'<span style="display:inline-block;width:11px;height:11px;border-radius:50%;background:{color};margin-right:6px;"></span>'
 
 
+def warning(text: str) -> str:
+    """A yellow box for a setting that is allowed but probably not meant (e.g. a start pose set other than the task file's)."""
+    return _big(f'<div style="{FONT}background:#fff4cc;border:1px solid {AMBER};border-left:6px solid {AMBER};border-radius:10px;padding:8px 12px;margin:4px 0;color:{INK};">⚠ {text}</div>')
+
+
 def position_card(side: str, joints_deg, gripper, hand_cm, fresh: bool, lang: i18n.Lang = i18n.EN, pitch_deg: float | None = None) -> str:
     """One arm's live position: seven joint angles (degrees), the gripper, and the hand's x, y, z in cm (the arm's base frame).
 
