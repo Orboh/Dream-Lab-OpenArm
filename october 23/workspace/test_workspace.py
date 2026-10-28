@@ -2,6 +2,7 @@
 
 import datetime as dt
 import json
+import os
 
 import numpy as np
 import pytest
@@ -1173,3 +1174,21 @@ def test_a_full_width_tag_is_flagged_as_it_is_typed_and_a_stopped_set_asks_befor
     p.f_mode.value = p.f_mode.options[2]  # session
     p.collect_start_clicked()
     assert p.collector.phase == "idle" and "7/10" in p.out_msg.content
+
+
+def test_the_collect_tab_follows_a_dataset_changed_outside_the_page_without_a_restart(collecting, tmp_path):
+    p = collecting
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    info = tmp_path / "ds" / "meta" / "info.json"
+    info.write_text('{"total_episodes": 10}')
+    p.collector.set_file.write_text('{"mode": "session", "tag": "s1", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
+    p.f_collector.value = "Tester"
+    p.collect_tick(force=True)
+    assert p.b_cresume.disabled is True and p.resume_info.content == ""
+    info.write_text('{"total_episodes": 7}')  # 3 bad episodes deleted outside the page
+    stamp = info.stat().st_mtime_ns + 10**9
+    os.utime(info, ns=(stamp, stamp))
+    p.collect_tick()  # the page's own loop, not a forced redraw
+    assert p.b_cresume.disabled is False and "7" in p.resume_info.content
+    p.collect_refresh_clicked()
+    assert p.lang.t("col.refreshed") in p.out_msg.content
