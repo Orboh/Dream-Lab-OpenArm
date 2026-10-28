@@ -443,6 +443,16 @@ class EditorPanel:
             self.f_countdown = g.add_number("", o.start_countdown_s, min=0, max=10, step=1)
             tx(self.f_countdown, "label", "col.countdown")
         self.collect_card = g.add_html(cards.collect_card(self.collector.snapshot(), self.lang))
+        self.review_box = g.add_folder("")  # V4: shown after a finished gate until the reviewer's OK is ticked
+        tx(self.review_box, "label", "col.review.folder")
+        with self.review_box:
+            self.review_info = g.add_markdown("")
+            self.f_reviewer = g.add_text("", "")
+            tx(self.f_reviewer, "label", "col.reviewer")
+            self.c_reviewed = g.add_checkbox("", False)
+            tx(self.c_reviewed, "label", "col.reviewed")
+            self.c_reviewed.on_update(lambda _e: self.review_ticked())
+        self._retext.append(self._review_text)
         self.b_cstart = g.add_button("", color="green")
         tx(self.b_cstart, "label", "col.start")
         self.resume_info = g.add_markdown("")
@@ -587,6 +597,26 @@ class EditorPanel:
             self.out_msg.content = self._error_text(exc)
         self.collect_tick(force=True)
 
+    def review_ticked(self) -> None:
+        """The gate review box was ticked: records the reviewer's OK, so a session may start; refused (and unticked) without a reviewer name."""
+        if not self.c_reviewed.value:
+            return
+        who = self.f_reviewer.value.strip()
+        try:
+            self.collector.mark_reviewed(who)
+            self.out_msg.content = self.lang.t("col.review.done", who=who)
+        except collect.CollectError as exc:
+            self.out_msg.content = self._error_text(exc)
+        self.c_reviewed.value = False
+        self.collect_tick(force=True)
+
+    def _review_text(self) -> None:
+        """Shows the review box only while a finished gate waits for its OK, with how many episodes it holds and where."""
+        gate = self.collector.review_pending()
+        self.review_box.visible = gate is not None
+        self.review_info.content = "" if gate is None else self.lang.t(
+            "col.review.info", have=gate["have"], target=gate["target"], repo=gate.get("repo_id") or "?")
+
     def _keep_mode(self) -> None:
         """A click on Mode while a run is going is undone: the mark stays on the mode that is running."""
         if self._marking or not self.collector.active:
@@ -616,6 +646,7 @@ class EditorPanel:
         self.b_cstart.disabled = running or nobody
         self.b_cresume.disabled = running or nobody or self.collector.pending() is None
         self._resume_text()
+        self._review_text()
 
     def collect_tick(self, force: bool = False) -> None:
         """Refreshes the Collect card and its buttons when the run changed (called a few times a second)."""

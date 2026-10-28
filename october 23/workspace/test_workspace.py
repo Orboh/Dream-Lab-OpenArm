@@ -990,6 +990,8 @@ def test_discard_button_works_with_the_automatic_return_even_if_saving_at_the_en
             return {"phase": "ready", "episode": 0, "started": 0, "rc": None, "run_dir": None, "target": None, "done": 0, "left": None, "saved": 0, "lines": [], "active": True}
         def pending(self):
             return None
+        def review_pending(self):
+            return None
     panel.collector = Running()
     panel.c_saveend.value, panel.c_return.value = True, True
     panel._collect_buttons()
@@ -1116,6 +1118,24 @@ def test_a_start_pose_set_other_than_the_task_files_gets_a_yellow_warning(collec
     p.f_poseset.value = "takeei-v5"
     p.set_language("日本語")
     assert "takeei-v5" in p.pose_warn.content and p.pose_warn.content != ""
+
+
+def test_after_a_gate_the_page_waits_for_the_review_before_a_session(collecting, tmp_path):
+    p = collecting
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 10}')
+    p.collector.set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
+    p.collect_tick(force=True)
+    assert p.review_box.visible is True and "10" in p.review_info.content
+    p.f_mode.value = p.f_mode.options[2]  # session
+    p.f_tag.value = "s2"
+    p.collect_start_clicked()
+    assert p.collector.phase == "idle" and p.out_msg.content == p.lang.t("col.err.review")
+    p.c_reviewed.value = True  # ticked with no reviewer name: refused, stays unticked
+    assert p.c_reviewed.value is False and p.collector.review_pending() is not None
+    p.f_reviewer.value = "Kota"
+    p.c_reviewed.value = True
+    assert p.collector.review_pending() is None and p.review_box.visible is False
 
 
 def test_an_emptied_episode_count_means_the_default_and_a_bad_one_is_refused(collecting):

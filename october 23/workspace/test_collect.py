@@ -1,5 +1,6 @@
 """Tests for collect.py: the command line, the refusals, the phase from the output, and keys typed into a real pseudo-terminal."""
 
+import json
 import pathlib
 import sys
 import textwrap
@@ -255,3 +256,31 @@ def test_a_set_that_saved_nothing_starts_again_with_a_new_dataset_and_dry_leaves
     s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))
     s.wait()
     assert s.pending()["left"] == 12
+
+
+def test_a_session_waits_until_the_gate_is_reviewed(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 10)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    assert s.review_pending()["have"] == 10
+    with pytest.raises(collect.CollectError, match="col.err.review"):
+        s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))  # dry and another gate are still allowed
+    assert s.wait() == 0
+    s.mark_reviewed("Kota")
+    assert s.review_pending() is None
+    saved = json.loads(set_file.read_text())
+    assert saved["reviewed_by"] == "Kota" and saved["reviewed_at"]
+    s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
+    assert s.wait() == 0
+
+
+def test_a_gate_that_stopped_short_blocks_a_session_until_it_is_finished(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 7)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, set_file=set_file)
+    assert s.review_pending() is None and s.pending()["left"] == 3  # resume it first; there is nothing to review yet
+    with pytest.raises(collect.CollectError, match="col.err.gateopen"):
+        s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))

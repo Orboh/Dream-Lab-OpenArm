@@ -6,6 +6,7 @@ Nothing about the dataset or the run folder is decided here: LeRobot and `record
 
 import collections
 import dataclasses
+import datetime as dt
 import json
 import os
 import pathlib
@@ -175,6 +176,11 @@ class CollectSession:
             raise CollectError("col.err.operator")
         if not OPERATOR_NAME.fullmatch(opts.operator.strip()):
             raise CollectError(f"col.err.operator.chars|{opts.operator.strip()}")
+        if opts.mode == "session":  # instructions §3.3: stop after the gate and show the reviewer; no session until the OK (V4)
+            if self.review_pending() is not None:
+                raise CollectError("col.err.review")
+            if self._gate_open():
+                raise CollectError("col.err.gateopen")
         argv, extra = self._argv_for(opts)
         target = opts.episodes or {"dry": 2, "gate": 10, "session": 10}[opts.mode]
         if opts.mode != "dry" and not opts.resume_root:  # a new set; a resume keeps the set it continues, a dry run leaves it alone
@@ -334,6 +340,35 @@ class CollectSession:
         if left <= 0:
             return None
         return {**current, "have": have, "left": left}
+
+    def _unreviewed_gate(self) -> dict | None:
+        """The last set when it is a gate nobody has reviewed yet, with `have` counted in its dataset; else None."""
+        current = self._read_set()
+        if not current or current.get("mode") != "gate" or current.get("reviewed_by") or not current.get("target"):
+            return None
+        return {**current, "have": dataset_episodes(current.get("dataset_root")) or 0}
+
+    def review_pending(self) -> dict | None:
+        """A finished gate waiting for the reviewer's OK (V4): `{..., have}`; None when there is none or a run is going."""
+        gate = None if self.active else self._unreviewed_gate()
+        return gate if gate and gate["have"] >= int(gate["target"]) else None
+
+    def _gate_open(self) -> bool:
+        """The last gate stopped short: resume it before any session."""
+        gate = self._unreviewed_gate()
+        return bool(gate and gate["have"] < int(gate["target"]))
+
+    def mark_reviewed(self, reviewer: str) -> None:
+        """Records the reviewer's OK on the finished gate in the set file, so a session may start (and the page remembers it after a restart).
+        @raise CollectError when no finished gate is waiting or no reviewer is named."""
+        gate = self.review_pending()
+        if gate is None:
+            raise CollectError("col.err.noreview")
+        if not reviewer.strip():
+            raise CollectError("col.err.reviewer")
+        current = self._read_set() or {}
+        current.update(reviewed_by=reviewer.strip(), reviewed_at=dt.datetime.now().astimezone().isoformat(timespec="seconds"))
+        self._write_set(current)
 
     def resume_options(self, base: Options) -> Options:
         """The options that finish the stopped set: its mode and tag, only the episodes it still needs, appended to its dataset.
