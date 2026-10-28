@@ -316,7 +316,7 @@ def test_a_full_width_tag_is_refused_before_the_set_file_is_touched(tmp_path, en
 def test_a_new_set_over_one_that_stopped_short_needs_a_confirmation(tmp_path, env_file):
     ds = _dataset(tmp_path / "ds", 7)
     set_file = tmp_path / "set.json"
-    set_file.write_text('{"mode": "session", "tag": "s1", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    set_file.write_text('{"mode": "session", "tag": "s1", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds", "gate_reviewed_by": "Kota"}' % ds)
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
     with pytest.raises(collect.CollectError, match=r"col.err.replace\|session s1: 7/10"):
         s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
@@ -347,3 +347,38 @@ def test_the_confirmation_lets_a_new_gate_replace_one_waiting_for_its_ok(tmp_pat
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
     s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester", replace_set=True))
     assert s.wait() == 0 and json.loads(set_file.read_text())["dataset_root"] is None
+
+
+def test_a_session_needs_a_reviewed_gate_even_when_there_is_no_set_at_all(tmp_path, env_file):
+    set_file = tmp_path / "set.json"  # 10/28: the set file was removed and a session ran with no gate
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match="col.err.nogate"):
+        s.start(collect.Options(mode="session", tag="t1l1-s1", env_file=env_file, operator="Tester"))
+    set_file.write_text('{"mode": "session", "tag": "t1l1-s1", "target": 10, "dataset_root": null, "repo_id": null}')  # a session from before this rule
+    with pytest.raises(collect.CollectError, match="col.err.nogate"):
+        s.start(collect.Options(mode="session", tag="t1l1-s2", env_file=env_file, operator="Tester"))
+
+
+def test_the_gate_ok_carries_from_session_to_session_until_a_new_gate(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 10)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds", "reviewed_by": "Kota"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    s.start(collect.Options(mode="session", tag="t1l1-s1", env_file=env_file, operator="Tester"))
+    assert s.wait() == 0 and json.loads(set_file.read_text())["gate_reviewed_by"] == "Kota"
+    s.start(collect.Options(mode="session", tag="t1l1-s2", env_file=env_file, operator="Tester", replace_set=True))  # no new gate; the empty s1 is replaced (V6)
+    assert s.wait() == 0 and s.gate_ok_by() == "Kota"
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester", replace_set=True))  # a new gate needs its own OK
+    assert s.wait() == 0 and s.gate_ok_by() is None
+
+
+def test_a_resumed_run_says_where_it_saved_although_its_manifest_names_no_dataset(tmp_path):
+    ds = _dataset(tmp_path / "ds_v1_20261028_153218", 10)
+    run = tmp_path / "20261028T064455Z-bi-x-v1-t1l1-s1"
+    run.mkdir()
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": null, "repo_id_stamped": null}}')  # what a RESUME=true run writes
+    (run / "command.sh").write_text(f"ENV_FILE=x.env \\\nRESUME=true DATASET_ROOT={ds} \\\n  REPO_ID=Orboh/ds bash scripts/collect_bimanual.sh session t1l1-s1 2\n")
+    assert collect.saved_location(str(run)) == {"run_dir": str(run), "dataset_root": str(ds), "episodes": 10}  # from command.sh
+    (run / "command.sh").unlink()
+    assert collect.saved_location(str(run), resume_root=str(ds))["dataset_root"] == str(ds)  # from what the page passed
+    assert collect.saved_location(str(run))["dataset_root"] is None
