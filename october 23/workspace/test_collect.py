@@ -375,3 +375,12 @@ def test_the_confirmation_lets_a_new_gate_replace_one_waiting_for_its_ok(tmp_pat
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
     s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester", replace_set=True))
     assert s.wait() == 0 and json.loads(set_file.read_text())["dataset_root"] is None
+
+
+def test_the_default_branches_come_from_bootstrap_sh_or_its_last_known_values(tmp_path):
+    boot = tmp_path / "bootstrap.sh"
+    boot.write_text('OPENARM_BRANCH="${OPENARM_BRANCH:-dev/next}"\nLEROBOT_BRANCH="${LEROBOT_BRANCH:-feat/other}"\n')
+    found = collect.default_branches(boot)
+    assert found["openarm-orboh"][1] == "dev/next" and found["lerobot"][1] == "feat/other"
+    missing = collect.default_branches(tmp_path / "gone.sh")
+    assert missing["openarm-orboh"][1] == "dev/openarm-vla" and missing["lerobot"][1] == "feat/bi-openarm-soft-move-to"

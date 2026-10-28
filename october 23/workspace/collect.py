@@ -20,10 +20,19 @@ from collections.abc import Callable
 
 REPO = pathlib.Path("~/projects/openarm-orboh").expanduser()
 LEROBOT = pathlib.Path("~/projects/lerobot").expanduser()
-DEFAULT_BRANCHES = {  # the branches collection is meant to run on (2026-10-28 instructions §1: do not switch them; Kento and Kota decide)
-    "openarm-orboh": (REPO, "feat/takeei-wood-l1"),
-    "lerobot": (LEROBOT, "feat/bi-openarm-soft-move-to"),
-}
+BOOTSTRAP = REPO / "scripts" / "bootstrap.sh"  # where Kento keeps the default pair of branches (OPENARM_BRANCH, LEROBOT_BRANCH)
+FALLBACK_BRANCHES = {"OPENARM_BRANCH": "dev/openarm-vla", "LEROBOT_BRANCH": "feat/bi-openarm-soft-move-to"}  # bootstrap.sh's values on 2026-10-28, used only when it cannot be read
+
+
+def default_branches(bootstrap: pathlib.Path = BOOTSTRAP) -> dict[str, tuple[pathlib.Path, str]]:
+    """The checkouts V8 watches and their default branch, read from bootstrap.sh (`OPENARM_BRANCH="${OPENARM_BRANCH:-dev/openarm-vla}"`),
+    so the page cannot drift from it. This PC's openarm-orboh is not on its default on purpose (instructions §1), so yellow is expected there."""
+    try:
+        text = pathlib.Path(bootstrap).read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    found = {key: (m.group(1) if (m := re.search(rf'^{key}="\$\{{{key}:-([^}}"]+)\}}"', text, re.M)) else value) for key, value in FALLBACK_BRANCHES.items()}
+    return {"openarm-orboh": (REPO, found["OPENARM_BRANCH"]), "lerobot": (LEROBOT, found["LEROBOT_BRANCH"])}
 DEFAULT_ENV = REPO / "config" / "bimanual-collect.kitakyushu_takeei_sort.env"
 COLLECTIONS = pathlib.Path("~/collections").expanduser()
 MODES = ("dry", "gate", "session")
@@ -173,7 +182,7 @@ def current_branch(repo: pathlib.Path) -> str | None:
 def branches(repos: dict[str, tuple[pathlib.Path, str]] | None = None) -> list[dict]:
     """Which branch openarm-orboh and lerobot are on, against the default (V8): `[{name, current, default, ok}]`; `current` None when unreadable."""
     rows = []
-    for name, (path, default) in (repos or DEFAULT_BRANCHES).items():
+    for name, (path, default) in (repos or default_branches()).items():
         current = current_branch(path)
         rows.append({"name": name, "current": current, "default": default, "ok": current == default})
     return rows
