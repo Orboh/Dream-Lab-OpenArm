@@ -1057,6 +1057,25 @@ def test_the_chosen_mode_and_language_are_marked_and_still_read_right(collecting
     assert p.f_mode.options[1].startswith(designer.MARK) and p._collect_options().mode == "gate"  # relabelled, still gate
 
 
+def test_operator_and_settings_are_frozen_while_a_run_is_going(collecting):
+    import designer
+
+    p = collecting
+    fields = p._collect_fields()
+    assert p.f_collector in fields and p.f_poseset in fields
+    assert all(f.disabled is False for f in fields)
+    p.collect_start_clicked()
+    assert all(f.disabled is True for f in fields)  # one session = one operator and one set of values (instructions section 1)
+    assert p.b_lang.disabled is False  # the language can still be switched
+    p.f_mode.value = p.f_mode.options[1]  # a click on gate during the dry run is undone
+    assert p.f_mode.options[0].startswith(designer.MARK) and p._collect_options().mode == "dry"
+    test_collect.wait_for(lambda: p.collector.phase == "ready")
+    p.collect_key("stop")
+    assert p.collector.wait() == 0
+    p.collect_tick(force=True)
+    assert all(f.disabled is False for f in fields)
+
+
 def test_an_emptied_episode_count_means_the_default_and_a_bad_one_is_refused(collecting):
     p = collecting
     p.f_episodes.value = ""

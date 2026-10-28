@@ -406,6 +406,7 @@ class EditorPanel:
         self.f_mode.options = tuple(self.lang.t(f"col.mode.{m}") for m in collect.MODES)
         self.f_mode.value = self.f_mode.options[collect.MODES.index(o.mode)]
         self._mark_on_click(self.f_mode)
+        self.f_mode.on_click(lambda _e: self._keep_mode())
         self.f_tag = g.add_text("", o.tag)
         tx(self.f_tag, "label", "col.tag")
         # A text field, not a number: viser's number input never sends an emptied field, so clearing "12" left "1" behind (2026-10-26)
@@ -537,12 +538,31 @@ class EditorPanel:
             self.out_msg.content = self._error_text(exc)
         self.collect_tick(force=True)
 
+    def _keep_mode(self) -> None:
+        """A click on Mode while a run is going is undone: the mark stays on the mode that is running."""
+        if self._marking or not self.collector.active:
+            return
+        self._marking = True  # setting the value calls this handler again
+        try:
+            self._set_choice(self.f_mode, collect.MODES, self.collector._mode)
+        finally:
+            self._marking = False
+        self._show_chosen(self.f_mode)
+
+    def _collect_fields(self) -> tuple:
+        """The Collect tab's settings: frozen while a run is going, since one session keeps one operator and one set of values (instructions §1, 2026-10-28).
+        Mode is not here: viser cannot disable a button group, so `_keep_mode` undoes a click on it instead."""
+        return (self.f_collector, self.f_tag, self.f_episodes, self.f_time, self.f_poseset,
+                self.c_sounds, self.c_bilateral, self.c_saveend, self.c_return, self.c_hold, self.f_countdown)
+
     def _collect_buttons(self) -> None:
         """Shows only what makes sense now: Start while idle, the key buttons while running; no discard when every episode is saved the instant it ends."""
         running = self.collector.active
         for b in (self.b_cnext, self.b_calign, self.b_cstop, self.b_ckill):
             b.disabled = not running
         self.b_crerecord.disabled = not running or (bool(self.c_saveend.value) and not bool(self.c_return.value))  # with the automatic return, ← discards and returns
+        for field in self._collect_fields():
+            field.disabled = running
         nobody = not self.f_collector.value.strip()  # every run is recorded under a name, so nothing starts without one
         self.b_cstart.disabled = running or nobody
         self.b_cresume.disabled = running or nobody or self.collector.pending() is None
