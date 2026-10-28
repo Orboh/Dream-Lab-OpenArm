@@ -284,3 +284,19 @@ def test_a_gate_that_stopped_short_blocks_a_session_until_it_is_finished(tmp_pat
     assert s.review_pending() is None and s.pending()["left"] == 3  # resume it first; there is nothing to review yet
     with pytest.raises(collect.CollectError, match="col.err.gateopen"):
         s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
+
+
+def test_a_finished_run_says_where_it_saved_and_only_paths_that_exist(tmp_path, env_file):
+    run = tmp_path / "20261028T042323Z-bi-test-dry"
+    run.mkdir()
+    ds = _dataset(tmp_path / "ds_test_20261028_132329", 2)
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": "%s", "repo_id_stamped": "Orboh/ds_test_20261028_132329"}}' % ds)
+    script = tmp_path / "fake.py"
+    script.write_text(f"print('[record-bi] 記録: {run}')\n")
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}), set_file=None)
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))
+    assert s.wait() == 0
+    assert s.snapshot()["saved_to"] == {"run_dir": str(run), "dataset_root": str(ds), "episodes": 2}
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": "%s"}}' % (tmp_path / "never_made"))  # 10/26: ended before a dataset was made
+    assert collect.saved_location(str(run)) == {"run_dir": str(run), "dataset_root": None, "episodes": None}
+    assert collect.saved_location(None)["run_dir"] is None and collect.saved_location(str(tmp_path / "gone"))["run_dir"] is None
