@@ -323,3 +323,15 @@ def test_the_gate_ok_carries_from_session_to_session_until_a_new_gate(tmp_path, 
     assert s.wait() == 0 and s.gate_ok_by() == "Kota"
     s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))  # a new gate needs its own OK
     assert s.wait() == 0 and s.gate_ok_by() is None
+
+
+def test_a_resumed_run_says_where_it_saved_although_its_manifest_names_no_dataset(tmp_path):
+    ds = _dataset(tmp_path / "ds_v1_20261028_153218", 10)
+    run = tmp_path / "20261028T064455Z-bi-x-v1-t1l1-s1"
+    run.mkdir()
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": null, "repo_id_stamped": null}}')  # what a RESUME=true run writes
+    (run / "command.sh").write_text(f"ENV_FILE=x.env \\\nRESUME=true DATASET_ROOT={ds} \\\n  REPO_ID=Orboh/ds bash scripts/collect_bimanual.sh session t1l1-s1 2\n")
+    assert collect.saved_location(str(run)) == {"run_dir": str(run), "dataset_root": str(ds), "episodes": 10}  # from command.sh
+    (run / "command.sh").unlink()
+    assert collect.saved_location(str(run), resume_root=str(ds))["dataset_root"] == str(ds)  # from what the page passed
+    assert collect.saved_location(str(run))["dataset_root"] is None
