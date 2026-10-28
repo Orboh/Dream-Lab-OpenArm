@@ -266,7 +266,7 @@ def test_a_session_waits_until_the_gate_is_reviewed(tmp_path, env_file):
     assert s.review_pending()["have"] == 10
     with pytest.raises(collect.CollectError, match="col.err.review"):
         s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
-    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))  # dry and another gate are still allowed
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))  # a dry run is still allowed (a new gate needs the confirmation, see below)
     assert s.wait() == 0
     s.mark_reviewed("Kota")
     assert s.review_pending() is None
@@ -325,3 +325,25 @@ def test_a_new_set_over_one_that_stopped_short_needs_a_confirmation(tmp_path, en
     assert s.wait() == 0
     s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester", replace_set=True))
     assert s.wait() == 0 and json.loads(set_file.read_text())["tag"] == "s2"
+
+
+def test_a_new_set_over_a_finished_gate_waiting_for_its_ok_needs_a_confirmation(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds_v1_20261028_123834", 10)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "test", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match=r"col.err.replace.review\|10/10"):  # 10/28 14:54: this gate was replaced without a word
+        s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))
+    assert json.loads(set_file.read_text())["dataset_root"] == str(ds)
+    s.mark_reviewed("Kota")  # once it has its OK, a new gate is an ordinary start
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))
+    assert s.wait() == 0
+
+
+def test_the_confirmation_lets_a_new_gate_replace_one_waiting_for_its_ok(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 10)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester", replace_set=True))
+    assert s.wait() == 0 and json.loads(set_file.read_text())["dataset_root"] is None

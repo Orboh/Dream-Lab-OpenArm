@@ -1173,3 +1173,15 @@ def test_a_full_width_tag_is_flagged_as_it_is_typed_and_a_stopped_set_asks_befor
     p.f_mode.value = p.f_mode.options[2]  # session
     p.collect_start_clicked()
     assert p.collector.phase == "idle" and "7/10" in p.out_msg.content
+
+
+def test_a_gate_waiting_for_its_ok_shows_the_confirmation_and_a_new_gate_is_refused_without_it(collecting, tmp_path):
+    p = collecting
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 10}')
+    p.collector.set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
+    p.collect_tick(force=True)
+    assert p.c_replace.visible is True and p.review_box.visible is True
+    p.f_mode.value = p.f_mode.options[1]  # gate
+    p.collect_start_clicked()
+    assert p.collector.phase == "idle" and p.out_msg.content == p.lang.t("col.err.replace.review", what="10/10")

@@ -235,6 +235,8 @@ STRINGS: dict[str, tuple[str, str]] = {
                           "セッションタグは半角の英数字とハイフンだけにしてください（例 s2・全角は不可）: {what}"),
     "col.err.replace": ("The last set ({what}) stopped short and can still be resumed. Press Resume, or tick \"Start a new set anyway\" to start a new one (the stopped set then cannot be resumed from this page).",
                         "直前のセット（{what}）が途中で止まっていて、まだ再開できます。「再開」を押すか、新しく始めるなら「それでも新しいセットを始める」にチェックを入れてください（止まったセットはこの画面から再開できなくなります）。"),
+    "col.err.replace.review": ("The last gate ({what}) is finished and waiting for the reviewer's OK. Show it to the reviewer first, or tick \"Start a new set anyway\" to start a new one (the waiting gate then disappears from this page).",
+                               "直前の gate（{what}）は終わっていて、確認者の OK 待ちです。先に確認者に見せるか、新しく始めるなら「それでも新しいセットを始める」にチェックを入れてください（OK 待ちの gate はこの画面から消えます）。"),
     "col.replace": ("Start a new set anyway (forget the stopped one's resume record)", "それでも新しいセットを始める（止まったセットの再開記録を消す）"),
     "col.err.tag": ("A session needs a tag such as s2.", "sessionにはs2のようなタグが必要です。"),
     "col.err.notrunning": ("No collection is running.", "収集は動いていません。"),
