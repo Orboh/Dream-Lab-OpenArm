@@ -896,6 +896,8 @@ def collecting(panel, tmp_path):
     panel.collector = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}),
                                              set_file=tmp_path / "set.json")
     panel.collect_opts.env_file = env
+    panel.f_collector.value = "Tester"
+    panel._collect_buttons()  # setting a value from code does not fire on_update
     yield panel
     if panel.collector.active:
         panel.collector.proc.kill()
@@ -1029,18 +1031,49 @@ def test_collect_resume_button_offers_only_a_stopped_set(collecting, tmp_path):
     assert p.collector.wait() == 0
 
 
-def test_collect_recheck_button_notices_a_dataset_edited_outside_the_page(collecting, tmp_path):
+def test_start_waits_for_an_operator_and_passes_the_typed_name(collecting):
     p = collecting
+    p.f_collector.value = ""
+    p._collect_buttons()
+    assert p.b_cstart.disabled is True
+    p.collect_start_clicked()  # a click that slips past the disabled button is refused too
+    assert p.collector.phase == "idle" and p.out_msg.content == p.lang.t("col.err.operator")
+    p.f_collector.value = " Suraj "
+    p._collect_buttons()
+    assert p.b_cstart.disabled is False and p._collect_options().operator == "Suraj"
+    assert p.f_operator.value != "Suraj"  # the Advanced "operator" (who saves the zones) is a different field
+
+
+def test_the_chosen_mode_and_language_are_marked_and_still_read_right(collecting):
+    import designer
+
+    p = collecting
+    assert p.f_mode.options[0].startswith(designer.MARK)  # dry, chosen at start
+    p.f_mode.value = p.f_mode.options[1]  # a click on gate
+    assert p.f_mode.options[1].startswith(designer.MARK) and not p.f_mode.options[0].startswith(designer.MARK)
+    assert p._collect_options().mode == "gate"
+    p.b_lang.value = p.b_lang.options[1]  # 日本語
+    assert p.lang.code != "en" and p.b_lang.options[1].startswith(designer.MARK)
+    assert p.f_mode.options[1].startswith(designer.MARK) and p._collect_options().mode == "gate"  # relabelled, still gate
+
+
+def test_operator_and_settings_are_frozen_while_a_run_is_going(collecting):
+    import designer
+
+    p = collecting
+    fields = p._collect_fields()
+    assert p.f_collector in fields and p.f_poseset in fields
+    assert all(f.disabled is False for f in fields)
+    p.collect_start_clicked()
+    assert all(f.disabled is True for f in fields)  # one session = one operator and one set of values (instructions section 1)
+    assert p.b_lang.disabled is False  # the language can still be switched
+    p.f_mode.value = p.f_mode.options[1]  # a click on gate during the dry run is undone
+    assert p.f_mode.options[0].startswith(designer.MARK) and p._collect_options().mode == "dry"
+    test_collect.wait_for(lambda: p.collector.phase == "ready")
+    p.collect_key("stop")
+    assert p.collector.wait() == 0
     p.collect_tick(force=True)
-    p.collect_recheck_clicked()
-    assert p.b_cresume.disabled is True and p.out_msg.content != ""  # nothing stopped short: says so
-    (tmp_path / "ds" / "meta").mkdir(parents=True)
-    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 9}')  # e.g. one episode deleted after the set finished
-    p.collector.set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
-    p.collect_tick()  # the run did not change, so the periodic tick alone does not see it
-    assert p.b_cresume.disabled is True
-    p.collect_recheck_clicked()
-    assert p.b_cresume.disabled is False and p.b_crecheck.disabled is False and "**1**" in p.resume_info.content and p.out_msg.content == ""
+    assert all(f.disabled is False for f in fields)
 
 
 def test_an_emptied_episode_count_means_the_default_and_a_bad_one_is_refused(collecting):

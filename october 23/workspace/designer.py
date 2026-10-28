@@ -6,6 +6,7 @@ panel is in methods the buttons call, so it is tested without a browser; the pur
 """
 
 import datetime as dt
+import os
 import pathlib
 from collections.abc import Callable
 
@@ -30,8 +31,14 @@ HERE = pathlib.Path(__file__).resolve().parent
 URDF = HERE.parent / "urdf" / "openarm_bimanual.urdf"
 MESH_ROOT = pathlib.Path("~/projects/openarm-orboh/openarm_description").expanduser()
 STATION = pathlib.Path("~/.dreamlabs/station.yaml").expanduser()
+MARK = "✅ "  # in front of the chosen button of a button group: viser draws all of them alike (2026-10-28)
 BLUE, RED, AMBER, GREEN, GREY = (60, 120, 220), (220, 50, 47), (255, 191, 0), (60, 180, 75), (150, 150, 150)
 JOINTS = 7
+
+
+def unmarked(text: str) -> str:
+    """A button group's option text without the chosen-button mark."""
+    return text.removeprefix(MARK)
 
 
 class RobotModel:
@@ -71,6 +78,8 @@ class EditorPanel:
         self.robot, self.read_q, self.cameras = robot, read_q, cameras
         self.lang = i18n.Lang("en")
         self._retext: list[Callable[[], None]] = []
+        self._marked: list = []  # button groups whose chosen button carries MARK
+        self._marking = False
         self.collector = collector or collect.CollectSession()
         has_default = (startpose.pose_sets_dir() / collect.DEFAULT_POSE_SET).is_dir()
         self.collect_opts = collect.Options(env_file=collect_env, pose_set=collect.DEFAULT_POSE_SET if has_default else "")
@@ -109,8 +118,27 @@ class EditorPanel:
 
     def _choice(self, handle, keys: tuple[str, ...]) -> str:
         """The language-neutral key (`left`, `right`, `both`) of the option chosen in a dropdown or button group whose texts change with the language."""
-        options = list(handle.options)
-        return keys[options.index(handle.value)] if handle.value in options else keys[0]
+        options = [unmarked(o) for o in handle.options]
+        value = unmarked(handle.value)
+        return keys[options.index(value)] if value in options else keys[0]
+
+    def _show_chosen(self, handle) -> None:
+        """Marks the chosen button of a button group (viser draws them all alike): the chosen one gets `MARK`, the others lose it."""
+        plain = [unmarked(o) for o in handle.options]
+        value = unmarked(handle.value)
+        index = plain.index(value) if value in plain else 0
+        self._marking = True  # viser calls the group's handlers when its value changes, also from code: this is not a click
+        try:
+            handle.options = tuple((MARK if i == index else "") + o for i, o in enumerate(plain))
+            handle.value = handle.options[index]
+        finally:
+            self._marking = False
+
+    def _mark_on_click(self, handle) -> None:
+        """Keeps a button group's chosen button marked, from now and after every click."""
+        self._marked.append(handle)
+        handle.on_click(lambda _e: None if self._marking else self._show_chosen(handle))
+        self._show_chosen(handle)
 
     def _set_choice(self, handle, keys: tuple[str, ...], key: str) -> None:
         handle.value = list(handle.options)[keys.index(key)]
@@ -132,7 +160,8 @@ class EditorPanel:
             pass
         self.b_lang = g.add_button_group("Language / 言語", i18n.LANGS)
         self.b_lang.value = i18n.LANGS[0]
-        self.b_lang.on_click(lambda _e: self.set_language(self.b_lang.value))
+        self.b_lang.on_click(lambda _e: None if self._marking else self.set_language(unmarked(self.b_lang.value)))
+        self._mark_on_click(self.b_lang)
         self.status = g.add_html(cards.status_strip(self.receiving, None, self.lang))
         self.out_msg = g.add_markdown("")
         if self.cameras is not None:
@@ -142,7 +171,6 @@ class EditorPanel:
             self.b_show_cams = g.add_checkbox("", True)
             tx(self.b_show_cams, "label", "cam.show")
             self.b_show_cams.on_update(lambda _e: self.show_cameras(self.b_show_cams.value))
-        self._build_move_folder(g)
         tabs = self.tabs = g.add_tab_group()
         tab_keys = ("tab.position", "tab.home", "tab.danger", "tab.save", "tab.collect")
         self.tab_labels = [self.lang.t(k) for k in tab_keys]
@@ -155,6 +183,7 @@ class EditorPanel:
         tab = tabs.add_tab(self.tab_labels[1])
         tx(tab, "label", tab_keys[1])
         with tab:
+            self._build_move_folder(g)
             tx(g.add_markdown(""), "content", "home.help")
             self.home_cards, self.b_home = {}, {}
             for side in ed.SIDES:
@@ -191,6 +220,7 @@ class EditorPanel:
                 tx(self.record_side, "label", "area.arm")
                 self._retext.append(lambda: self._relabel_choice(self.record_side))
                 self._set_choice(self.record_side, ed.SIDES + ("both",), "both")
+                self._mark_on_click(self.record_side)
                 self.b_point = g.add_button("", color="green")
                 self.b_undo = g.add_button("", color="gray")
                 self.b_clear = g.add_button("", color="gray")
@@ -300,14 +330,16 @@ class EditorPanel:
     def _relabel_choice(self, handle, keys: tuple[str, ...] | None = None) -> None:
         """Puts the arm names of the new language on a choice, keeping what was chosen."""
         keys = keys or ed.SIDES + ("both",)
-        old = list(handle.options)
-        index = old.index(handle.value) if handle.value in old else 0
+        old = [unmarked(o) for o in handle.options]
+        index = old.index(unmarked(handle.value)) if unmarked(handle.value) in old else 0
         if keys[0] == "both":
             texts = (self.lang.t("arm.both"),) + tuple(self.lang.t(f"side.{x}") for x in ed.SIDES)
         else:
             texts = self._arm_texts()
         handle.options = texts
         handle.value = texts[index]
+        if handle in self._marked:
+            self._show_chosen(handle)
 
     # -- start pose set (Home tab) --------------------------------------------------------------------------------
     def _base_set(self) -> str:
@@ -365,11 +397,16 @@ class EditorPanel:
         tx(g.add_markdown(""), "content", "col.help")
         self.keys_hint = g.add_markdown("")
         tx(self.keys_hint, "content", "col.keys")
+        self.f_collector = g.add_text("", os.environ.get("OPERATOR", ""))  # empty until typed (or OPERATOR=<name> at launch): Start waits for it
+        tx(self.f_collector, "label", "col.operator")
+        self.f_collector.on_update(lambda _e: self._collect_buttons())
         self.f_mode = g.add_button_group("Mode", ("dry", "gate", "session"))
         tx(self.f_mode, "label", "col.mode")
         self._retext.append(self._relabel_mode)
         self.f_mode.options = tuple(self.lang.t(f"col.mode.{m}") for m in collect.MODES)
         self.f_mode.value = self.f_mode.options[collect.MODES.index(o.mode)]
+        self._mark_on_click(self.f_mode)
+        self.f_mode.on_click(lambda _e: self._keep_mode())
         self.f_tag = g.add_text("", o.tag)
         tx(self.f_tag, "label", "col.tag")
         # A text field, not a number: viser's number input never sends an emptied field, so clearing "12" left "1" behind (2026-10-26)
@@ -419,19 +456,20 @@ class EditorPanel:
         self._collect_buttons()
 
     def _relabel_mode(self) -> None:
-        old = list(self.f_mode.options)
-        index = old.index(self.f_mode.value) if self.f_mode.value in old else 0
+        old = [unmarked(o) for o in self.f_mode.options]
+        index = old.index(unmarked(self.f_mode.value)) if unmarked(self.f_mode.value) in old else 0
         self.f_mode.options = tuple(self.lang.t(f"col.mode.{m}") for m in collect.MODES)
         self.f_mode.value = self.f_mode.options[index]
+        self._show_chosen(self.f_mode)
 
     def _collect_options(self) -> collect.Options:
         """The chosen options, read from the card."""
         o = self.collect_opts
-        o.mode = collect.MODES[list(self.f_mode.options).index(self.f_mode.value)] if self.f_mode.value in self.f_mode.options else o.mode
+        o.mode = self._choice(self.f_mode, collect.MODES) if unmarked(self.f_mode.value) in [unmarked(x) for x in self.f_mode.options] else o.mode
         count = self.f_episodes.value.strip()
         if count and not count.isdigit():
             raise collect.CollectError(f"col.err.episodes|{count}")
-        o.tag, o.episodes = self.f_tag.value.strip(), int(count or 0)
+        o.operator, o.tag, o.episodes = self.f_collector.value.strip(), self.f_tag.value.strip(), int(count or 0)
         o.episode_time_s, o.pose_set = int(self.f_time.value), self.f_poseset.value.strip()
         o.play_sounds, o.bilateral, o.save_on_episode_end = bool(self.c_sounds.value), bool(self.c_bilateral.value), bool(self.c_saveend.value)
         o.start_pose_hold, o.start_countdown_s = bool(self.c_hold.value), int(self.f_countdown.value)
@@ -500,14 +538,34 @@ class EditorPanel:
             self.out_msg.content = self._error_text(exc)
         self.collect_tick(force=True)
 
+    def _keep_mode(self) -> None:
+        """A click on Mode while a run is going is undone: the mark stays on the mode that is running."""
+        if self._marking or not self.collector.active:
+            return
+        self._marking = True  # setting the value calls this handler again
+        try:
+            self._set_choice(self.f_mode, collect.MODES, self.collector._mode)
+        finally:
+            self._marking = False
+        self._show_chosen(self.f_mode)
+
+    def _collect_fields(self) -> tuple:
+        """The Collect tab's settings: frozen while a run is going, since one session keeps one operator and one set of values (instructions §1, 2026-10-28).
+        Mode is not here: viser cannot disable a button group, so `_keep_mode` undoes a click on it instead."""
+        return (self.f_collector, self.f_tag, self.f_episodes, self.f_time, self.f_poseset,
+                self.c_sounds, self.c_bilateral, self.c_saveend, self.c_return, self.c_hold, self.f_countdown)
+
     def _collect_buttons(self) -> None:
         """Shows only what makes sense now: Start while idle, the key buttons while running; no discard when every episode is saved the instant it ends."""
         running = self.collector.active
         for b in (self.b_cnext, self.b_calign, self.b_cstop, self.b_ckill):
             b.disabled = not running
         self.b_crerecord.disabled = not running or (bool(self.c_saveend.value) and not bool(self.c_return.value))  # with the automatic return, ← discards and returns
-        self.b_cstart.disabled = running
-        self.b_cresume.disabled = running or self.collector.pending() is None
+        for field in self._collect_fields():
+            field.disabled = running
+        nobody = not self.f_collector.value.strip()  # every run is recorded under a name, so nothing starts without one
+        self.b_cstart.disabled = running or nobody
+        self.b_cresume.disabled = running or nobody or self.collector.pending() is None
         self._resume_text()
 
     def collect_tick(self, force: bool = False) -> None:
@@ -521,7 +579,7 @@ class EditorPanel:
         self._collect_buttons()
 
     def _build_move_folder(self, g) -> None:
-        """Go to home / Park for the real arms, above the tabs so Park is in reach from every tab."""
+        """Go to home / Park for the real arms, in the Home tab only: the Collect tab must not offer it, since collection drives the same arms (2026-10-28)."""
         import homemove
 
         self.mover = homemove.HomeMover(STATION)
