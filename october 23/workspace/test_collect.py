@@ -58,6 +58,19 @@ def test_command_is_the_terminal_line(env_file):
     assert env["BILATERAL_FEEDBACK"] == "false" and "L_BILATERAL_GRIPPER_KP" not in env
 
 
+def test_operator_reaches_the_script_and_an_empty_or_full_width_one_is_refused(tmp_path, env_file):
+    _, env = collect.command(collect.Options(operator=" Suraj ", env_file=env_file))
+    assert env["OPERATOR"] == "Suraj"  # wins over the settings file's OPERATOR (collect_bimanual.sh)
+    _, env = collect.command(collect.Options(env_file=env_file))
+    assert "OPERATOR" not in env
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, set_file=tmp_path / "set.json")
+    with pytest.raises(collect.CollectError, match="col.err.operator$"):
+        s.start(collect.Options(operator="  ", env_file=env_file))
+    with pytest.raises(collect.CollectError, match="col.err.operator.chars"):
+        s.start(collect.Options(operator="Ｓｕｒａｊ", env_file=env_file))  # full width, as typed with a Japanese keyboard
+    assert s.phase == "idle" and not (tmp_path / "set.json").exists()
+
+
 def test_refuses_while_a_teleop_runs(tmp_path, env_file):
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: "run_teleop")
     with pytest.raises(collect.CollectError, match="col.err.teleop"):
@@ -89,7 +102,7 @@ def test_run_folder_is_read_from_the_output():
 
 
 def test_keys_reach_a_real_terminal_and_stop_ends_the_run(session, env_file):
-    session.start(collect.Options(env_file=env_file))
+    session.start(collect.Options(env_file=env_file, operator="Tester"))
     wait_for(lambda: session.phase == "ready")
     session.send("align")
     wait_for(lambda: any("Arm returned" in line for line in session.snapshot()["lines"]))
@@ -104,9 +117,9 @@ def test_keys_reach_a_real_terminal_and_stop_ends_the_run(session, env_file):
 def test_second_start_while_running_is_refused_and_send_without_run_fails(session, env_file):
     with pytest.raises(collect.CollectError, match="col.err.notrunning"):
         session.send("next")
-    session.start(collect.Options(env_file=env_file))
+    session.start(collect.Options(env_file=env_file, operator="Tester"))
     with pytest.raises(collect.CollectError, match="col.err.busy"):
-        session.start(collect.Options(env_file=env_file))
+        session.start(collect.Options(env_file=env_file, operator="Tester"))
 
 
 def wait_for(cond, timeout: float = 5.0) -> None:
@@ -204,11 +217,11 @@ def test_a_stopped_set_resumes_with_only_the_episodes_left_into_its_dataset(tmp_
     script = tmp_path / "fake.py"
     script.write_text(f"print('[record-bi] 記録: {run}')\n")
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}), set_file=tmp_path / "set.json")
-    s.start(collect.Options(mode="gate", env_file=env_file))
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))
     assert s.wait() == 0
     todo = s.pending()
     assert (todo["mode"], todo["target"], todo["have"], todo["left"]) == ("gate", 10, 8, 2)
-    opts = s.resume_options(collect.Options(env_file=env_file, pose_set="v5"))
+    opts = s.resume_options(collect.Options(env_file=env_file, pose_set="v5", operator="Tester"))
     assert (opts.mode, opts.episodes, opts.pose_set) == ("gate", 2, "v5")
     _, env = collect.command(opts, pathlib.Path("/r"))
     assert env["RESUME"] == "true" and env["DATASET_ROOT"] == str(ds) and env["REPO_ID"] == "Orboh/ds_v1_20261026_141740"
@@ -228,6 +241,6 @@ def test_a_set_that_saved_nothing_starts_again_with_a_new_dataset_and_dry_leaves
     assert (opts.mode, opts.tag, opts.episodes, opts.resume_root) == ("session", "s2", 12, "")
     _, env = collect.command(opts, pathlib.Path("/r"))
     assert "RESUME" not in env
-    s.start(collect.Options(mode="dry", env_file=env_file))
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))
     s.wait()
     assert s.pending()["left"] == 12
