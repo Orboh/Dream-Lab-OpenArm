@@ -340,3 +340,16 @@ def test_the_disk_stamp_changes_when_the_set_or_its_dataset_changes_outside_the_
     info.write_text('{"total_episodes": 10}')
     os.utime(info, ns=(before[1] + 10**9, before[1] + 10**9))  # a merge written a second later
     assert s.disk_stamp() != before
+
+
+def test_branches_reads_each_checkout_and_compares_it_with_the_default(tmp_path):
+    import subprocess
+
+    repo = tmp_path / "orboh"
+    subprocess.run(["git", "init", "-q", "-b", "feat/wood", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    rows = collect.branches({"openarm-orboh": (repo, "feat/wood"), "lerobot": (tmp_path / "missing", "feat/soft")})
+    assert rows[0] == {"name": "openarm-orboh", "current": "feat/wood", "default": "feat/wood", "ok": True}
+    assert rows[1]["current"] is None and rows[1]["ok"] is False
+    subprocess.run(["git", "-C", str(repo), "switch", "-q", "--detach"], check=True)
+    assert collect.current_branch(repo).startswith("HEAD (")
