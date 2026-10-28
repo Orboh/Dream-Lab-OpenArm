@@ -300,3 +300,28 @@ def test_a_finished_run_says_where_it_saved_and_only_paths_that_exist(tmp_path, 
     (run / "manifest.json").write_text('{"artifacts": {"dataset_root": "%s"}}' % (tmp_path / "never_made"))  # 10/26: ended before a dataset was made
     assert collect.saved_location(str(run)) == {"run_dir": str(run), "dataset_root": None, "episodes": None}
     assert collect.saved_location(None)["run_dir"] is None and collect.saved_location(str(tmp_path / "gone"))["run_dir"] is None
+
+
+def test_a_full_width_tag_is_refused_before_the_set_file_is_touched(tmp_path, env_file):
+    assert collect.tag_problem("s2") is None and collect.tag_problem("") is None
+    assert collect.tag_problem("s１") == "col.err.tag.chars|s１" and collect.tag_problem("s 2") is not None
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": null, "repo_id": null}')
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match="col.err.tag.chars"):
+        s.start(collect.Options(mode="session", tag="s１", env_file=env_file, operator="Tester"))
+    assert json.loads(set_file.read_text())["mode"] == "gate"  # 10/26: this record was overwritten and Resume was lost
+
+
+def test_a_new_set_over_one_that_stopped_short_needs_a_confirmation(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 7)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "session", "tag": "s1", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match=r"col.err.replace\|session s1: 7/10"):
+        s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
+    assert json.loads(set_file.read_text())["tag"] == "s1"
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))  # a dry run does not touch the set
+    assert s.wait() == 0
+    s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester", replace_set=True))
+    assert s.wait() == 0 and json.loads(set_file.read_text())["tag"] == "s2"
