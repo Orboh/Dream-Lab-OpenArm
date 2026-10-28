@@ -670,7 +670,7 @@ class EditorPanel:
         nobody = not self.f_collector.value.strip()  # every run is recorded under a name, so nothing starts without one
         self.b_cstart.disabled = running or nobody
         self.b_cresume.disabled = running or nobody or self.collector.pending() is None
-        self.c_replace.visible = not running and self.collector.pending() is not None
+        self.c_replace.visible = not running and (self.collector.pending() is not None or self.collector.review_pending() is not None)
         self._resume_text()
         self._review_text()
 

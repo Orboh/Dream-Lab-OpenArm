@@ -241,10 +241,13 @@ class CollectSession:
                 raise CollectError("col.err.review")
             if self._gate_open():
                 raise CollectError("col.err.gateopen")
-        if opts.mode != "dry" and not opts.resume_root and not opts.replace_set:  # a new set would overwrite the resume record of one that stopped short (V6)
+        if opts.mode != "dry" and not opts.resume_root and not opts.replace_set:  # a new set would overwrite the record of one that stopped short (V6)
             todo = self.pending()
             if todo is not None:
                 raise CollectError(f"col.err.replace|{todo['mode']}{' ' + todo['tag'] if todo.get('tag') else ''}: {todo['have']}/{todo['target']}")
+            gate = self.review_pending()  # or of a finished gate still waiting for its OK: a new gate replaced one of 10 on 10/28 14:54
+            if gate is not None:
+                raise CollectError(f"col.err.replace.review|{gate['have']}/{gate['target']}")
         argv, extra = self._argv_for(opts)
         target = opts.episodes or {"dry": 2, "gate": 10, "session": 10}[opts.mode]
         if opts.mode != "dry" and not opts.resume_root:  # a new set; a resume keeps the set it continues, a dry run leaves it alone

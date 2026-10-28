@@ -1208,3 +1208,15 @@ def test_the_top_of_the_page_shows_the_branches_and_follows_a_switch(panel):
     assert "⚠" in panel.branch_strip.content and "<b>main</b>" in panel.branch_strip.content
     panel.set_language("ja")
     assert "既定: feat/bi-openarm-soft-move-to" in panel.branch_strip.content
+
+
+def test_a_gate_waiting_for_its_ok_shows_the_confirmation_and_a_new_gate_is_refused_without_it(collecting, tmp_path):
+    p = collecting
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 10}')
+    p.collector.set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
+    p.collect_tick(force=True)
+    assert p.c_replace.visible is True and p.review_box.visible is True
+    p.f_mode.value = p.f_mode.options[1]  # gate
+    p.collect_start_clicked()
+    assert p.collector.phase == "idle" and p.out_msg.content == p.lang.t("col.err.replace.review", what="10/10")
