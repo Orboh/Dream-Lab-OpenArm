@@ -1076,6 +1076,28 @@ def test_operator_and_settings_are_frozen_while_a_run_is_going(collecting):
     assert all(f.disabled is False for f in fields)
 
 
+def test_choosing_a_task_file_shows_its_values_and_runs_with_it(collecting, tmp_path):
+    import collect
+
+    p = collecting
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    wood = cfg / "bimanual-collect.wood.env"
+    wood.write_text('TASK="Pick up the wood"\nSCENE=wood-v1\nPOSE_SET=wood-pose\nEPISODE_TIME_S=600\n')
+    (cfg / "bimanual-collect.sort.env").write_text("TASK=Sort\nSCENE=sort-v1\nPOSE_SET=sort-pose\nEPISODE_TIME_S=120\n")
+    p.collect_env_refresh()
+    assert set(p.f_envfile.options) >= {"bimanual-collect.wood.env", "bimanual-collect.sort.env"}
+    p.f_envfile.value = "bimanual-collect.wood.env"
+    for value in ("Pick up the wood", "wood-v1", "wood-pose", "600"):
+        assert value in p.env_info.content
+    assert "wood-pose" in p.f_poseset.label and "600" in p.f_time.label  # the "empty = settings file" hints follow the chosen file
+    opts = p._collect_options()
+    assert opts.env_file == wood and collect.command(opts)[1]["ENV_FILE"] == str(wood)  # what command.sh will show
+    p.f_envfile.value = "bimanual-collect.sort.env"
+    assert "Sort" in p.env_info.content and "120" in p.env_info.content
+    assert p.f_envfile in p._collect_fields()  # frozen while a run is going, like the operator
+
+
 def test_an_emptied_episode_count_means_the_default_and_a_bad_one_is_refused(collecting):
     p = collecting
     p.f_episodes.value = ""

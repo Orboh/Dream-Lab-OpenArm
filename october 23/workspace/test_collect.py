@@ -71,6 +71,17 @@ def test_operator_reaches_the_script_and_an_empty_or_full_width_one_is_refused(t
     assert s.phase == "idle" and not (tmp_path / "set.json").exists()
 
 
+def test_task_files_are_listed_and_their_four_values_read(tmp_path):
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    (cfg / "bimanual-collect.wood.env").write_text('TASK="Pick up the wood"\nSCENE=wood-v1  # scene\nPOSE_SET=p1\nEPISODE_TIME_S=600\n')
+    (cfg / "bimanual-collect.sort.env").write_text("TASK=Sort\n")
+    (cfg / "other.env").write_text("TASK=x\n")
+    assert [f.name for f in collect.env_files(tmp_path)] == ["bimanual-collect.sort.env", "bimanual-collect.wood.env"]
+    assert collect.env_summary(cfg / "bimanual-collect.wood.env") == {"TASK": "Pick up the wood", "SCENE": "wood-v1", "POSE_SET": "p1", "EPISODE_TIME_S": "600"}
+    assert collect.env_summary(cfg / "bimanual-collect.sort.env")["SCENE"] == ""
+
+
 def test_refuses_while_a_teleop_runs(tmp_path, env_file):
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: "run_teleop")
     with pytest.raises(collect.CollectError, match="col.err.teleop"):
