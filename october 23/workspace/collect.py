@@ -181,10 +181,15 @@ class CollectSession:
                 raise CollectError("col.err.review")
             if self._gate_open():
                 raise CollectError("col.err.gateopen")
+            if self.gate_ok_by() is None:  # no reviewed gate at all, e.g. after the set file was removed: 10/28 a session ran with no gate
+                raise CollectError("col.err.nogate")
         argv, extra = self._argv_for(opts)
         target = opts.episodes or {"dry": 2, "gate": 10, "session": 10}[opts.mode]
         if opts.mode != "dry" and not opts.resume_root:  # a new set; a resume keeps the set it continues, a dry run leaves it alone
-            self._write_set({"mode": opts.mode, "tag": opts.tag.strip(), "target": target, "dataset_root": None, "repo_id": None})
+            new_set = {"mode": opts.mode, "tag": opts.tag.strip(), "target": target, "dataset_root": None, "repo_id": None}
+            if opts.mode == "session":  # the gate's OK goes along from session to session, until a new gate
+                new_set["gate_reviewed_by"] = self.gate_ok_by()
+            self._write_set(new_set)
         master, slave = pty.openpty()
         env = {**os.environ, **extra, "TERM": "xterm", "PYTHONUNBUFFERED": "1"}
         self.lines.clear()
@@ -357,6 +362,16 @@ class CollectSession:
         """The last gate stopped short: resume it before any session."""
         gate = self._unreviewed_gate()
         return bool(gate and gate["have"] < int(gate["target"]))
+
+    def gate_ok_by(self) -> str | None:
+        """Who gave the OK that lets a session start (V4, instructions §3.3): the reviewer of the last gate, or the one a session
+        carried over from its gate; None when there is no reviewed gate (no set, an unreviewed gate, or a session from before this rule)."""
+        current = self._read_set() or {}
+        if current.get("mode") == "gate":
+            return current.get("reviewed_by") or None
+        if current.get("mode") == "session":
+            return current.get("gate_reviewed_by") or None
+        return None
 
     def mark_reviewed(self, reviewer: str) -> None:
         """Records the reviewer's OK on the finished gate in the set file, so a session may start (and the page remembers it after a restart).

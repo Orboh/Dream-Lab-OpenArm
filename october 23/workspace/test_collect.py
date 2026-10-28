@@ -284,3 +284,26 @@ def test_a_gate_that_stopped_short_blocks_a_session_until_it_is_finished(tmp_pat
     assert s.review_pending() is None and s.pending()["left"] == 3  # resume it first; there is nothing to review yet
     with pytest.raises(collect.CollectError, match="col.err.gateopen"):
         s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
+
+
+def test_a_session_needs_a_reviewed_gate_even_when_there_is_no_set_at_all(tmp_path, env_file):
+    set_file = tmp_path / "set.json"  # 10/28: the set file was removed and a session ran with no gate
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match="col.err.nogate"):
+        s.start(collect.Options(mode="session", tag="t1l1-s1", env_file=env_file, operator="Tester"))
+    set_file.write_text('{"mode": "session", "tag": "t1l1-s1", "target": 10, "dataset_root": null, "repo_id": null}')  # a session from before this rule
+    with pytest.raises(collect.CollectError, match="col.err.nogate"):
+        s.start(collect.Options(mode="session", tag="t1l1-s2", env_file=env_file, operator="Tester"))
+
+
+def test_the_gate_ok_carries_from_session_to_session_until_a_new_gate(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 10)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds", "reviewed_by": "Kota"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    s.start(collect.Options(mode="session", tag="t1l1-s1", env_file=env_file, operator="Tester"))
+    assert s.wait() == 0 and json.loads(set_file.read_text())["gate_reviewed_by"] == "Kota"
+    s.start(collect.Options(mode="session", tag="t1l1-s2", env_file=env_file, operator="Tester"))  # the next session needs no new gate
+    assert s.wait() == 0 and s.gate_ok_by() == "Kota"
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))  # a new gate needs its own OK
+    assert s.wait() == 0 and s.gate_ok_by() is None

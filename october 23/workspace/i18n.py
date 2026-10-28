@@ -223,6 +223,8 @@ STRINGS: dict[str, tuple[str, str]] = {
     "col.err.operator": ("Type the operator (who records) first.", "先に操作者（録る人）を入力してください。"),
     "col.err.operator.chars": ("The operator must be half-width letters, digits, spaces, . _ or -: {what}", "操作者は半角の英数字・空白・. _ - だけにしてください: {what}"),
     "col.err.review": ("The gate is waiting for review: show it to the reviewer and tick their OK on this tab before a session.", "gate が確認待ちです。確認者に見せて、このタブで OK にチェックを入れてから session を始めてください。"),
+    "col.err.nogate": ("A session needs a gate of 10 reviewed by the reviewer first (instructions §3.3): record a gate, show it to the reviewer, and tick their OK on this tab.",
+                       "session の前に、確認者が OK を出した gate（10 本）が要ります（指示 §3.3）。gate を録って確認者に見せ、このタブで OK にチェックを入れてください。"),
     "col.err.gateopen": ("The last gate stopped short: finish it first (Resume), then show it to the reviewer.", "直前の gate が途中で止まっています。先に「再開」で終わらせてから確認者に見せてください。"),
     "col.err.noreview": ("There is no finished gate waiting for review.", "確認待ちの終わった gate はありません。"),
     "col.err.reviewer": ("Type the reviewer's name first.", "先に確認者の名前を入力してください。"),
