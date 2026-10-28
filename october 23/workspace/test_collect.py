@@ -1,6 +1,7 @@
 """Tests for collect.py: the command line, the refusals, the phase from the output, and keys typed into a real pseudo-terminal."""
 
 import json
+import os
 import pathlib
 import sys
 import textwrap
@@ -325,6 +326,20 @@ def test_a_new_set_over_one_that_stopped_short_needs_a_confirmation(tmp_path, en
     assert s.wait() == 0
     s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester", replace_set=True))
     assert s.wait() == 0 and json.loads(set_file.read_text())["tag"] == "s2"
+
+
+def test_the_disk_stamp_changes_when_the_set_or_its_dataset_changes_outside_the_page(tmp_path):
+    ds = _dataset(tmp_path / "ds", 7)
+    set_file = tmp_path / "set.json"
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, set_file=set_file)
+    assert s.disk_stamp() == (None, None)
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    before = s.disk_stamp()
+    assert None not in before
+    info = ds / "meta" / "info.json"
+    info.write_text('{"total_episodes": 10}')
+    os.utime(info, ns=(before[1] + 10**9, before[1] + 10**9))  # a merge written a second later
+    assert s.disk_stamp() != before
 
 
 def test_a_new_set_over_a_finished_gate_waiting_for_its_ok_needs_a_confirmation(tmp_path, env_file):

@@ -386,6 +386,19 @@ class CollectSession:
             current.update(dataset_root=artifacts["dataset_root"], repo_id=artifacts["repo_id_stamped"])
             self._write_set(current)
 
+    def disk_stamp(self) -> tuple:
+        """When the set file and its dataset's `meta/info.json` last changed: the page redraws when this does,
+        so a dataset changed outside the page (merged, cleaned, deleted) shows without a restart (V7). Cheap: two stat calls and a small read."""
+        def mtime(path: pathlib.Path | None) -> int | None:
+            try:
+                return path.stat().st_mtime_ns if path is not None else None
+            except OSError:
+                return None
+
+        current = self._read_set() or {}
+        root = current.get("dataset_root")
+        return mtime(self.set_file), mtime(pathlib.Path(root) / "meta" / "info.json" if root else None)
+
     def pending(self) -> dict | None:
         """The last set if it stopped short: `{mode, tag, target, have, left, dataset_root, repo_id}`; None when it is complete, unknown or running.
 
