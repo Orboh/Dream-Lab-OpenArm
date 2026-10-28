@@ -286,6 +286,22 @@ def test_a_gate_that_stopped_short_blocks_a_session_until_it_is_finished(tmp_pat
         s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
 
 
+def test_a_finished_run_says_where_it_saved_and_only_paths_that_exist(tmp_path, env_file):
+    run = tmp_path / "20261028T042323Z-bi-test-dry"
+    run.mkdir()
+    ds = _dataset(tmp_path / "ds_test_20261028_132329", 2)
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": "%s", "repo_id_stamped": "Orboh/ds_test_20261028_132329"}}' % ds)
+    script = tmp_path / "fake.py"
+    script.write_text(f"print('[record-bi] 記録: {run}')\n")
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, str(script)], {}), set_file=None)
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))
+    assert s.wait() == 0
+    assert s.snapshot()["saved_to"] == {"run_dir": str(run), "dataset_root": str(ds), "episodes": 2}
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": "%s"}}' % (tmp_path / "never_made"))  # 10/26: ended before a dataset was made
+    assert collect.saved_location(str(run)) == {"run_dir": str(run), "dataset_root": None, "episodes": None}
+    assert collect.saved_location(None)["run_dir"] is None and collect.saved_location(str(tmp_path / "gone"))["run_dir"] is None
+
+
 def test_a_session_needs_a_reviewed_gate_even_when_there_is_no_set_at_all(tmp_path, env_file):
     set_file = tmp_path / "set.json"  # 10/28: the set file was removed and a session ran with no gate
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
@@ -307,3 +323,15 @@ def test_the_gate_ok_carries_from_session_to_session_until_a_new_gate(tmp_path, 
     assert s.wait() == 0 and s.gate_ok_by() == "Kota"
     s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))  # a new gate needs its own OK
     assert s.wait() == 0 and s.gate_ok_by() is None
+
+
+def test_a_resumed_run_says_where_it_saved_although_its_manifest_names_no_dataset(tmp_path):
+    ds = _dataset(tmp_path / "ds_v1_20261028_153218", 10)
+    run = tmp_path / "20261028T064455Z-bi-x-v1-t1l1-s1"
+    run.mkdir()
+    (run / "manifest.json").write_text('{"artifacts": {"dataset_root": null, "repo_id_stamped": null}}')  # what a RESUME=true run writes
+    (run / "command.sh").write_text(f"ENV_FILE=x.env \\\nRESUME=true DATASET_ROOT={ds} \\\n  REPO_ID=Orboh/ds bash scripts/collect_bimanual.sh session t1l1-s1 2\n")
+    assert collect.saved_location(str(run)) == {"run_dir": str(run), "dataset_root": str(ds), "episodes": 10}  # from command.sh
+    (run / "command.sh").unlink()
+    assert collect.saved_location(str(run), resume_root=str(ds))["dataset_root"] == str(ds)  # from what the page passed
+    assert collect.saved_location(str(run))["dataset_root"] is None

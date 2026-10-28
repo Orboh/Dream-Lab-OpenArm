@@ -100,6 +100,38 @@ def dataset_episodes(root: str | None) -> int | None:
         return None
 
 
+def _command_value(path: pathlib.Path, key: str) -> str | None:
+    """`KEY=value` from a run's command.sh, where several assignments share one line (`RESUME=true DATASET_ROOT=/… \\`); None when missing."""
+    try:
+        match = re.search(rf"(?:^|\s){re.escape(key)}=(\S+)", path.read_text(encoding="utf-8"), re.M)
+    except OSError:
+        return None
+    return match.group(1).strip("\"'") or None if match else None
+
+
+def saved_location(run_dir: str | None, resume_root: str | None = None) -> dict:
+    """Where a finished run left its data (V5): the run folder and the dataset folder named in its manifest.json, each only when it exists.
+
+    A resumed run appends to an existing dataset and its manifest leaves `dataset_root` empty, so then the folder it resumed into is used:
+    `resume_root`, else the `DATASET_ROOT=` in its command.sh (10/28: "no dataset saved" was shown while the resumes saved 7 episodes).
+    @param run_dir The run folder the script printed (`~/collections/<UTC>-<tag>`), or None.
+    @param resume_root The dataset folder the page passed for a Resume, or None.
+    @return `{run_dir, dataset_root, episodes}`; a path is None when it is unknown or not on disk, `episodes` when the dataset is readable.
+    """
+    run = pathlib.Path(run_dir) if run_dir else None
+    if run is None or not run.is_dir():
+        return {"run_dir": None, "dataset_root": None, "episodes": None}
+    try:  # the stamped name is decided in Python (stamp_repo_id), so the manifest is the only sure source of the real folder
+        root = (json.loads((run / "manifest.json").read_text(encoding="utf-8")).get("artifacts") or {}).get("dataset_root")
+    except (OSError, ValueError, AttributeError):
+        root = None
+    if not root:
+        root = resume_root or _command_value(run / "command.sh", "DATASET_ROOT")
+    if not root or not pathlib.Path(root).is_dir():
+        root = None  # 10/26: three runs ended before a dataset was made
+    return {"run_dir": str(run), "dataset_root": root, "episodes": dataset_episodes(root)}
+
+
 def env_value(path: pathlib.Path, key: str) -> str:
     """`KEY=value` from a settings file ('' when missing); quotes and a trailing `# comment` are dropped."""
     try:
@@ -151,6 +183,8 @@ class CollectSession:
         self.saved = 0  # episodes the script reported as written to the dataset ("を保存した")
         self.rc: int | None = None
         self.run_dir: str | None = None
+        self.saved_to: dict | None = None  # where the last finished run saved (V5); None while one is going
+        self._resume_root: str | None = None  # the dataset a Resume appends to; its manifest does not name it
         self._mode = "dry"  # the mode of the current/last run
         self.proc: subprocess.Popen | None = None
         self._master: int | None = None
@@ -194,7 +228,8 @@ class CollectSession:
         env = {**os.environ, **extra, "TERM": "xterm", "PYTHONUNBUFFERED": "1"}
         self.lines.clear()
         self.phase, self.episode, self.started, self.rc, self.run_dir = "starting", 0, 0, None, None
-        self.saved = 0
+        self.saved, self.saved_to = 0, None
+        self._resume_root = opts.resume_root or None
         self.target, self.done = target, 0
         self._mode = opts.mode
         self.proc = subprocess.Popen(argv, stdin=slave, stdout=slave, stderr=slave, cwd=self.repo, env=env, start_new_session=True, close_fds=True)
@@ -244,8 +279,9 @@ class CollectSession:
             self.feed(buffer.decode("utf-8", "replace"))
         proc.wait()
         self._remember_dataset()  # before "finished", so the page offers Resume the moment it sees the run end
+        saved_to = saved_location(self.run_dir, self._resume_root)
         with self._lock:
-            self.rc = proc.returncode
+            self.rc, self.saved_to = proc.returncode, saved_to
             self.phase = "finished"
         try:
             os.close(master)
@@ -298,7 +334,7 @@ class CollectSession:
             left = None if self.target is None else max(self.target - self.done, 0)
             return {"phase": self.phase, "episode": self.episode, "started": self.started, "rc": self.rc, "run_dir": self.run_dir,
                     "target": self.target, "done": self.done, "left": left, "saved": self.saved,
-                    "lines": list(self.lines)[-last:], "active": self.active}
+                    "lines": list(self.lines)[-last:], "active": self.active, "saved_to": self.saved_to}
 
     # -- the set (gate / session) across runs -------------------------------------------------------------------------
     def _read_set(self) -> dict | None:

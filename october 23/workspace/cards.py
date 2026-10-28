@@ -136,10 +136,29 @@ def collect_card(snap: dict, lang: i18n.Lang = i18n.EN) -> str:
                 f'<div style="color:{GREY};font-size:13px;">{lang.t("col.left.detail", done=snap["done"], total=snap["target"])}</div>')
     folder = f'<div style="color:{GREY};font-size:12px;margin-top:4px;">{lang.t("col.run")}: {html.escape(snap["run_dir"])}</div>' if snap["run_dir"] else ""
     count = f'<div style="color:{GREY};font-size:12px;margin-top:4px;">{lang.t("col.episodes.done")}: {snap["started"]}</div>' if snap["started"] else ""
+    where = _saved_to(snap.get("saved_to"), lang) if phase == "finished" else ""
     tail = "\n".join(html.escape(line[:160]) for line in snap["lines"])
     log = (f'<div style="color:{GREY};font-size:11px;margin-top:6px;">{lang.t("col.log")}</div>'
            f'<pre style="margin:2px 0 0;font-size:11px;white-space:pre-wrap;max-height:180px;overflow:auto;">{tail}</pre>') if tail else ""
-    return _card(f'<div style="font-size:15px;font-weight:700;">{_dot(color)}{state}</div>{left}{count}{folder}{log}', color)
+    return _card(f'<div style="font-size:15px;font-weight:700;">{_dot(color)}{state}</div>{left}{where}{count}{folder}{log}', color)
+
+
+def _saved_to(where: dict | None, lang: i18n.Lang) -> str:
+    """The "saved to" box of a finished run (V5): the dataset folder and the run folder, only paths that exist; "nothing saved" when there is no dataset."""
+    import html
+
+    if where is None:
+        return ""
+    rows = []
+    if where.get("dataset_root"):
+        n = "" if where.get("episodes") is None else f' ({lang.t("col.where.episodes", n=where["episodes"])})'
+        rows.append(f'<div>{lang.t("col.where.dataset")}{n}:<br><code style="user-select:all;">{html.escape(where["dataset_root"])}</code></div>')
+    else:
+        rows.append(f'<div style="color:{AMBER};font-weight:700;">{lang.t("col.where.none")}</div>')
+    if where.get("run_dir"):
+        rows.append(f'<div style="margin-top:4px;">{lang.t("col.where.run")}:<br><code style="user-select:all;">{html.escape(where["run_dir"])}</code></div>')
+    return (f'<div style="margin-top:6px;padding:6px 8px;border:1px solid {GREY};border-radius:6px;font-size:12px;word-break:break-all;">'
+            f'<div style="font-weight:700;font-size:13px;margin-bottom:2px;">{lang.t("col.where")}</div>{"".join(rows)}</div>')
 
 
 # Keys for the Collect tab, as they were in the terminal. innerHTML never runs <script>, so the code rides on an image's onerror.
