@@ -70,6 +70,20 @@ def status_strip(receiving: dict[str, bool], clash: str | None, lang: i18n.Lang 
     return _big(f'<div style="{FONT}font-size:12px;padding:4px 2px;">{lights}<br>{verdict}</div>')
 
 
+def branch_strip(rows: list[dict], lang: i18n.Lang = i18n.EN) -> str:
+    """The branches collection runs on, under the top strip (V8): one quiet line when all are the default, a yellow box naming the ones that are not."""
+    import html
+
+    def name(row: dict) -> str:
+        current = html.escape(row["current"] or lang.t("branch.unknown"))
+        return f'{row["name"]} <b>{current}</b>' + ("" if row["ok"] else f' ({lang.t("branch.default", default=html.escape(row["default"]))})')
+
+    line = " &nbsp;·&nbsp; ".join(name(row) for row in rows)
+    if all(row["ok"] for row in rows):
+        return _big(f'<div style="{FONT}font-size:12px;padding:0 2px 4px;color:{GREY};">{lang.t("branch.title")}: {line}</div>')
+    return warning(f'{lang.t("branch.differs")}<br><span style="font-size:12px;">{line}</span>')
+
+
 def home_card(side: str, home_set: bool, has_path: bool, home_deg=None, lang: i18n.Lang = i18n.EN) -> str:
     """One arm's home: whether it is set, whether a path from rest is recorded, and the angles."""
     name = lang.t(f"side.{side}")

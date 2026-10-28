@@ -1194,6 +1194,22 @@ def test_the_collect_tab_follows_a_dataset_changed_outside_the_page_without_a_re
     assert p.lang.t("col.refreshed") in p.out_msg.content
 
 
+def test_the_top_of_the_page_shows_the_branches_and_follows_a_switch(panel):
+    rows = [{"name": "openarm-orboh", "current": "feat/takeei-wood-l1", "default": "feat/takeei-wood-l1", "ok": True},
+            {"name": "lerobot", "current": "feat/bi-openarm-soft-move-to", "default": "feat/bi-openarm-soft-move-to", "ok": True}]
+    panel.branches = lambda: rows
+    panel.branch_tick(force=True)
+    assert "feat/takeei-wood-l1" in panel.branch_strip.content and "⚠" not in panel.branch_strip.content
+    rows[1] = {**rows[1], "current": "main", "ok": False}  # switched in a terminal
+    panel.branch_tick()  # within a few seconds: not yet
+    assert "⚠" not in panel.branch_strip.content
+    panel._branches_at -= designer.BRANCH_EVERY_S
+    panel.branch_tick()
+    assert "⚠" in panel.branch_strip.content and "<b>main</b>" in panel.branch_strip.content
+    panel.set_language("ja")
+    assert "既定: feat/bi-openarm-soft-move-to" in panel.branch_strip.content
+
+
 def test_a_gate_waiting_for_its_ok_shows_the_confirmation_and_a_new_gate_is_refused_without_it(collecting, tmp_path):
     p = collecting
     (tmp_path / "ds" / "meta").mkdir(parents=True)

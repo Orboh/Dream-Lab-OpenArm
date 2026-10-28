@@ -342,6 +342,19 @@ def test_the_disk_stamp_changes_when_the_set_or_its_dataset_changes_outside_the_
     assert s.disk_stamp() != before
 
 
+def test_branches_reads_each_checkout_and_compares_it_with_the_default(tmp_path):
+    import subprocess
+
+    repo = tmp_path / "orboh"
+    subprocess.run(["git", "init", "-q", "-b", "feat/wood", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"], check=True)
+    rows = collect.branches({"openarm-orboh": (repo, "feat/wood"), "lerobot": (tmp_path / "missing", "feat/soft")})
+    assert rows[0] == {"name": "openarm-orboh", "current": "feat/wood", "default": "feat/wood", "ok": True}
+    assert rows[1]["current"] is None and rows[1]["ok"] is False
+    subprocess.run(["git", "-C", str(repo), "switch", "-q", "--detach"], check=True)
+    assert collect.current_branch(repo).startswith("HEAD (")
+
+
 def test_a_new_set_over_a_finished_gate_waiting_for_its_ok_needs_a_confirmation(tmp_path, env_file):
     ds = _dataset(tmp_path / "ds_v1_20261028_123834", 10)
     set_file = tmp_path / "set.json"
@@ -362,6 +375,15 @@ def test_the_confirmation_lets_a_new_gate_replace_one_waiting_for_its_ok(tmp_pat
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
     s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester", replace_set=True))
     assert s.wait() == 0 and json.loads(set_file.read_text())["dataset_root"] is None
+
+
+def test_the_default_branches_come_from_bootstrap_sh_or_its_last_known_values(tmp_path):
+    boot = tmp_path / "bootstrap.sh"
+    boot.write_text('OPENARM_BRANCH="${OPENARM_BRANCH:-dev/next}"\nLEROBOT_BRANCH="${LEROBOT_BRANCH:-feat/other}"\n')
+    found = collect.default_branches(boot)
+    assert found["openarm-orboh"][1] == "dev/next" and found["lerobot"][1] == "feat/other"
+    missing = collect.default_branches(tmp_path / "gone.sh")
+    assert missing["openarm-orboh"][1] == "dev/openarm-vla" and missing["lerobot"][1] == "feat/bi-openarm-soft-move-to"
 
 
 def test_a_session_needs_a_reviewed_gate_even_when_there_is_no_set_at_all(tmp_path, env_file):
