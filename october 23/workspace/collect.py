@@ -19,6 +19,20 @@ import time
 from collections.abc import Callable
 
 REPO = pathlib.Path("~/projects/openarm-orboh").expanduser()
+LEROBOT = pathlib.Path("~/projects/lerobot").expanduser()
+BOOTSTRAP = REPO / "scripts" / "bootstrap.sh"  # where Kento keeps the default pair of branches (OPENARM_BRANCH, LEROBOT_BRANCH)
+FALLBACK_BRANCHES = {"OPENARM_BRANCH": "main", "LEROBOT_BRANCH": "feat/bi-openarm-soft-move-to"}  # bootstrap.sh's values on 2026-11-03 (openarm-orboh's main line is `main` since then), used only when it cannot be read
+
+
+def default_branches(bootstrap: pathlib.Path = BOOTSTRAP) -> dict[str, tuple[pathlib.Path, str]]:
+    """The checkouts V8 watches and their default branch, read from bootstrap.sh (`OPENARM_BRANCH="${OPENARM_BRANCH:-main}"`),
+    so the page cannot drift from it. The collecting PC runs openarm-orboh on `main` (AGENTS.md §1, 2026-11-03 Kento), so yellow there means a wrong checkout."""
+    try:
+        text = pathlib.Path(bootstrap).read_text(encoding="utf-8")
+    except OSError:
+        text = ""
+    found = {key: (m.group(1) if (m := re.search(rf'^{key}="\$\{{{key}:-([^}}"]+)\}}"', text, re.M)) else value) for key, value in FALLBACK_BRANCHES.items()}
+    return {"openarm-orboh": (REPO, found["OPENARM_BRANCH"]), "lerobot": (LEROBOT, found["LEROBOT_BRANCH"])}
 DEFAULT_ENV = REPO / "config" / "bimanual-collect.kitakyushu_takeei_sort.env"
 COLLECTIONS = pathlib.Path("~/collections").expanduser()
 MODES = ("dry", "gate", "session")
@@ -162,6 +176,30 @@ def env_files(repo: pathlib.Path = REPO) -> list[pathlib.Path]:
 def env_summary(path: pathlib.Path) -> dict[str, str]:
     """The four values of a settings file the Collect tab shows ('' when one is missing)."""
     return {key: env_value(path, key) for key in ENV_SHOWN}
+
+
+def current_branch(repo: pathlib.Path) -> str | None:
+    """The branch a checkout is on (`HEAD (abc1234)` when detached), or None when it is not a git checkout."""
+    def git(*args: str) -> str | None:
+        try:
+            done = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, timeout=3, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return done.stdout.strip() if done.returncode == 0 else None
+
+    branch = git("rev-parse", "--abbrev-ref", "HEAD")
+    if branch == "HEAD":
+        return f"HEAD ({git('rev-parse', '--short', 'HEAD')})"
+    return branch
+
+
+def branches(repos: dict[str, tuple[pathlib.Path, str]] | None = None) -> list[dict]:
+    """Which branch openarm-orboh and lerobot are on, against the default (V8): `[{name, current, default, ok}]`; `current` None when unreadable."""
+    rows = []
+    for name, (path, default) in (repos or default_branches()).items():
+        current = current_branch(path)
+        rows.append({"name": name, "current": current, "default": default, "ok": current == default})
+    return rows
 
 
 def running_teleop(pgrep: Callable[[str], bool] | None = None) -> str | None:

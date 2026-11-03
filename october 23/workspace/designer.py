@@ -9,6 +9,7 @@ import datetime as dt
 import html
 import os
 import pathlib
+import time
 from collections.abc import Callable
 
 import numpy as np
@@ -32,6 +33,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 URDF = HERE.parent / "urdf" / "openarm_bimanual.urdf"
 MESH_ROOT = pathlib.Path("~/projects/openarm-orboh/openarm_description").expanduser()
 STATION = pathlib.Path("~/.dreamlabs/station.yaml").expanduser()
+BRANCH_EVERY_S = 5.0  # how often the top of the page re-reads the branches of openarm-orboh and lerobot (V8)
 MARK = "✅ "  # in front of the chosen button of a button group: viser draws all of them alike (2026-10-28)
 BLUE, RED, AMBER, GREEN, GREY = (60, 120, 220), (220, 50, 47), (255, 191, 0), (60, 180, 75), (150, 150, 150)
 JOINTS = 7
@@ -70,11 +72,12 @@ class EditorPanel:
     def __init__(self, server: viser.ViserServer, state: ed.EditorState, out_dir: pathlib.Path, operator: str, robot: RobotModel | None = None,
                  read_q: Callable[[str], np.ndarray] | None = None, station_keys: pathlib.Path | None = None,
                  cameras: list[dict[str, str]] | None = None, collector: collect.CollectSession | None = None,
-                 collect_env: pathlib.Path = collect.DEFAULT_ENV) -> None:
+                 collect_env: pathlib.Path = collect.DEFAULT_ENV, branches: Callable[[], list[dict]] = collect.branches) -> None:
         """@param collector Runs episode collection for the Collect tab (None: a new one). @param collect_env The collection settings file.
         @param server The viser server. @param state The editor state. @param out_dir Where Save writes. @param operator Who is editing.
         @param robot The drawn robot (None in tests). @param read_q Live joints per side (radians), or None. @param station_keys Where Export writes.
-        @param cameras RealSense name/serial pairs for the switchable feeds in the Home card, or None."""
+        @param cameras RealSense name/serial pairs for the switchable feeds in the Home card, or None.
+        @param branches Reads the branches shown at the top (tests replace it)."""
         self.server, self.state, self.out_dir, self.operator = server, state, pathlib.Path(out_dir), operator
         self.robot, self.read_q, self.cameras = robot, read_q, cameras
         self.lang = i18n.Lang("en")
@@ -82,6 +85,7 @@ class EditorPanel:
         self._marked: list = []  # button groups whose chosen button carries MARK
         self._marking = False
         self.collector = collector or collect.CollectSession()
+        self.branches = branches
         has_default = (startpose.pose_sets_dir() / collect.DEFAULT_POSE_SET).is_dir()
         self.collect_opts = collect.Options(env_file=collect_env, pose_set=collect.DEFAULT_POSE_SET if has_default else "")
         self._last_live: dict[str, np.ndarray] = {}
@@ -166,6 +170,10 @@ class EditorPanel:
         self.b_lang.on_click(lambda _e: None if self._marking else self.set_language(unmarked(self.b_lang.value)))
         self._mark_on_click(self.b_lang)
         self.status = g.add_html(cards.status_strip(self.receiving, None, self.lang))
+        self.branch_strip = g.add_html("")  # V8: the branches of openarm-orboh and lerobot, yellow when not the default
+        self._branches_at = 0.0
+        self._retext.append(lambda: self.branch_tick(force=True))
+        self.branch_tick(force=True)
         self.out_msg = g.add_markdown("")
         if self.cameras is not None:
             import viewer
@@ -666,6 +674,13 @@ class EditorPanel:
         self._resume_text()
         self._review_text()
 
+    def branch_tick(self, force: bool = False) -> None:
+        """Re-reads the branches of openarm-orboh and lerobot every few seconds, so a switch made in a terminal shows without a restart (V8)."""
+        if not force and time.monotonic() - self._branches_at < BRANCH_EVERY_S:
+            return
+        self._branches_at = time.monotonic()
+        self.branch_strip.content = cards.branch_strip(self.branches(), self.lang)
+
     def collect_refresh_clicked(self) -> None:
         """Collect tab, Refresh: reads the set and its dataset from disk again and says what it found (V7)."""
         self.collect_tick(force=True)
@@ -680,6 +695,7 @@ class EditorPanel:
         if seen == self._collect_seen and not force:
             return
         self._collect_seen = seen
+        self.branch_tick(force=True)  # a run that just started or ended: show the branches it used
         self.collect_card.content = cards.collect_card(snap, self.lang)
         self._collect_buttons()
 
@@ -1235,6 +1251,7 @@ def serve_designer(state: ed.EditorState, out_dir: pathlib.Path, operator: str, 
     try:
         while True:
             panel.collect_tick()
+            panel.branch_tick()
             panel.move_tick()
             if read_q is not None:
                 live, fresh = {}, {}
