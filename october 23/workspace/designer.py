@@ -422,7 +422,7 @@ class EditorPanel:
         self.f_mode.options = tuple(self.lang.t(f"col.mode.{m}") for m in collect.MODES)
         self.f_mode.value = self.f_mode.options[collect.MODES.index(o.mode)]
         self._mark_on_click(self.f_mode)
-        self.f_mode.on_click(lambda _e: self._keep_mode())
+        self.f_mode.on_click(lambda _e: (self._keep_mode(), self._tag_check()))
         self.f_tag = g.add_text("", o.tag)
         tx(self.f_tag, "label", "col.tag")
         self.tag_warn = g.add_html("")  # V6: a full-width or other bad character is refused as it is typed
@@ -516,6 +516,8 @@ class EditorPanel:
         for apply in self._env_labels:
             apply()
         self._pose_warning()
+        if hasattr(self, "tag_warn"):  # the aluminium task checks the tag by its own rule (V9)
+            self._tag_check()
 
     def _pose_warning(self) -> None:
         """Warns (yellow) when the start pose set typed on the page is not the one the task file names: on 10/26 sets A and B/C
@@ -636,8 +638,11 @@ class EditorPanel:
             "col.review.info", have=gate["have"], target=gate["target"], repo=gate.get("repo_id") or "?")
 
     def _tag_check(self) -> None:
-        """The session tag as it is typed: a full-width `s１` or any other bad character gets a yellow box under the field at once, and a session will not start (V6)."""
-        problem = collect.tag_problem(self.f_tag.value)
+        """The session tag as it is typed: a full-width `s１` or any other bad character gets a yellow box under the field at once, and a session will not start (V6).
+        With the aluminium task's settings file the tag must also be `t2-l3-c01` for a session, or name the issue code for a gate (V9)."""
+        modes = [unmarked(x) for x in self.f_mode.options]
+        mode = self._choice(self.f_mode, collect.MODES) if unmarked(self.f_mode.value) in modes else self.collect_opts.mode
+        problem = collect.tag_problem(self.f_tag.value, self._env_paths.get(self.f_envfile.value, self.collect_opts.env_file), mode)
         self.tag_warn.content = "" if problem is None else cards.warning(self._error_text(collect.CollectError(problem)))
         if problem is not None:
             self.out_msg.content = self._error_text(collect.CollectError(problem))

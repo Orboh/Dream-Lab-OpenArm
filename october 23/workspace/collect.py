@@ -1,4 +1,4 @@
-"""Starts and stops episode collection from the page: runs the existing `collect_bimanual.sh` unchanged, so the data is saved exactly as before.
+"""Starts and stops episode collection from the page: runs the existing `collect_bimanual.sh` unchanged (the aluminium task through `collect_alframe.sh`), so the data is saved exactly as before.
 
 The script reads its control keys (right arrow, left arrow, `a`, Esc) from a terminal, so the child gets a pseudo-terminal and the page types those keys into it.
 Nothing about the dataset or the run folder is decided here: LeRobot and `record_bimanual_openarm.sh` write them (`~/collections/<UTC>-<tag>/`).
@@ -45,6 +45,10 @@ RUN_DIR = re.compile(r"\[record-bi\] 記録: (\S+)|run_dir=(\S+)")
 RECORDING = re.compile(r"Recording episode (\d+)|録画中 episode (\d+)")  # lerobot's English log line, or the Japanese banner the fork prints since 2026-10
 TAG_SUFFIX = re.compile(r"[A-Za-z0-9-]+")  # the session tag goes into the scene-tag, which record_bimanual_openarm.sh allows only half-width letters, digits and - (instructions §3.3)
 OPERATOR_NAME = re.compile(r"[A-Za-z][A-Za-z0-9 ._-]*")  # half-width only: the name goes into the dataset's manifest as typed
+ALFRAME_SLUG = "ti_alframe"  # the aluminium frame task: collected through collect_alframe.sh, never collect_bimanual.sh directly (2026-11-03 Kento, V9)
+ALFRAME_TAG = re.compile(r"t\d+-l\d+[a-z]?-c0[1-4]")  # issue code + card c01-c04 (P1-P4), lower case: one run = one issue code on one card (collection-quickref §2)
+ALFRAME_ISSUE = re.compile(r"(t\d+-l\d+[a-z]?)(?:-c0[1-4])?", re.I)  # what the gate takes from the tag field: `t2-l3`, `T2-L3` or `t2-l3-c01`
+ALFRAME_OPERATOR = re.compile(r"[A-Za-z0-9._-]+")  # collect_alframe.sh refuses spaces in the operator
 ENV_SHOWN = ("TASK", "SCENE", "POSE_SET", "EPISODE_TIME_S")  # what the Collect tab shows of the chosen settings file (V2, 2026-10-28)
 SET_FILE = COLLECTIONS / ".collect-set.json"  # the last gate/session set: how many it asked for and where its dataset is, so a stopped set can be finished later
 
@@ -82,9 +86,18 @@ def command(opts: Options, repo: pathlib.Path = REPO) -> tuple[list[str], dict[s
     @param repo The openarm-orboh checkout.
     @return `(argv, extra_env)`; `extra_env` is added to this process's environment.
     """
-    argv = ["bash", str(repo / "scripts" / "collect_bimanual.sh"), opts.mode]
-    if opts.mode == "session":
-        argv.append(opts.tag)
+    if is_alframe(opts.env_file):  # `collect_alframe.sh <operator> <tag> [N]`, `<operator> gate <issue> [N]`, `<operator> dry [N]` (V9)
+        argv = ["bash", str(repo / "scripts" / "collect_alframe.sh"), opts.operator.strip()]
+        if opts.mode == "session":
+            argv.append(opts.tag.strip())
+        elif opts.mode == "gate":
+            argv += ["gate", gate_issue(opts.tag)]
+        else:
+            argv.append(opts.mode)
+    else:
+        argv = ["bash", str(repo / "scripts" / "collect_bimanual.sh"), opts.mode]
+        if opts.mode == "session":
+            argv.append(opts.tag)
     if opts.episodes > 0:  # the script takes the count as the last word: `gate N`, `dry N`, `session TAG N`
         argv.append(str(opts.episodes))
     env = {"ENV_FILE": str(opts.env_file), "PLAY_SOUNDS": str(opts.play_sounds).lower(), "BILATERAL_FEEDBACK": str(opts.bilateral).lower(),
@@ -106,11 +119,32 @@ def command(opts: Options, repo: pathlib.Path = REPO) -> tuple[list[str], dict[s
     return argv, env
 
 
-def tag_problem(tag: str) -> str | None:
-    """Why a session tag would be refused, as a message key ('' and a good tag: None). Checked as it is typed, so `s１` is caught before any run (V6)."""
+def is_alframe(env_file: pathlib.Path | str | None) -> bool:
+    """Whether the settings file is the aluminium frame task's (`TASK_SLUG=ti_alframe`), which runs through collect_alframe.sh (V9)."""
+    return bool(env_file) and env_value(pathlib.Path(env_file), "TASK_SLUG") == ALFRAME_SLUG
+
+
+def gate_issue(tag: str) -> str:
+    """The issue code a gate of the aluminium task records, from the tag field: `t2-l3` or `t2-l3-c01` -> `T2-L3`, `t1-l0a` -> `T1-L0a` ('' when unreadable)."""
+    match = ALFRAME_ISSUE.fullmatch(tag.strip())
+    if not match:
+        return ""
+    run, level = match.group(1).lower().split("-")
+    return f"T{run[1:]}-L{level[1:]}"
+
+
+def tag_problem(tag: str, env_file: pathlib.Path | str | None = None, mode: str = "session") -> str | None:
+    """Why a tag would be refused, as a message key ('' and a good tag: None). Checked as it is typed, so `s１` is caught before any run (V6).
+
+    With the aluminium task's settings file a session tag must be `t2-l3-c01` (issue code + card c01-c04) and a gate's field must name the issue code (V9)."""
     tag = tag.strip()
     if tag and not TAG_SUFFIX.fullmatch(tag):
         return f"col.err.tag.chars|{tag}"
+    if tag and is_alframe(env_file):
+        if mode == "session" and not ALFRAME_TAG.fullmatch(tag):
+            return f"col.err.tag.alframe|{tag}"
+        if mode == "gate" and not gate_issue(tag):
+            return f"col.err.tag.alframe.gate|{tag}"
     return None
 
 
@@ -254,12 +288,19 @@ class CollectSession:
             raise CollectError(f"col.err.env|{opts.env_file}")
         if opts.mode == "session" and not opts.tag.strip():
             raise CollectError("col.err.tag")
-        if opts.mode == "session" and tag_problem(opts.tag):  # before the set file is written: on 10/26 a full-width tag overwrote it and Resume was lost
-            raise CollectError(tag_problem(opts.tag))
+        alframe = is_alframe(opts.env_file)
+        if alframe and opts.mode == "gate" and not opts.tag.strip():
+            raise CollectError("col.err.tag.gate")
+        if opts.mode == "session" or (alframe and opts.mode == "gate"):  # before the set file is written: on 10/26 a full-width tag overwrote it and Resume was lost
+            problem = tag_problem(opts.tag, opts.env_file, opts.mode)
+            if problem:
+                raise CollectError(problem)
         if not opts.operator.strip():
             raise CollectError("col.err.operator")
         if not OPERATOR_NAME.fullmatch(opts.operator.strip()):
             raise CollectError(f"col.err.operator.chars|{opts.operator.strip()}")
+        if alframe and not ALFRAME_OPERATOR.fullmatch(opts.operator.strip()):
+            raise CollectError(f"col.err.operator.alframe|{opts.operator.strip()}")
         if opts.mode == "session":  # instructions §3.3: stop after the gate and show the reviewer; no session until the OK (V4)
             if self.review_pending() is not None:
                 raise CollectError("col.err.review")
