@@ -28,6 +28,7 @@ ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[()][A-Za-z0-9]|\r")
 TARGET = re.compile(r"\[collect-bi\] mode=\S+ .*?episodes=(\d+)")  # the line collect_bimanual.sh prints with the number asked for
 RUN_DIR = re.compile(r"\[record-bi\] 記録: (\S+)|run_dir=(\S+)")
 RECORDING = re.compile(r"Recording episode (\d+)|録画中 episode (\d+)")  # lerobot's English log line, or the Japanese banner the fork prints since 2026-10
+OPERATOR_NAME = re.compile(r"[A-Za-z][A-Za-z0-9 ._-]*")  # half-width only: the name goes into the dataset's manifest as typed
 SET_FILE = COLLECTIONS / ".collect-set.json"  # the last gate/session set: how many it asked for and where its dataset is, so a stopped set can be finished later
 
 
@@ -40,6 +41,7 @@ class Options:
     """What the Start button passes: the three words of `collect_bimanual.sh` plus the switches from the runbook (2026-10-19)."""
 
     mode: str = "dry"
+    operator: str = ""  # who records this run; passed as OPERATOR, which wins over the settings file's (all runs said Kota until 2026-10-28)
     tag: str = ""
     episodes: int = 0  # 0: the script's own default
     play_sounds: bool = True
@@ -69,6 +71,8 @@ def command(opts: Options, repo: pathlib.Path = REPO) -> tuple[list[str], dict[s
         argv.append(str(opts.episodes))
     env = {"ENV_FILE": str(opts.env_file), "PLAY_SOUNDS": str(opts.play_sounds).lower(), "BILATERAL_FEEDBACK": str(opts.bilateral).lower(),
            "SAVE_ON_EPISODE_END": str(opts.save_on_episode_end).lower()}
+    if opts.operator.strip():
+        env["OPERATOR"] = opts.operator.strip()
     if opts.episode_time_s > 0:  # a variable given by the caller wins over the settings file (collect_bimanual.sh)
         env["EPISODE_TIME_S"] = str(int(opts.episode_time_s))
     env["RETURN_ON_EPISODE_END"] = str(opts.return_on_episode_end).lower()
@@ -156,6 +160,10 @@ class CollectSession:
             raise CollectError(f"col.err.env|{opts.env_file}")
         if opts.mode == "session" and not opts.tag.strip():
             raise CollectError("col.err.tag")
+        if not opts.operator.strip():
+            raise CollectError("col.err.operator")
+        if not OPERATOR_NAME.fullmatch(opts.operator.strip()):
+            raise CollectError(f"col.err.operator.chars|{opts.operator.strip()}")
         argv, extra = self._argv_for(opts)
         target = opts.episodes or {"dry": 2, "gate": 10, "session": 10}[opts.mode]
         if opts.mode != "dry" and not opts.resume_root:  # a new set; a resume keeps the set it continues, a dry run leaves it alone
