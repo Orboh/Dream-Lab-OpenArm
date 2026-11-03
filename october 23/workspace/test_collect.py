@@ -419,3 +419,53 @@ def test_a_resumed_run_says_where_it_saved_although_its_manifest_names_no_datase
     (run / "command.sh").unlink()
     assert collect.saved_location(str(run), resume_root=str(ds))["dataset_root"] == str(ds)  # from what the page passed
     assert collect.saved_location(str(run))["dataset_root"] is None
+
+
+@pytest.fixture
+def alframe_env(tmp_path: pathlib.Path) -> pathlib.Path:
+    path = tmp_path / "bimanual-collect.ti_alframe.env"
+    path.write_text("TASK_SLUG=ti_alframe\n")
+    return path
+
+
+def test_the_aluminium_task_runs_through_collect_alframe_sh_with_the_operator_first(alframe_env, env_file):
+    # V9 (2026-11-03 Kento): the aluminium task goes through `collect_alframe.sh <operator> <tag> <N>`, never collect_bimanual.sh directly
+    r = pathlib.Path("/r")
+    argv, env = collect.command(collect.Options(mode="session", operator="Mune", tag="t2-l3-c01", episodes=5, env_file=alframe_env), r)
+    assert argv == ["bash", "/r/scripts/collect_alframe.sh", "Mune", "t2-l3-c01", "5"] and env["ENV_FILE"] == str(alframe_env)
+    argv, _ = collect.command(collect.Options(mode="session", operator="Mune", tag="t2-l3-c01", env_file=alframe_env), r)
+    assert argv == ["bash", "/r/scripts/collect_alframe.sh", "Mune", "t2-l3-c01"]  # empty count: the script's default
+    argv, _ = collect.command(collect.Options(mode="gate", operator="Mune", tag="t2-l3-c01", episodes=10, env_file=alframe_env), r)
+    assert argv == ["bash", "/r/scripts/collect_alframe.sh", "Mune", "gate", "T2-L3", "10"]
+    argv, _ = collect.command(collect.Options(mode="dry", operator="Mune", env_file=alframe_env), r)
+    assert argv == ["bash", "/r/scripts/collect_alframe.sh", "Mune", "dry"]
+    argv, _ = collect.command(collect.Options(mode="session", operator="Mune", tag="t1-l2-s1", env_file=env_file), r)
+    assert argv[:2] == ["bash", "/r/scripts/collect_bimanual.sh"]  # other tasks (wood) stay on collect_bimanual.sh
+
+
+def test_the_gate_reads_the_issue_code_from_the_tag_field():
+    assert collect.gate_issue("t2-l3") == "T2-L3" and collect.gate_issue("T2-L3") == "T2-L3" and collect.gate_issue("t2-l3-c04") == "T2-L3"
+    assert collect.gate_issue("t1-l0a") == "T1-L0a" and collect.gate_issue("t2-l3-c05") == "" and collect.gate_issue("") == ""
+
+
+def test_an_aluminium_session_tag_must_be_one_issue_code_on_one_card(alframe_env, env_file):
+    assert collect.tag_problem("t2-l3-c01", alframe_env) is None and collect.tag_problem("t1-l0a-c04", alframe_env) is None
+    for bad in ("s2", "t2-l3", "t2l3-c01", "t2-l3-c05", "t2-l3-c1", "T2-L3-C01", "t2-l3-c01-x", "t1-l1-t2-l3-c01"):
+        assert collect.tag_problem(bad, alframe_env) == f"col.err.tag.alframe|{bad}", bad
+    assert collect.tag_problem("s2", env_file) is None  # the wood task keeps its own rule (collect_bimanual.sh)
+    assert collect.tag_problem("t2-l3", alframe_env, "gate") is None and collect.tag_problem("c01", alframe_env, "gate") == "col.err.tag.alframe.gate|c01"
+    assert collect.tag_problem("", alframe_env) is None  # an empty field is not flagged as it is typed; Start refuses it
+
+
+def test_an_aluminium_run_is_refused_without_a_card_tag_an_issue_code_or_with_a_spaced_operator(tmp_path, alframe_env):
+    set_file = tmp_path / "set.json"
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match="col.err.tag.alframe"):
+        s.start(collect.Options(mode="session", tag="t2-l3-s2", env_file=alframe_env, operator="Mune"))
+    with pytest.raises(collect.CollectError, match="col.err.tag.gate$"):
+        s.start(collect.Options(mode="gate", env_file=alframe_env, operator="Mune"))
+    with pytest.raises(collect.CollectError, match="col.err.operator.alframe"):
+        s.start(collect.Options(mode="gate", tag="t2-l3", env_file=alframe_env, operator="Mune Saito"))
+    assert not set_file.exists()  # refused before the set file is written
+    s.start(collect.Options(mode="gate", tag="t2-l3", env_file=alframe_env, operator="Mune"))
+    assert s.wait() == 0

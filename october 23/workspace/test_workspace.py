@@ -1160,6 +1160,28 @@ def test_the_station_file_gives_dreams_ik_the_robots_column_for_both_arms():
         assert body.dream_keep_out(side)[0] in fragment[side]["keep_out"]
 
 
+def test_the_aluminium_task_flags_a_tag_without_the_card_as_it_is_typed(collecting, tmp_path):
+    import collect
+
+    p = collecting
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    (cfg / "bimanual-collect.ti_alframe.env").write_text("TASK_SLUG=ti_alframe\n")
+    (cfg / "bimanual-collect.ti_wood.env").write_text("TASK_SLUG=ti_wood\n")
+    p.collect_env_refresh()
+    p.f_envfile.value = "bimanual-collect.ti_alframe.env"
+    p._set_choice(p.f_mode, collect.MODES, "session")
+    p.f_tag.value = "t2-l3-s2"  # V9: one run = one issue code on one card (c01-c04)
+    assert "t2-l3-s2" in p.tag_warn.content and p.out_msg.content == p.lang.t("col.err.tag.alframe", what="t2-l3-s2")
+    p.f_tag.value = "t2-l3-c01"
+    assert p.tag_warn.content == ""
+    p.f_tag.value = "t2-l3-s2"
+    p.f_envfile.value = "bimanual-collect.ti_wood.env"  # the wood task keeps collect_bimanual.sh's rule
+    assert p.tag_warn.content == ""
+    opts = p._collect_options()
+    assert collect.command(opts)[0][1].endswith("collect_bimanual.sh")
+
+
 def test_a_full_width_tag_is_flagged_as_it_is_typed_and_a_stopped_set_asks_before_a_new_one(collecting, tmp_path):
     p = collecting
     p.f_tag.value = "s１"
