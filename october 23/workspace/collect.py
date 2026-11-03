@@ -29,6 +29,7 @@ TARGET = re.compile(r"\[collect-bi\] mode=\S+ .*?episodes=(\d+)")  # the line co
 RUN_DIR = re.compile(r"\[record-bi\] 記録: (\S+)|run_dir=(\S+)")
 RECORDING = re.compile(r"Recording episode (\d+)|録画中 episode (\d+)")  # lerobot's English log line, or the Japanese banner the fork prints since 2026-10
 OPERATOR_NAME = re.compile(r"[A-Za-z][A-Za-z0-9 ._-]*")  # half-width only: the name goes into the dataset's manifest as typed
+ENV_SHOWN = ("TASK", "SCENE", "POSE_SET", "EPISODE_TIME_S")  # what the Collect tab shows of the chosen settings file (V2, 2026-10-28)
 SET_FILE = COLLECTIONS / ".collect-set.json"  # the last gate/session set: how many it asked for and where its dataset is, so a stopped set can be finished later
 
 
@@ -108,6 +109,16 @@ def env_value(path: pathlib.Path, key: str) -> str:
     if not match:
         return ""
     return re.sub(r"\s+#.*$", "", match.group(1)).strip().strip("\"'")
+
+
+def env_files(repo: pathlib.Path = REPO) -> list[pathlib.Path]:
+    """The collection settings files a run can use: `config/bimanual-collect.*.env` in openarm-orboh, by name."""
+    return sorted((pathlib.Path(repo) / "config").glob("bimanual-collect.*.env"))
+
+
+def env_summary(path: pathlib.Path) -> dict[str, str]:
+    """The four values of a settings file the Collect tab shows ('' when one is missing)."""
+    return {key: env_value(path, key) for key in ENV_SHOWN}
 
 
 def running_teleop(pgrep: Callable[[str], bool] | None = None) -> str | None:

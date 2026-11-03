@@ -104,8 +104,9 @@ class EditorPanel:
         self.redraw()
 
     # -- GUI ------------------------------------------------------------------------------------------------------------
-    def _tx(self, handle, attr: str, key: str, **fields) -> None:
-        """Gives a widget its text in the current language now, and again whenever the language changes. A field given as a function is called each time."""
+    def _tx(self, handle, attr: str, key: str, **fields) -> Callable[[], None]:
+        """Gives a widget its text in the current language now, and again whenever the language changes. A field given as a function is called each time.
+        @return The function that sets the text again (to refresh it when a field's value changed)."""
         def apply() -> None:
             text = self.lang.t(key, **{k: (v() if callable(v) else v) for k, v in fields.items()})
             if isinstance(handle, viser.GuiTabHandle):  # viser has no public tab label setter: change the label and rebuild the tab row
@@ -115,6 +116,7 @@ class EditorPanel:
                 setattr(handle, attr, text)
         self._retext.append(apply)
         apply()
+        return apply
 
     def _choice(self, handle, keys: tuple[str, ...]) -> str:
         """The language-neutral key (`left`, `right`, `both`) of the option chosen in a dropdown or button group whose texts change with the language."""
@@ -400,6 +402,11 @@ class EditorPanel:
         self.f_collector = g.add_text("", os.environ.get("OPERATOR", ""))  # empty until typed (or OPERATOR=<name> at launch): Start waits for it
         tx(self.f_collector, "label", "col.operator")
         self.f_collector.on_update(lambda _e: self._collect_buttons())
+        self.f_envfile = g.add_dropdown("", ("-",))  # the task: which settings file collect_bimanual.sh reads (V2); options from collect_env_refresh
+        tx(self.f_envfile, "label", "col.env")
+        self.env_info = g.add_markdown("")
+        self._retext.append(self._env_info_text)
+        self._env_paths: dict[str, pathlib.Path] = {}
         self.f_mode = g.add_button_group("Mode", ("dry", "gate", "session"))
         tx(self.f_mode, "label", "col.mode")
         self._retext.append(self._relabel_mode)
@@ -412,11 +419,13 @@ class EditorPanel:
         # A text field, not a number: viser's number input never sends an emptied field, so clearing "12" left "1" behind (2026-10-26)
         self.f_episodes = g.add_text("", str(o.episodes) if o.episodes else "")
         tx(self.f_episodes, "label", "col.episodes")
-        env_time, env_pose = collect.env_value(o.env_file, "EPISODE_TIME_S") or "?", collect.env_value(o.env_file, "POSE_SET") or "?"
         self.f_time = g.add_number("", o.episode_time_s, min=0, max=3600, step=10)
-        tx(self.f_time, "label", "col.time", default=env_time)
         self.f_poseset = g.add_text("", o.pose_set)  # not f_pose: that is the Advanced "show robot at" dropdown
-        tx(self.f_poseset, "label", "col.pose", default=env_pose)
+        self._env_labels = (  # their "empty = settings file" hints follow the chosen file
+            tx(self.f_time, "label", "col.time", default=lambda: collect.env_value(self.collect_opts.env_file, "EPISODE_TIME_S") or "?"),
+            tx(self.f_poseset, "label", "col.pose", default=lambda: collect.env_value(self.collect_opts.env_file, "POSE_SET") or "?"))
+        self.f_envfile.on_update(lambda _e: self.collect_env_changed())
+        self.collect_env_refresh()
         folder = g.add_folder("Options", expand_by_default=False)
         tx(folder, "label", "col.opts")
         with folder:
@@ -455,6 +464,32 @@ class EditorPanel:
         self.b_ckill.on_click(lambda _e: self.collect_kill_clicked())
         self._collect_buttons()
 
+    def collect_env_refresh(self) -> None:
+        """Lists the settings files of openarm-orboh's config folder (plus the one given at launch, if it lives elsewhere) and selects the current one."""
+        config = pathlib.Path(self.collector.repo) / "config"
+        paths = collect.env_files(self.collector.repo)
+        current = pathlib.Path(self.collect_opts.env_file)
+        if current not in paths:
+            paths.append(current)
+        self._env_paths = {(f.name if f.parent == config else str(f)): f for f in paths}
+        self.f_envfile.options = tuple(self._env_paths)
+        self.f_envfile.value = next(name for name, f in self._env_paths.items() if f == current)
+        self.collect_env_changed()
+
+    def collect_env_changed(self) -> None:
+        """A task file was chosen: the next run reads it, and the page shows its TASK, SCENE, POSE_SET and EPISODE_TIME_S."""
+        path = self._env_paths.get(self.f_envfile.value)
+        if path is None:
+            return
+        self.collect_opts.env_file = path
+        self._env_info_text()
+        for apply in self._env_labels:
+            apply()
+
+    def _env_info_text(self) -> None:
+        v = collect.env_summary(self.collect_opts.env_file)
+        self.env_info.content = self.lang.t("col.env.info", task=v["TASK"] or "?", scene=v["SCENE"] or "?", pose=v["POSE_SET"] or "?", time=v["EPISODE_TIME_S"] or "?")
+
     def _relabel_mode(self) -> None:
         old = [unmarked(o) for o in self.f_mode.options]
         index = old.index(unmarked(self.f_mode.value)) if unmarked(self.f_mode.value) in old else 0
@@ -470,6 +505,7 @@ class EditorPanel:
         if count and not count.isdigit():
             raise collect.CollectError(f"col.err.episodes|{count}")
         o.operator, o.tag, o.episodes = self.f_collector.value.strip(), self.f_tag.value.strip(), int(count or 0)
+        o.env_file = self._env_paths.get(self.f_envfile.value, o.env_file)
         o.episode_time_s, o.pose_set = int(self.f_time.value), self.f_poseset.value.strip()
         o.play_sounds, o.bilateral, o.save_on_episode_end = bool(self.c_sounds.value), bool(self.c_bilateral.value), bool(self.c_saveend.value)
         o.start_pose_hold, o.start_countdown_s = bool(self.c_hold.value), int(self.f_countdown.value)
@@ -552,7 +588,7 @@ class EditorPanel:
     def _collect_fields(self) -> tuple:
         """The Collect tab's settings: frozen while a run is going, since one session keeps one operator and one set of values (instructions §1, 2026-10-28).
         Mode is not here: viser cannot disable a button group, so `_keep_mode` undoes a click on it instead."""
-        return (self.f_collector, self.f_tag, self.f_episodes, self.f_time, self.f_poseset,
+        return (self.f_collector, self.f_envfile, self.f_tag, self.f_episodes, self.f_time, self.f_poseset,
                 self.c_sounds, self.c_bilateral, self.c_saveend, self.c_return, self.c_hold, self.f_countdown)
 
     def _collect_buttons(self) -> None:
