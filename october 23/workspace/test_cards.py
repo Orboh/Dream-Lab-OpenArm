@@ -86,3 +86,13 @@ def test_checklist_warns_when_the_two_allowed_areas_overlap():
     items = {label: (ok, hint) for label, ok, hint in cards.build_checklist(state, th.TeachSession())}
     ok, hint = items["The two allowed areas do not overlap"]
     assert not ok and "3.8" in hint
+
+
+def test_collect_card_shows_where_a_finished_run_saved_or_that_nothing_was():
+    snap = {"phase": "finished", "rc": 0, "episode": 2, "started": 2, "run_dir": "/c/run", "target": 2, "done": 2, "left": 0, "saved": 2, "lines": [], "active": False,
+            "saved_to": {"run_dir": "/c/run", "dataset_root": "/hf/Orboh/ds_20261028_132329", "episodes": 2}}
+    html = cards.collect_card(snap)
+    assert "Saved to" in html and "/hf/Orboh/ds_20261028_132329" in html and "2 episodes" in html and "No dataset" not in html
+    snap["saved_to"] = {"run_dir": "/c/run", "dataset_root": None, "episodes": None}
+    assert "No dataset was saved" in cards.collect_card(snap)
+    assert "Saved to" not in cards.collect_card({**snap, "phase": "recording"})  # only once the run is over
