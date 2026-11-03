@@ -6,6 +6,7 @@ panel is in methods the buttons call, so it is tested without a browser; the pur
 """
 
 import datetime as dt
+import html
 import os
 import pathlib
 from collections.abc import Callable
@@ -424,6 +425,9 @@ class EditorPanel:
         self._env_labels = (  # their "empty = settings file" hints follow the chosen file
             tx(self.f_time, "label", "col.time", default=lambda: collect.env_value(self.collect_opts.env_file, "EPISODE_TIME_S") or "?"),
             tx(self.f_poseset, "label", "col.pose", default=lambda: collect.env_value(self.collect_opts.env_file, "POSE_SET") or "?"))
+        self.pose_warn = g.add_html("")  # V3: yellow when the start pose set differs from the task file's POSE_SET
+        self._retext.append(self._pose_warning)
+        self.f_poseset.on_update(lambda _e: self._pose_warning())
         self.f_envfile.on_update(lambda _e: self.collect_env_changed())
         self.collect_env_refresh()
         folder = g.add_folder("Options", expand_by_default=False)
@@ -485,6 +489,15 @@ class EditorPanel:
         self._env_info_text()
         for apply in self._env_labels:
             apply()
+        self._pose_warning()
+
+    def _pose_warning(self) -> None:
+        """Warns (yellow) when the start pose set typed on the page is not the one the task file names: on 10/26 sets A and B/C
+        used different start poses (wrist J7 97° left, 73° right apart) and nobody noticed until afterwards (V3, 2026-10-28)."""
+        page = self.f_poseset.value.strip()
+        file = collect.env_value(self.collect_opts.env_file, "POSE_SET")
+        differs = bool(page and file and page != file)
+        self.pose_warn.content = cards.warning(self.lang.t("col.pose.differs", page=html.escape(page), file=html.escape(file))) if differs else ""
 
     def _env_info_text(self) -> None:
         v = collect.env_summary(self.collect_opts.env_file)

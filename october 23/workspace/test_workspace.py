@@ -1098,6 +1098,26 @@ def test_choosing_a_task_file_shows_its_values_and_runs_with_it(collecting, tmp_
     assert p.f_envfile in p._collect_fields()  # frozen while a run is going, like the operator
 
 
+def test_a_start_pose_set_other_than_the_task_files_gets_a_yellow_warning(collecting, tmp_path):
+    import cards
+
+    p = collecting
+    cfg = tmp_path / "config"
+    cfg.mkdir()
+    (cfg / "bimanual-collect.wood.env").write_text("TASK=wood\nPOSE_SET=wood-pose\n")
+    p.collect_env_refresh()
+    p.f_envfile.value = "bimanual-collect.wood.env"
+    p.f_poseset.value = "takeei-v5"
+    assert cards.AMBER in p.pose_warn.content and "takeei-v5" in p.pose_warn.content and "wood-pose" in p.pose_warn.content
+    p.f_poseset.value = "wood-pose"
+    assert p.pose_warn.content == ""  # the same set: no warning
+    p.f_poseset.value = ""
+    assert p.pose_warn.content == ""  # empty uses the file's set
+    p.f_poseset.value = "takeei-v5"
+    p.set_language("日本語")
+    assert "takeei-v5" in p.pose_warn.content and p.pose_warn.content != ""
+
+
 def test_an_emptied_episode_count_means_the_default_and_a_bad_one_is_refused(collecting):
     p = collecting
     p.f_episodes.value = ""
