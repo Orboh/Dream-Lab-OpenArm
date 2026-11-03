@@ -194,6 +194,8 @@ STRINGS: dict[str, tuple[str, str]] = {
     "col.saveend": ("save the instant an episode ends", "エピソード終了の瞬間に保存"),
     "col.start": ("Start collection", "収集を開始"),
     "col.resume": ("Resume the stopped set (only the episodes left)", "途中から再開（残りの本数だけ録る）"),
+    "col.refresh": ("Refresh (read the set and its dataset again)", "更新（セットとデータセットを読み直す）"),
+    "col.refreshed": ("Read the set and its dataset again.", "セットとデータセットを読み直しました。"),
     "col.resume.info": ("Stopped set **{name}**: {have} of {total} saved. Resume records the remaining **{left}** into the same dataset.",
                         "中断したセット **{name}**: {total} 本中 {have} 本保存済み。「途中から再開」で残り **{left} 本** を同じデータセットに追加します。"),
     "col.err.noresume": ("There is no stopped set to resume.", "再開できる中断セットはありません。"),

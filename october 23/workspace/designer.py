@@ -462,6 +462,9 @@ class EditorPanel:
         self._retext.append(self._resume_text)
         self.b_cresume = g.add_button("", color="green")
         tx(self.b_cresume, "label", "col.resume")
+        self.b_crefresh = g.add_button("", color="gray")  # V7: re-reads the set and its dataset now (the page also does it by itself when they change)
+        tx(self.b_crefresh, "label", "col.refresh")
+        self.b_crefresh.on_click(lambda _e: self.collect_refresh_clicked())
         self.c_replace = g.add_checkbox("", False)  # V6: shown while a stopped set can be resumed; a new gate/session forgets it only when ticked
         tx(self.c_replace, "label", "col.replace")
         self.b_cnext = g.add_button("", color="green")
@@ -663,10 +666,17 @@ class EditorPanel:
         self._resume_text()
         self._review_text()
 
+    def collect_refresh_clicked(self) -> None:
+        """Collect tab, Refresh: reads the set and its dataset from disk again and says what it found (V7)."""
+        self.collect_tick(force=True)
+        todo = self.collector.pending()
+        self.out_msg.content = self.lang.t("col.refreshed") + ("" if todo is None else " " + self.resume_info.content)
+
     def collect_tick(self, force: bool = False) -> None:
-        """Refreshes the Collect card and its buttons when the run changed (called a few times a second)."""
+        """Refreshes the Collect card and its buttons when the run, or the set and its dataset on disk, changed (called a few times a second)."""
         snap = self.collector.snapshot()
-        seen = (snap["phase"], snap["episode"], snap["started"], snap["rc"], tuple(snap["lines"][-3:]), self.lang.code, bool(self.c_saveend.value), bool(self.c_return.value), snap["saved"], snap["done"])
+        seen = (snap["phase"], snap["episode"], snap["started"], snap["rc"], tuple(snap["lines"][-3:]), self.lang.code, bool(self.c_saveend.value), bool(self.c_return.value), snap["saved"], snap["done"],
+                self.collector.disk_stamp())  # V7: 10/26 the tab kept "0 left" and a disabled Resume after the dataset changed outside the page
         if seen == self._collect_seen and not force:
             return
         self._collect_seen = seen
