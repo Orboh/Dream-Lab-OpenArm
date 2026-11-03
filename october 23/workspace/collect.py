@@ -29,6 +29,7 @@ ANSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b[()][A-Za-z0-9]|\r")
 TARGET = re.compile(r"\[collect-bi\] mode=\S+ .*?episodes=(\d+)")  # the line collect_bimanual.sh prints with the number asked for
 RUN_DIR = re.compile(r"\[record-bi\] 記録: (\S+)|run_dir=(\S+)")
 RECORDING = re.compile(r"Recording episode (\d+)|録画中 episode (\d+)")  # lerobot's English log line, or the Japanese banner the fork prints since 2026-10
+TAG_SUFFIX = re.compile(r"[A-Za-z0-9-]+")  # the session tag goes into the scene-tag, which record_bimanual_openarm.sh allows only half-width letters, digits and - (instructions §3.3)
 OPERATOR_NAME = re.compile(r"[A-Za-z][A-Za-z0-9 ._-]*")  # half-width only: the name goes into the dataset's manifest as typed
 ENV_SHOWN = ("TASK", "SCENE", "POSE_SET", "EPISODE_TIME_S")  # what the Collect tab shows of the chosen settings file (V2, 2026-10-28)
 SET_FILE = COLLECTIONS / ".collect-set.json"  # the last gate/session set: how many it asked for and where its dataset is, so a stopped set can be finished later
@@ -57,6 +58,7 @@ class Options:
     pose_set: str = ""  # the start-pose set to use; "": the settings file's POSE_SET
     resume_root: str = ""  # an existing dataset folder to append to (RESUME=true); "": a new dataset
     resume_repo_id: str = ""  # its stamped repo id (…_v1_YYYYMMDD_HHMMSS), needed with resume_root
+    replace_set: bool = False  # a new gate/session may forget a set that stopped short (its resume record); False: refused until confirmed (V6)
 
 
 def command(opts: Options, repo: pathlib.Path = REPO) -> tuple[list[str], dict[str, str]]:
@@ -88,6 +90,14 @@ def command(opts: Options, repo: pathlib.Path = REPO) -> tuple[list[str], dict[s
     if opts.resume_root:  # record_bimanual_openarm.sh: RESUME needs the real folder and the stamped name, else it makes a new dataset
         env.update(RESUME="true", DATASET_ROOT=opts.resume_root, REPO_ID=opts.resume_repo_id)
     return argv, env
+
+
+def tag_problem(tag: str) -> str | None:
+    """Why a session tag would be refused, as a message key ('' and a good tag: None). Checked as it is typed, so `s１` is caught before any run (V6)."""
+    tag = tag.strip()
+    if tag and not TAG_SUFFIX.fullmatch(tag):
+        return f"col.err.tag.chars|{tag}"
+    return None
 
 
 def dataset_episodes(root: str | None) -> int | None:
@@ -206,6 +216,8 @@ class CollectSession:
             raise CollectError(f"col.err.env|{opts.env_file}")
         if opts.mode == "session" and not opts.tag.strip():
             raise CollectError("col.err.tag")
+        if opts.mode == "session" and tag_problem(opts.tag):  # before the set file is written: on 10/26 a full-width tag overwrote it and Resume was lost
+            raise CollectError(tag_problem(opts.tag))
         if not opts.operator.strip():
             raise CollectError("col.err.operator")
         if not OPERATOR_NAME.fullmatch(opts.operator.strip()):
@@ -217,6 +229,13 @@ class CollectSession:
                 raise CollectError("col.err.gateopen")
             if self.gate_ok_by() is None:  # no reviewed gate at all, e.g. after the set file was removed: 10/28 a session ran with no gate
                 raise CollectError("col.err.nogate")
+        if opts.mode != "dry" and not opts.resume_root and not opts.replace_set:  # a new set would overwrite the record of one that stopped short (V6)
+            todo = self.pending()
+            if todo is not None:
+                raise CollectError(f"col.err.replace|{todo['mode']}{' ' + todo['tag'] if todo.get('tag') else ''}: {todo['have']}/{todo['target']}")
+            gate = self.review_pending()  # or of a finished gate still waiting for its OK: a new gate replaced one of 10 on 10/28 14:54
+            if gate is not None:
+                raise CollectError(f"col.err.replace.review|{gate['have']}/{gate['target']}")
         argv, extra = self._argv_for(opts)
         target = opts.episodes or {"dry": 2, "gate": 10, "session": 10}[opts.mode]
         if opts.mode != "dry" and not opts.resume_root:  # a new set; a resume keeps the set it continues, a dry run leaves it alone

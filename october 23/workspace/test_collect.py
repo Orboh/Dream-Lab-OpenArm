@@ -266,7 +266,7 @@ def test_a_session_waits_until_the_gate_is_reviewed(tmp_path, env_file):
     assert s.review_pending()["have"] == 10
     with pytest.raises(collect.CollectError, match="col.err.review"):
         s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
-    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))  # dry and another gate are still allowed
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))  # a dry run is still allowed (a new gate needs the confirmation, see below)
     assert s.wait() == 0
     s.mark_reviewed("Kota")
     assert s.review_pending() is None
@@ -302,6 +302,53 @@ def test_a_finished_run_says_where_it_saved_and_only_paths_that_exist(tmp_path, 
     assert collect.saved_location(None)["run_dir"] is None and collect.saved_location(str(tmp_path / "gone"))["run_dir"] is None
 
 
+def test_a_full_width_tag_is_refused_before_the_set_file_is_touched(tmp_path, env_file):
+    assert collect.tag_problem("s2") is None and collect.tag_problem("") is None
+    assert collect.tag_problem("s１") == "col.err.tag.chars|s１" and collect.tag_problem("s 2") is not None
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": null, "repo_id": null}')
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match="col.err.tag.chars"):
+        s.start(collect.Options(mode="session", tag="s１", env_file=env_file, operator="Tester"))
+    assert json.loads(set_file.read_text())["mode"] == "gate"  # 10/26: this record was overwritten and Resume was lost
+
+
+def test_a_new_set_over_one_that_stopped_short_needs_a_confirmation(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 7)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "session", "tag": "s1", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds", "gate_reviewed_by": "Kota"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match=r"col.err.replace\|session s1: 7/10"):
+        s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester"))
+    assert json.loads(set_file.read_text())["tag"] == "s1"
+    s.start(collect.Options(mode="dry", env_file=env_file, operator="Tester"))  # a dry run does not touch the set
+    assert s.wait() == 0
+    s.start(collect.Options(mode="session", tag="s2", env_file=env_file, operator="Tester", replace_set=True))
+    assert s.wait() == 0 and json.loads(set_file.read_text())["tag"] == "s2"
+
+
+def test_a_new_set_over_a_finished_gate_waiting_for_its_ok_needs_a_confirmation(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds_v1_20261028_123834", 10)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "test", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    with pytest.raises(collect.CollectError, match=r"col.err.replace.review\|10/10"):  # 10/28 14:54: this gate was replaced without a word
+        s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))
+    assert json.loads(set_file.read_text())["dataset_root"] == str(ds)
+    s.mark_reviewed("Kota")  # once it has its OK, a new gate is an ordinary start
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))
+    assert s.wait() == 0
+
+
+def test_the_confirmation_lets_a_new_gate_replace_one_waiting_for_its_ok(tmp_path, env_file):
+    ds = _dataset(tmp_path / "ds", 10)
+    set_file = tmp_path / "set.json"
+    set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % ds)
+    s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester", replace_set=True))
+    assert s.wait() == 0 and json.loads(set_file.read_text())["dataset_root"] is None
+
+
 def test_a_session_needs_a_reviewed_gate_even_when_there_is_no_set_at_all(tmp_path, env_file):
     set_file = tmp_path / "set.json"  # 10/28: the set file was removed and a session ran with no gate
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
@@ -319,9 +366,9 @@ def test_the_gate_ok_carries_from_session_to_session_until_a_new_gate(tmp_path, 
     s = collect.CollectSession(repo=tmp_path, teleop_probe=lambda: None, argv_for=lambda o: ([sys.executable, "-c", "pass"], {}), set_file=set_file)
     s.start(collect.Options(mode="session", tag="t1l1-s1", env_file=env_file, operator="Tester"))
     assert s.wait() == 0 and json.loads(set_file.read_text())["gate_reviewed_by"] == "Kota"
-    s.start(collect.Options(mode="session", tag="t1l1-s2", env_file=env_file, operator="Tester"))  # the next session needs no new gate
+    s.start(collect.Options(mode="session", tag="t1l1-s2", env_file=env_file, operator="Tester", replace_set=True))  # no new gate; the empty s1 is replaced (V6)
     assert s.wait() == 0 and s.gate_ok_by() == "Kota"
-    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester"))  # a new gate needs its own OK
+    s.start(collect.Options(mode="gate", env_file=env_file, operator="Tester", replace_set=True))  # a new gate needs its own OK
     assert s.wait() == 0 and s.gate_ok_by() is None
 
 

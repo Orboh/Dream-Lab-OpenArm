@@ -1157,3 +1157,31 @@ def test_the_station_file_gives_dreams_ik_the_robots_column_for_both_arms():
     fragment = zb.station_fragment(raw, {"left": (0.0, 0.1), "right": (0.0, -0.1)})
     for side in ("left", "right"):
         assert body.dream_keep_out(side)[0] in fragment[side]["keep_out"]
+
+
+def test_a_full_width_tag_is_flagged_as_it_is_typed_and_a_stopped_set_asks_before_a_new_one(collecting, tmp_path):
+    p = collecting
+    p.f_tag.value = "s１"
+    assert "s１" in p.tag_warn.content and p.out_msg.content == p.lang.t("col.err.tag.chars", what="s１")
+    p.f_tag.value = "s2"
+    assert p.tag_warn.content == ""
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 7}')
+    p.collector.set_file.write_text('{"mode": "session", "tag": "s1", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds", "gate_reviewed_by": "Kota"}' % (tmp_path / "ds"))
+    p.collect_tick(force=True)
+    assert p.c_replace.visible is True
+    p.f_mode.value = p.f_mode.options[2]  # session
+    p.collect_start_clicked()
+    assert p.collector.phase == "idle" and "7/10" in p.out_msg.content
+
+
+def test_a_gate_waiting_for_its_ok_shows_the_confirmation_and_a_new_gate_is_refused_without_it(collecting, tmp_path):
+    p = collecting
+    (tmp_path / "ds" / "meta").mkdir(parents=True)
+    (tmp_path / "ds" / "meta" / "info.json").write_text('{"total_episodes": 10}')
+    p.collector.set_file.write_text('{"mode": "gate", "tag": "", "target": 10, "dataset_root": "%s", "repo_id": "Orboh/ds"}' % (tmp_path / "ds"))
+    p.collect_tick(force=True)
+    assert p.c_replace.visible is True and p.review_box.visible is True
+    p.f_mode.value = p.f_mode.options[1]  # gate
+    p.collect_start_clicked()
+    assert p.collector.phase == "idle" and p.out_msg.content == p.lang.t("col.err.replace.review", what="10/10")

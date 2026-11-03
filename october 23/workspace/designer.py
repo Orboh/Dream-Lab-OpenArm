@@ -417,6 +417,9 @@ class EditorPanel:
         self.f_mode.on_click(lambda _e: self._keep_mode())
         self.f_tag = g.add_text("", o.tag)
         tx(self.f_tag, "label", "col.tag")
+        self.tag_warn = g.add_html("")  # V6: a full-width or other bad character is refused as it is typed
+        self._retext.append(self._tag_check)
+        self.f_tag.on_update(lambda _e: self._tag_check())
         # A text field, not a number: viser's number input never sends an emptied field, so clearing "12" left "1" behind (2026-10-26)
         self.f_episodes = g.add_text("", str(o.episodes) if o.episodes else "")
         tx(self.f_episodes, "label", "col.episodes")
@@ -459,6 +462,8 @@ class EditorPanel:
         self._retext.append(self._resume_text)
         self.b_cresume = g.add_button("", color="green")
         tx(self.b_cresume, "label", "col.resume")
+        self.c_replace = g.add_checkbox("", False)  # V6: shown while a stopped set can be resumed; a new gate/session forgets it only when ticked
+        tx(self.c_replace, "label", "col.replace")
         self.b_cnext = g.add_button("", color="green")
         tx(self.b_cnext, "label", "col.next")
         self.b_crerecord = g.add_button("", color="gray")
@@ -533,6 +538,7 @@ class EditorPanel:
         o.play_sounds, o.bilateral, o.save_on_episode_end = bool(self.c_sounds.value), bool(self.c_bilateral.value), bool(self.c_saveend.value)
         o.start_pose_hold, o.start_countdown_s = bool(self.c_hold.value), int(self.f_countdown.value)
         o.return_on_episode_end = bool(self.c_return.value)
+        o.replace_set = bool(self.c_replace.value)
         return o
 
     def _error_text(self, exc: collect.CollectError) -> str:
@@ -558,6 +564,7 @@ class EditorPanel:
             if self.cams is not None:
                 self.cams.close()
             self.collector.start(opts)
+            self.c_replace.value = False  # one confirmation per new set
             self.out_msg.content = self.lang.t("col.state.starting") + " " + self.lang.t("col.count", mode=opts.mode, n=self.collector.target) + note
         except collect.CollectError as exc:
             self.out_msg.content = self._error_text(exc)
@@ -617,6 +624,13 @@ class EditorPanel:
         self.review_info.content = "" if gate is None else self.lang.t(
             "col.review.info", have=gate["have"], target=gate["target"], repo=gate.get("repo_id") or "?")
 
+    def _tag_check(self) -> None:
+        """The session tag as it is typed: a full-width `s１` or any other bad character gets a yellow box under the field at once, and a session will not start (V6)."""
+        problem = collect.tag_problem(self.f_tag.value)
+        self.tag_warn.content = "" if problem is None else cards.warning(self._error_text(collect.CollectError(problem)))
+        if problem is not None:
+            self.out_msg.content = self._error_text(collect.CollectError(problem))
+
     def _keep_mode(self) -> None:
         """A click on Mode while a run is going is undone: the mark stays on the mode that is running."""
         if self._marking or not self.collector.active:
@@ -645,6 +659,7 @@ class EditorPanel:
         nobody = not self.f_collector.value.strip()  # every run is recorded under a name, so nothing starts without one
         self.b_cstart.disabled = running or nobody
         self.b_cresume.disabled = running or nobody or self.collector.pending() is None
+        self.c_replace.visible = not running and (self.collector.pending() is not None or self.collector.review_pending() is not None)
         self._resume_text()
         self._review_text()
 
