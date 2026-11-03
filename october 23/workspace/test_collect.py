@@ -383,7 +383,7 @@ def test_the_default_branches_come_from_bootstrap_sh_or_its_last_known_values(tm
     found = collect.default_branches(boot)
     assert found["openarm-orboh"][1] == "dev/next" and found["lerobot"][1] == "feat/other"
     missing = collect.default_branches(tmp_path / "gone.sh")
-    assert missing["openarm-orboh"][1] == "dev/openarm-vla" and missing["lerobot"][1] == "feat/bi-openarm-soft-move-to"
+    assert missing["openarm-orboh"][1] == "main" and missing["lerobot"][1] == "feat/bi-openarm-soft-move-to"
 
 
 def test_a_session_needs_a_reviewed_gate_even_when_there_is_no_set_at_all(tmp_path, env_file):

@@ -21,12 +21,12 @@ from collections.abc import Callable
 REPO = pathlib.Path("~/projects/openarm-orboh").expanduser()
 LEROBOT = pathlib.Path("~/projects/lerobot").expanduser()
 BOOTSTRAP = REPO / "scripts" / "bootstrap.sh"  # where Kento keeps the default pair of branches (OPENARM_BRANCH, LEROBOT_BRANCH)
-FALLBACK_BRANCHES = {"OPENARM_BRANCH": "dev/openarm-vla", "LEROBOT_BRANCH": "feat/bi-openarm-soft-move-to"}  # bootstrap.sh's values on 2026-10-28, used only when it cannot be read
+FALLBACK_BRANCHES = {"OPENARM_BRANCH": "main", "LEROBOT_BRANCH": "feat/bi-openarm-soft-move-to"}  # bootstrap.sh's values on 2026-11-03 (openarm-orboh's main line is `main` since then), used only when it cannot be read
 
 
 def default_branches(bootstrap: pathlib.Path = BOOTSTRAP) -> dict[str, tuple[pathlib.Path, str]]:
-    """The checkouts V8 watches and their default branch, read from bootstrap.sh (`OPENARM_BRANCH="${OPENARM_BRANCH:-dev/openarm-vla}"`),
-    so the page cannot drift from it. This PC's openarm-orboh is not on its default on purpose (instructions §1), so yellow is expected there."""
+    """The checkouts V8 watches and their default branch, read from bootstrap.sh (`OPENARM_BRANCH="${OPENARM_BRANCH:-main}"`),
+    so the page cannot drift from it. The collecting PC runs openarm-orboh on `main` (AGENTS.md §1, 2026-11-03 Kento), so yellow there means a wrong checkout."""
     try:
         text = pathlib.Path(bootstrap).read_text(encoding="utf-8")
     except OSError:

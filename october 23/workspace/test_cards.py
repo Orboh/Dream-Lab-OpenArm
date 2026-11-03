@@ -99,10 +99,10 @@ def test_collect_card_shows_where_a_finished_run_saved_or_that_nothing_was():
 
 
 def test_branch_strip_is_quiet_on_the_defaults_and_yellow_naming_the_one_that_is_not():
-    ok = [{"name": "openarm-orboh", "current": "feat/takeei-wood-l1", "default": "feat/takeei-wood-l1", "ok": True},
+    ok = [{"name": "openarm-orboh", "current": "main", "default": "main", "ok": True},
           {"name": "lerobot", "current": "feat/bi-openarm-soft-move-to", "default": "feat/bi-openarm-soft-move-to", "ok": True}]
     html = cards.branch_strip(ok)
-    assert "feat/takeei-wood-l1" in html and "feat/bi-openarm-soft-move-to" in html and "⚠" not in html
+    assert "openarm-orboh <b>main</b>" in html and "feat/bi-openarm-soft-move-to" in html and "⚠" not in html
     off = [ok[0], {"name": "lerobot", "current": "main", "default": "feat/bi-openarm-soft-move-to", "ok": False}]
     html = cards.branch_strip(off)
     assert "⚠" in html and "<b>main</b>" in html and "default: feat/bi-openarm-soft-move-to" in html

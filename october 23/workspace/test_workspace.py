@@ -1195,11 +1195,11 @@ def test_the_collect_tab_follows_a_dataset_changed_outside_the_page_without_a_re
 
 
 def test_the_top_of_the_page_shows_the_branches_and_follows_a_switch(panel):
-    rows = [{"name": "openarm-orboh", "current": "feat/takeei-wood-l1", "default": "feat/takeei-wood-l1", "ok": True},
+    rows = [{"name": "openarm-orboh", "current": "main", "default": "main", "ok": True},
             {"name": "lerobot", "current": "feat/bi-openarm-soft-move-to", "default": "feat/bi-openarm-soft-move-to", "ok": True}]
     panel.branches = lambda: rows
     panel.branch_tick(force=True)
-    assert "feat/takeei-wood-l1" in panel.branch_strip.content and "⚠" not in panel.branch_strip.content
+    assert "openarm-orboh <b>main</b>" in panel.branch_strip.content and "⚠" not in panel.branch_strip.content
     rows[1] = {**rows[1], "current": "main", "ok": False}  # switched in a terminal
     panel.branch_tick()  # within a few seconds: not yet
     assert "⚠" not in panel.branch_strip.content
